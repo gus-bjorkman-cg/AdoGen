@@ -5,8 +5,23 @@
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
     </PropertyGroup>
+    
+    <PropertyGroup>
+        <PackageId>AdoGen.Abstractions</PackageId>
+        <Version>0.0.0-localbuild</Version>
+        <Authors>Gus Björkman</Authors>
+        <RepositoryUrl>https://github.com/gus-bjorkman-cg/AdoGen</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <IncludeSymbols>true</IncludeSymbols>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+<!--        <SymbolPackageFormat>snupkg</SymbolPackageFormat>-->
+        <Description>Abstractions for AdoGen source generator.</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.3" />
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.102" PrivateAssets="All" />
     </ItemGroup>
 </Project>

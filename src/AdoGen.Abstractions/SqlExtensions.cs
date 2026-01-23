@@ -110,20 +110,20 @@ public static class SqlExtensions
             return await command.Query<T>(ct);
         }
 
-        public async ValueTask<T> QueryFirstOrDefaultAsync<T>(string sql, CancellationToken ct, CommandType commandType = CommandType.Text, SqlTransaction? transaction = null) where T : ISqlResult<T>
+        public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(string sql, CancellationToken ct, CommandType commandType = CommandType.Text, SqlTransaction? transaction = null) where T : ISqlResult<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction);
             return await command.QueryFirstOrDefault<T>(ct);
         }
         
-        public async ValueTask<T> QueryFirstOrDefaultAsync<T>(string sql, SqlParameter parameter, CancellationToken ct, CommandType commandType = CommandType.Text, SqlTransaction? transaction = null) where T : ISqlResult<T>
+        public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(string sql, SqlParameter parameter, CancellationToken ct, CommandType commandType = CommandType.Text, SqlTransaction? transaction = null) where T : ISqlResult<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction);
             command.Parameters.Add(parameter);
             return await command.QueryFirstOrDefault<T>(ct);
         }
         
-        public async ValueTask<T> QueryFirstOrDefaultAsync<T>(string sql, IEnumerable<SqlParameter> parameters, CancellationToken ct, CommandType commandType = CommandType.Text, SqlTransaction? transaction = null) where T : ISqlResult<T>
+        public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(string sql, IEnumerable<SqlParameter> parameters, CancellationToken ct, CommandType commandType = CommandType.Text, SqlTransaction? transaction = null) where T : ISqlResult<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction);
             foreach (var parameter in parameters)

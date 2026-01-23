@@ -2,8 +2,8 @@ using System.Data;
 using System.Text;
 using Microsoft.Data.SqlClient;
 using AdoGen.Abstractions;
+using AdoGen.Sample.Features.Users;
 using Testcontainers.MsSql;
-using User = AdoGen.Sample.Features.Users.User;
 
 namespace AdoGen.Benchmarks;
 

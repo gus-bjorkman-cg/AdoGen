@@ -49,7 +49,7 @@ public static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MissingSqlResultInterface = new(
         id: "AG006",
         title: "Cannot find ISqlResult interface",
-        messageFormat: "Could not resolve '{0}'. Ensure StronglyTypedSql.Abstractions is referenced.",
+        messageFormat: "Could not resolve '{0}'. Ensure AdoGen.Abstractions is referenced.",
         category: Category,
         DiagnosticSeverity.Error, true);
 

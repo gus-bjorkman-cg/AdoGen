@@ -1,7 +1,0 @@
-<Solution>
-  <Project Path="src\AdoGen.Abstractions\AdoGen.Abstractions.csproj" />
-  <Project Path="src\AdoGen.Benchmarks\AdoGen.Benchmarks.csproj" />
-  <Project Path="src\AdoGen.Generator\AdoGen.Generator.csproj" />
-  <Project Path="examples\AdoGen.Sample\AdoGen.Sample.csproj" />
-  <Project Path="src\AdoGen.Tests\AdoGen.Tests.csproj" />
-</Solution>
