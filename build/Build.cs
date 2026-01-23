@@ -36,7 +36,6 @@ class Build : NukeBuild
     Project AbstractionsProject;
     Project GeneratorProject;
     Project TestProject;
-    GitHubActions GitHubActions => GitHubActions.Instance;
     
     static AbsolutePath OutputDirectory => RootDirectory / "output";
     static AbsolutePath SourceDirectory => RootDirectory / "src";
