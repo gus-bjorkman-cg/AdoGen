@@ -1,10 +1,16 @@
 using Nuke.Common;
+using Nuke.Common.CI.GitHubActions;
 using Nuke.Common.Git;
 using Nuke.Common.IO;
 using Nuke.Common.ProjectModel;
 using Nuke.Common.Tools.DotNet;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
+[GitHubActions(
+    "continuous",
+    GitHubActionsImage.UbuntuLatest,
+    On = [GitHubActionsTrigger.Push],
+    InvokedTargets = [nameof(Pack)])]
 class Build : NukeBuild
 {
     public static int Main () => Execute<Build>(x => x.Compile);
@@ -30,6 +36,7 @@ class Build : NukeBuild
     Project AbstractionsProject;
     Project GeneratorProject;
     Project TestProject;
+    GitHubActions GitHubActions => GitHubActions.Instance;
     
     static AbsolutePath OutputDirectory => RootDirectory / "output";
     static AbsolutePath SourceDirectory => RootDirectory / "src";
