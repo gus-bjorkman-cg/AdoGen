@@ -29,6 +29,9 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 | DapperList        | 413.7 us | 10.07 us | 28.91 us | 400.5 us | 1.9531 |  21.39 KB |
 ```
 
+Example usage
+-------------------
+
 ```csharp
 public sealed partial record User(Guid Id, string Name, string Email) : ISqlResult;
 
@@ -36,8 +39,8 @@ public sealed class UserProfile : SqlProfile<User>
 {
     public UserProfile()
     {
-        Configure(x => x.Name).VarChar(20);
-        Configure(x => x.Email).VarChar(50);
+        RuleFor(x => x.Name).VarChar(20);
+        RuleFor(x => x.Email).VarChar(50);
     }
 }
 
