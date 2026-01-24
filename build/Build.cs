@@ -9,11 +9,24 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 [GitHubActions(
     "continuous",
     GitHubActionsImage.UbuntuLatest,
-    On = [GitHubActionsTrigger.Push],
-    InvokedTargets = [nameof(Pack)])]
+    On = [GitHubActionsTrigger.Push, GitHubActionsTrigger.PullRequest],
+    InvokedTargets = [nameof(CI)], 
+        CacheKeyFiles = ["**/global.json", "**/*.csproj", "**/Directory.Packages.props"])]
 class Build : NukeBuild
 {
     public static int Main () => Execute<Build>(x => x.Compile);
+    
+    [Solution(GenerateProjects = true)]
+    readonly Solution Solution;
+    [GitRepository] 
+    readonly GitRepository GitRepo;
+    
+    static AbsolutePath OutputDirectory => RootDirectory / "output";
+    static AbsolutePath SourceDirectory => RootDirectory / "src";
+    
+    Project AbstractionsProject;
+    Project GeneratorProject;
+    Project TestProject;
     
     protected override void OnBuildInitialized()
     {
@@ -30,18 +43,12 @@ class Build : NukeBuild
     [Parameter("Package version to produce. Default: 0.1.0.0")]
     readonly string PackageVersion = "0.1.0.0";
     
-    [Solution(GenerateProjects = true)]
-    readonly Solution Solution;
+    bool IsMainBranch => GitRepo != null && GitRepo!.Branch!.Equals("refs/heads/main");
     
-    Project AbstractionsProject;
-    Project GeneratorProject;
-    Project TestProject;
-    
-    static AbsolutePath OutputDirectory => RootDirectory / "output";
-    static AbsolutePath SourceDirectory => RootDirectory / "src";
-    
-    [GitRepository]
-    readonly GitRepository GitRepo;
+    Target CI => x => x
+        .Description("Entry target for both local and CI builds")
+        .DependsOn(Pack).OnlyWhenDynamic(() => IsServerBuild && IsMainBranch)
+        .DependsOn(Test).OnlyWhenDynamic(() => !IsServerBuild || !IsMainBranch);
     
     Target Clean => x => x
         .Executes(() =>
@@ -54,7 +61,7 @@ class Build : NukeBuild
 
     Target Compile => x => x
         .DependsOn(Restore)
-        .Executes(() => DotNetBuild(x => x.SetProjectFile(Solution).EnableNoRestore()));
+        .Executes(() => DotNetBuild(x => x.SetProjectFile(Solution).EnableNoRestore().SetConfiguration(Configuration)));
     
     Target Test => x => x
         .DependsOn(Compile)
@@ -70,7 +77,7 @@ class Build : NukeBuild
             DotNetPack(s => s
                 .SetProject(AbstractionsProject)
                 .SetConfiguration(Configuration)
-                .SetOutputDirectory("artifacts")
+                .SetOutputDirectory(OutputDirectory)
                 .SetNoBuild(true)
                 .SetProperty("Version", PackageVersion)
                 .SetProperty("PackageVersion", PackageVersion)
@@ -81,7 +88,7 @@ class Build : NukeBuild
             DotNetPack(s => s
                 .SetProject(GeneratorProject)
                 .SetConfiguration(Configuration)
-                .SetOutputDirectory("artifacts")
+                .SetOutputDirectory(OutputDirectory)
                 .SetNoBuild(true)
                 .SetProperty("Version", PackageVersion)
                 .SetProperty("PackageVersion", PackageVersion)
