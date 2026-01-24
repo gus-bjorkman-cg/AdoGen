@@ -47,7 +47,7 @@ class Build : NukeBuild
     
     Target CI => x => x
         .Description("Entry target for both local and CI builds")
-        .DependsOn(Pack).OnlyWhenDynamic(() => IsServerBuild && IsMainBranch)
+        .DependsOn(PublishArtifacts).OnlyWhenDynamic(() => IsServerBuild && IsMainBranch)
         .DependsOn(Test).OnlyWhenDynamic(() => !IsServerBuild || !IsMainBranch);
     
     Target Clean => x => x
@@ -96,4 +96,9 @@ class Build : NukeBuild
                 .SetProperty("FileVersion", PackageVersion)
             );
         });
+    
+    Target PublishArtifacts => x => x
+        .DependsOn(Pack)
+        .Produces(OutputDirectory / "*.nupkg")
+        .Produces(OutputDirectory / "*.snupkg");
 }
