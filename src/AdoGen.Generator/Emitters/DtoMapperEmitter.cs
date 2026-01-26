@@ -10,7 +10,6 @@ namespace AdoGen.Generator.Emitters;
 
 internal static class DtoMapperEmitter
 {
-    private const string AggressiveInlining = "[MethodImpl(MethodImplOptions.AggressiveInlining)]";
     private const string AbstractionsLib = "AdoGen.Abstractions";
     private const string InterfaceSqlResult = $"{AbstractionsLib}.ISqlResult";
 
@@ -93,7 +92,6 @@ internal static class DtoMapperEmitter
             {
                 private static bool IsInitialized;
             {{ordinals}}
-                {{AggressiveInlining}}
                 public static {{dtoTypeName}} Map(SqlDataReader reader)
                 {
                     if (!IsInitialized)
@@ -111,9 +109,8 @@ internal static class DtoMapperEmitter
     }
 
     private const string EnumHelper =
-        $$"""
+        """
          
-             {{AggressiveInlining}}
              private static TEnum EnumCast<TUnderlying, TEnum>(TUnderlying value)
                  where TUnderlying : unmanaged
                  where TEnum : unmanaged

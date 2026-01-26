@@ -11,7 +11,7 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
     GitHubActionsImage.UbuntuLatest,
     On = [GitHubActionsTrigger.Push, GitHubActionsTrigger.PullRequest],
     InvokedTargets = [nameof(CI)], 
-        CacheKeyFiles = ["**/global.json", "**/*.csproj", "**/Directory.Packages.props"])]
+    CacheKeyFiles = ["**/global.json", "**/*.csproj", "**/Directory.Packages.props"])]
 class Build : NukeBuild
 {
     public static int Main () => Execute<Build>(x => x.Compile);
