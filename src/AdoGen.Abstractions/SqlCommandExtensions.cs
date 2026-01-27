@@ -10,12 +10,13 @@ public static class SqlCommandExtensions
 {
     extension(SqlCommand command)
     {
-        public async ValueTask<List<T>> Query<T>(CancellationToken ct)
+        public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
             where T : ISqlResult<T>
         {
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 
-            await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+            await using var reader = await command
+                .ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
         
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return [];
             
@@ -25,19 +26,20 @@ public static class SqlCommandExtensions
             return items;
         }
 
-        public async ValueTask<T?> QueryFirstOrDefault<T>(CancellationToken ct)
+        public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
             where T : ISqlResult<T>
         {
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 
-            await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+            await using var reader = await command
+                .ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return default;
         
             return reader.Map<T>();
         }
 
-        public async ValueTask<SqlDataReader> QueryMulti(CancellationToken ct)
+        public async ValueTask<SqlDataReader> QueryMultiAsync(CancellationToken ct)
         {
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
         

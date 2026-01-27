@@ -16,7 +16,7 @@ public abstract class TestBase : IAsyncLifetime
     protected static CancellationToken Ct => TestContext.CancellationToken;
     
     protected static readonly Faker<User> UserFaker = new Faker<User>()
-        .CustomInstantiator(x => new User(Guid.CreateVersion7(), x.Person.FullName, x.Person.Email));
+        .CustomInstantiator(x => new User(Guid.CreateVersion7(), x.Person.FirstName, x.Person.Email));
 
     protected TestBase(TestContext testContext)
     {
@@ -33,15 +33,15 @@ public abstract class TestBase : IAsyncLifetime
     
     async ValueTask IAsyncLifetime.InitializeAsync()
     {
-        await Connection.Insert(DefaultUsers, Ct);
-        await Connection.Insert(DefaultOrders, Ct);
+        await Connection.InsertAsync(DefaultUsers, Ct);
+        await Connection.InsertAsync(DefaultOrders, Ct);
         await InitializeAsync();
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync()
     {
-        await Connection.Truncate<User>(Ct);
-        await Connection.Truncate<Order>(Ct);
+        await Connection.TruncateAsync<User>(Ct);
+        await Connection.TruncateAsync<Order>(Ct);
         await DisposeAsync();
         Connection.Dispose();
         GC.SuppressFinalize(this);

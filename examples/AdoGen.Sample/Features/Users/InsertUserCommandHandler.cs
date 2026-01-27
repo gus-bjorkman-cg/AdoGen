@@ -8,7 +8,7 @@ public sealed class InsertUserCommandHandler(string connectionString)
     {
         await using var connection = new SqlConnection(connectionString);
         var user = new User(Guid.CreateVersion7(), command.Name, command.Email);
-        await connection.Insert(user, ct);
+        await connection.InsertAsync(user, ct);
         
         return user;
     }

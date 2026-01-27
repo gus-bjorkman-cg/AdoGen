@@ -23,8 +23,8 @@ public sealed class TestContext : IAsyncLifetime
         await connection.OpenAsync(CancellationToken);
         await using var command = connection.CreateCommand(SqlCreateDb);
         await command.ExecuteNonQueryAsync(CancellationToken);
-        await connection.CreateTable<User>(CancellationToken);
-        await connection.CreateTable<Order>(CancellationToken);
+        await connection.CreateTableAsync<User>(CancellationToken);
+        await connection.CreateTableAsync<Order>(CancellationToken);
     }
 
     public async ValueTask DisposeAsync() => await _msSqlContainer.DisposeAsync();

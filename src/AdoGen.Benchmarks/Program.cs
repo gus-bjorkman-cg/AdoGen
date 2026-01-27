@@ -1,4 +1,4 @@
 ﻿using BenchmarkDotNet.Running;
 using AdoGen.Benchmarks;
 
-BenchmarkRunner.Run<AppBenchmarks>();
+new BenchmarkSwitcher(typeof(IAssemblyMarker).Assembly).Run(args, new CommonConfig());
