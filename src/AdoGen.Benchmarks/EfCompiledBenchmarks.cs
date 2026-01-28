@@ -34,14 +34,15 @@ public class EfCompiledBenchmarks : TestBase
         await CompiledByName(dbContext, name).FirstOrDefaultAsync(CancellationToken);
     }
     
-    private static readonly Func<TestDbContext, IAsyncEnumerable<UserModel>> CompiledUsersAll =
-        EF.CompileAsyncQuery((TestDbContext context) => context.Users.AsNoTracking().Take(10));
+    private static readonly Func<TestDbContext, int, IAsyncEnumerable<UserModel>> CompiledUsersAll =
+        EF.CompileAsyncQuery((TestDbContext context, int skip) => context.Users.AsNoTracking().OrderBy(x => x.Id).Take(10).Skip(skip));
     
     [Benchmark]
     [BenchmarkCategory("QueryAsync")]
     public async Task QueryAsync()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
-        await CompiledUsersAll(dbContext).ToListAsync(CancellationToken);
+        await CompiledUsersAll(dbContext, Index).ToListAsync(CancellationToken);
+        Index += 10;
     }
 }

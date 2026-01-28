@@ -1,3 +1,4 @@
+using System.Data;
 using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
@@ -32,7 +33,15 @@ public class AdoGenBenchmarks : TestBase
     public async Task QueryAsync()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
-        await sqlConnection.QueryAsync<User>(SqlGetTen, CancellationToken);
+        var param = new SqlParameter
+        {
+            ParameterName = "offset",
+            Value = Index,
+            Direction = ParameterDirection.Input,
+            DbType = DbType.Int32
+        };
+        await sqlConnection.QueryAsync<User>(SqlGetTen, param, CancellationToken);
+        Index += 10;
     }
 
     [Benchmark]
@@ -54,11 +63,13 @@ public class AdoGenBenchmarks : TestBase
         await sqlConnection.InsertAsync(users, CancellationToken);
     }
 }
+
 public static class FakerExtensions
 {
-    public static Faker<T> WithDefaultConstructor<T>(this Faker<T> faker) where T : class => faker.CustomInstantiator(_ =>
-    {
-        var constructor = typeof(T).GetConstructors().First();
-        return (T)constructor.Invoke(new object[constructor.GetParameters().Length]);
-    }); 
+    public static Faker<T> WithDefaultConstructor<T>(this Faker<T> faker) where T : class =>
+        faker.CustomInstantiator(_ =>
+        {
+            var constructor = typeof(T).GetConstructors()[0];
+            return (T)constructor.Invoke(new object[constructor.GetParameters().Length]);
+        });
 }

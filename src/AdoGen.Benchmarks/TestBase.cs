@@ -17,7 +17,7 @@ public abstract class TestBase
 
     private const string SqlCreateDb = "CREATE DATABASE [TestDb]";
     protected const string SqlGetOne = "SELECT TOP(1) * FROM Users WHERE Name = @Name";
-    protected const string SqlGetTen = "SELECT TOP(10) * FROM Users";
+    protected const string SqlGetTen = "SELECT * FROM Users ORDER BY ID OFFSET @offset ROWS FETCH NEXT 10 ROWS ONLY;";
     
     [GlobalSetup]
     public async Task InitializeAsync()

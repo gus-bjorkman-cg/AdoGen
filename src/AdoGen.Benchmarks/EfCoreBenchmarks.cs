@@ -47,7 +47,8 @@ public class EfCoreBenchmarks : TestBase
     public async Task QueryAsync()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
-        await dbContext.Users.AsNoTracking().Take(10).ToListAsync(CancellationToken);
+        await dbContext.Users.AsNoTracking().OrderBy(x => x.Id).Take(10).Skip(Index).ToListAsync(CancellationToken);
+        Index += 10;
     }
     
     [Benchmark]

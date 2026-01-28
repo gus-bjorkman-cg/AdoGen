@@ -37,12 +37,16 @@ public class DapperBenchmarks : TestBase
     [BenchmarkCategory("QueryAsync")]
     public async Task QueryAsync()
     {
+        var parameters = new DynamicParameters();
+        parameters.Add("offset", Index, DbType.Int32);
         var command = new CommandDefinition(
             commandText: SqlGetTen,
             commandType: CommandType.Text, 
+            parameters: parameters,
             cancellationToken: CancellationToken);
         
         await using var sqlConnection = new SqlConnection(ConnectionString);
         (await sqlConnection.QueryAsync<User>(command)).AsList();
+        Index += 10;
     }
 }
