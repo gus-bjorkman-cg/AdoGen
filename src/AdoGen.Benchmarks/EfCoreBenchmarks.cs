@@ -29,8 +29,8 @@ public class EfCoreBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("QueryFirstOrDefaultAsync")]
-    public async Task QueryFirstOrDefaultAsync()
+    [BenchmarkCategory("FirstOrDefault")]
+    public async Task FirstOrDefault()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
         var name = Index.ToString();
@@ -43,8 +43,8 @@ public class EfCoreBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("QueryAsync")]
-    public async Task QueryAsync()
+    [BenchmarkCategory("ToList")]
+    public async Task ToList()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
         await dbContext.Users.AsNoTracking().OrderBy(x => x.Id).Take(10).Skip(Index).ToListAsync(CancellationToken);
@@ -52,8 +52,8 @@ public class EfCoreBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("AddAsync")]
-    public async Task AddAsync()
+    [BenchmarkCategory("Insert")]
+    public async Task Insert()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
         UserStream.MoveNext();
@@ -63,8 +63,8 @@ public class EfCoreBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("AddRangeAsync")]
-    public async Task AddRangeAsync()
+    [BenchmarkCategory("InsertMulti")]
+    public async Task InsertMulti()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
         var users = UserFaker.Generate(10);

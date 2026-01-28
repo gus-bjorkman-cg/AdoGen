@@ -19,8 +19,8 @@ public class AdoGenBenchmarks : TestBase
     private static readonly IEnumerator<User> UserStream = UserFaker.GenerateForever().GetEnumerator();
 
     [Benchmark]
-    [BenchmarkCategory("QueryFirstOrDefaultAsync")]
-    public async Task QueryFirstOrDefaultAsync()
+    [BenchmarkCategory("FirstOrDefault")]
+    public async Task FirstOrDefault()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         var param = UserSql.CreateParameterName(Index.ToString());
@@ -29,8 +29,8 @@ public class AdoGenBenchmarks : TestBase
     }
 
     [Benchmark]
-    [BenchmarkCategory("QueryAsync")]
-    public async Task QueryAsync()
+    [BenchmarkCategory("ToList")]
+    public async Task ToList()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         var param = new SqlParameter
@@ -45,8 +45,8 @@ public class AdoGenBenchmarks : TestBase
     }
 
     [Benchmark]
-    [BenchmarkCategory("AddAsync")]
-    public async Task AddAsync()
+    [BenchmarkCategory("Insert")]
+    public async Task Insert()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         UserStream.MoveNext();
@@ -55,8 +55,8 @@ public class AdoGenBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("AddRangeAsync")]
-    public async Task AddRangeAsync()
+    [BenchmarkCategory("InsertMulti")]
+    public async Task InsertMulti()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         var users = UserFaker.Generate(10);

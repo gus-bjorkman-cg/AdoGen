@@ -24,8 +24,8 @@ public class EfCompiledBenchmarks : TestBase
             context.Users.AsNoTracking().Where(u => u.Name == name));
     
     [Benchmark]
-    [BenchmarkCategory("QueryFirstOrDefaultAsync")]
-    public async Task QueryFirstOrDefaultAsync()
+    [BenchmarkCategory("FirstOrDefault")]
+    public async Task FirstOrDefault()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
         var name = Index.ToString();
@@ -38,8 +38,8 @@ public class EfCompiledBenchmarks : TestBase
         EF.CompileAsyncQuery((TestDbContext context, int skip) => context.Users.AsNoTracking().OrderBy(x => x.Id).Take(10).Skip(skip));
     
     [Benchmark]
-    [BenchmarkCategory("QueryAsync")]
-    public async Task QueryAsync()
+    [BenchmarkCategory("ToList")]
+    public async Task ToList()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
         await CompiledUsersAll(dbContext, Index).ToListAsync(CancellationToken);

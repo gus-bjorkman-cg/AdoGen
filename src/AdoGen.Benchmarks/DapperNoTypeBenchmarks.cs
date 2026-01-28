@@ -18,8 +18,8 @@ public class DapperNoTypeBenchmarks : TestBase
     private static readonly IEnumerator<User> UserStream = UserFaker.GenerateForever().GetEnumerator();
     
     [Benchmark]
-    [BenchmarkCategory("QueryFirstOrDefaultAsync")]
-    public async Task QueryFirstOrDefaultAsync()
+    [BenchmarkCategory("FirstOrDefault")]
+    public async Task FirstOrDefault()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         var param = new { Name = Index.ToString() };
@@ -29,8 +29,8 @@ public class DapperNoTypeBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("QueryAsync")]
-    public async Task QueryAsync()
+    [BenchmarkCategory("ToList")]
+    public async Task ToList()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         
@@ -41,8 +41,8 @@ public class DapperNoTypeBenchmarks : TestBase
     private const string SqlInsert = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES (@Id, @Name, @Email);";
     
     [Benchmark]
-    [BenchmarkCategory("AddAsync")]
-    public async Task AddAsync()
+    [BenchmarkCategory("Insert")]
+    public async Task Insert()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         UserStream.MoveNext();
@@ -51,8 +51,8 @@ public class DapperNoTypeBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("AddRangeAsync")]
-    public async Task AddRangeAsync()
+    [BenchmarkCategory("InsertMulti")]
+    public async Task InsertMulti()
     {
         await using var sqlConnection = new SqlConnection(ConnectionString);
         var users = UserFaker.Generate(10);

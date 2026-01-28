@@ -10,8 +10,8 @@ namespace AdoGen.Benchmarks;
 public class DapperBenchmarks : TestBase
 {
     [Benchmark]
-    [BenchmarkCategory("QueryFirstOrDefaultAsync")]
-    public async Task QueryFirstOrDefaultAsync()
+    [BenchmarkCategory("FirstOrDefault")]
+    public async Task FirstOrDefault()
     {
         var parameters = new DynamicParameters();
         parameters.Add("Name", new DbString
@@ -34,8 +34,8 @@ public class DapperBenchmarks : TestBase
     }
     
     [Benchmark]
-    [BenchmarkCategory("QueryAsync")]
-    public async Task QueryAsync()
+    [BenchmarkCategory("ToList")]
+    public async Task ToList()
     {
         var parameters = new DynamicParameters();
         parameters.Add("offset", Index, DbType.Int32);
