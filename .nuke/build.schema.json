@@ -29,6 +29,7 @@
         "Compile",
         "Pack",
         "PublishArtifacts",
+        "PublishNuGet",
         "Restore",
         "Test"
       ]
@@ -111,6 +112,11 @@
             "Debug",
             "Release"
           ]
+        },
+        "NuGetApiKey": {
+          "type": "string",
+          "description": "NuGet API key (from GH secret or env NUGET_API_KEY)",
+          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
         "PackageVersion": {
           "type": "string",

@@ -1,0 +1,16 @@
+<Project>
+    <PropertyGroup>
+        <Deterministic>true</Deterministic>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Authors>Björkman, Gus</Authors>
+        <Version>0.0.0-localbuild</Version>
+        <RepositoryUrl>https://github.com/gus-bjorkman-cg/AdoGen</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/gus-bjorkman-cg/AdoGen</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    </PropertyGroup>
+</Project>

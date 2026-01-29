@@ -10,8 +10,8 @@ internal sealed class ParamConfig
     public required string ParameterName { get; set; }
     public SqlDbType? DbType { get; set; }
     public int? Size { get; set; }
-    public byte? Precision { get; set; }
-    public byte? Scale { get; set; }
+    public int? Precision { get; set; }
+    public int? Scale { get; set; }
     public bool? IsNullable { get; set; }
     public string? DefaultSqlExpression { get; set; }
 }

@@ -10,6 +10,12 @@ public static class SqlCommandExtensions
 {
     extension(SqlCommand command)
     {
+        /// <summary>
+        /// Executes the SQL and maps the objects by using the source generated mapper.
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
             where T : ISqlResult<T>
         {
@@ -26,6 +32,12 @@ public static class SqlCommandExtensions
             return items;
         }
 
+        /// <summary>
+        /// Executes the SQL and maps the object by using the source generated mapper.
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
             where T : ISqlResult<T>
         {
@@ -39,6 +51,11 @@ public static class SqlCommandExtensions
             return reader.Map<T>();
         }
 
+        /// <summary>
+        /// Opens the connection if not opened and executes the reader.
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <returns></returns>
         public async ValueTask<SqlDataReader> QueryMultiAsync(CancellationToken ct)
         {
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
@@ -46,6 +63,13 @@ public static class SqlCommandExtensions
             return await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         }
         
+        /// <summary>
+        /// Creates a Sql parameter and adds it to the SqlCommand.
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="value"></param>
+        /// <param name="type"></param>
+        /// <param name="size"></param>
         public void CreateParameter(string name, 
             object? value, 
             SqlDbType type,

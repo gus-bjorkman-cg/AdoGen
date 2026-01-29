@@ -8,16 +8,9 @@
     
     <PropertyGroup>
         <PackageId>AdoGen.Abstractions</PackageId>
-        <Version>0.0.0-localbuild</Version>
-        <Authors>Gus Björkman</Authors>
-        <RepositoryUrl>https://github.com/gus-bjorkman-cg/AdoGen</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
         <IncludeSymbols>true</IncludeSymbols>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-<!--        <SymbolPackageFormat>snupkg</SymbolPackageFormat>-->
         <Description>Abstractions for AdoGen source generator.</Description>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>

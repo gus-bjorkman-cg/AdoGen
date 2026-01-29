@@ -72,8 +72,7 @@ internal static class DtoMapperEmitter
             read.AppendLine($"            {p.Name} {sep} {getterExpr}{(isLast ? "" : ",")}");
         }
 
-        if (setUsingConstructor) read.Append(')');
-        else read.AppendLine("        }");
+        read.Append(setUsingConstructor ? "        )" : "        }");
 
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
@@ -251,5 +250,4 @@ internal static class DtoMapperEmitter
         ["global::System.Guid"] = "Guid"
         // DateOnly / TimeOnly are special-cased (not direct Get* methods)
     };
-
 }
