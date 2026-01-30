@@ -13,7 +13,9 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 [GitHubActions(
     "continuous",
     GitHubActionsImage.UbuntuLatest,
-    On = [GitHubActionsTrigger.Push, GitHubActionsTrigger.PullRequest],
+    OnPushBranches = ["**"],
+    OnPullRequestBranches = ["**"],
+    OnPushTags = ["v*"],
     InvokedTargets = [nameof(CI)], 
     ImportSecrets = [nameof(NuGetApiKey)],
     CacheKeyFiles = ["**/global.json", "**/*.csproj", "**/Directory.Packages.props"])]
@@ -47,7 +49,6 @@ class Build : NukeBuild
     Project GeneratorProject;
     Project TestProject;
 
-    bool IsMainBranch;
     bool IsTagBuild;
     
     public static int Main () => Execute<Build>(x => x.Compile);
@@ -60,7 +61,6 @@ class Build : NukeBuild
         GeneratorProject = Solution.AdoGen_Generator;
         TestProject = Solution.AdoGen_Tests;
         IsTagBuild = GitRepo?.Branch?.StartsWith(TagPath) == true;
-        IsMainBranch = GitRepo != null && GitRepo!.Branch!.Equals("refs/heads/main");
     }
     
     string ExtractReleaseNotes(string tagVersion)
@@ -104,8 +104,8 @@ class Build : NukeBuild
     
     Target CI => x => x
         .Description("Entry target for both local and CI builds")
-        .DependsOn(PublishNuGet).OnlyWhenDynamic(() => IsServerBuild && IsMainBranch)
-        .DependsOn(Test).OnlyWhenDynamic(() => !IsServerBuild || !IsMainBranch);
+        .DependsOn(PublishNuGet).OnlyWhenDynamic(() => IsServerBuild && IsTagBuild)
+        .DependsOn(Test).OnlyWhenDynamic(() => !IsServerBuild || !IsTagBuild);
     
     Target Clean => x => x
         .Description("Deleting SourceDirectory obj and bin folders")
@@ -148,10 +148,10 @@ class Build : NukeBuild
                 .SetNoBuild(true)
                 .EnableNoLogo()
                 .EnableNoRestore()
-                .SetProperty("Version", PackageVersion)
-                .SetProperty("PackageVersion", PackageVersion)
-                .SetProperty("AssemblyVersion", PackageVersion)
-                .SetProperty("FileVersion", PackageVersion)
+                .SetProperty("Version", version)
+                .SetProperty("PackageVersion", version)
+                .SetProperty("AssemblyVersion", version)
+                .SetProperty("FileVersion", version)
                 .SetProperty("IncludeSymbols", "true")
                 .SetProperty("SymbolPackageFormat", "snupkg")
                 .SetProperty("PackageReleaseNotes", notes));
@@ -163,10 +163,10 @@ class Build : NukeBuild
                 .SetNoBuild(true)
                 .EnableNoLogo()
                 .EnableNoRestore()
-                .SetProperty("Version", PackageVersion)
-                .SetProperty("PackageVersion", PackageVersion)
-                .SetProperty("AssemblyVersion", PackageVersion)
-                .SetProperty("FileVersion", PackageVersion)
+                .SetProperty("Version", version)
+                .SetProperty("PackageVersion", version)
+                .SetProperty("AssemblyVersion", version)
+                .SetProperty("FileVersion", version)
                 .SetProperty("IncludeSymbols", "false")
                 .SetProperty("SymbolPackageFormat", "snupkg")
                 .SetProperty("PackageReleaseNotes", notes));
@@ -178,24 +178,30 @@ class Build : NukeBuild
         .Produces(OutputDirectory / "*.nupkg")
         .Produces(OutputDirectory / "*.snupkg");
     
-    Target PublishNuGet => _ => _
+    Target PublishNuGet => x => x
         .DependsOn(PublishArtifacts)
-        .OnlyWhenDynamic(() => IsServerBuild && IsMainBranch && IsTagBuild)
+        .OnlyWhenDynamic(() => IsServerBuild && IsTagBuild)
         .Requires(() => !string.IsNullOrWhiteSpace(NuGetApiKey))
         .Executes(() =>
         {
             var generator = OutputDirectory.GlobFiles("AdoGen.Generator*.nupkg").Single();
-            var abstractions = OutputDirectory.GlobFiles("AdoGen.Abstractions*.snupkg").Single();
+            var abstractions = OutputDirectory.GlobFiles("AdoGen.Abstractions*.nupkg").Single();
+            var abstractionsSym = OutputDirectory.GlobFiles("AdoGen.Abstractions*.snupkg").Single();
             
             DotNetNuGetPush(s => s
                 .SetTargetPath(generator)
                 .SetSource(NugetSource)
                 .SetApiKey(NuGetApiKey)
-                .EnableNoSymbols()
                 .EnableSkipDuplicate());
-            
+
             DotNetNuGetPush(s => s
                 .SetTargetPath(abstractions)
+                .SetSource(NugetSource)
+                .SetApiKey(NuGetApiKey)
+                .EnableSkipDuplicate());
+
+            DotNetNuGetPush(s => s
+                .SetTargetPath(abstractionsSym)
                 .SetSource(NugetSource)
                 .SetApiKey(NuGetApiKey)
                 .EnableSkipDuplicate());
