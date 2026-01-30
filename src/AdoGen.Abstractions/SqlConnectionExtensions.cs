@@ -7,6 +7,9 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Abstractions;
 
+/// <summary>
+/// Extensions class for SqlConnection. 
+/// </summary>
 public static class SqlConnectionExtensions
 {
     extension(SqlConnection connection)

@@ -5,8 +5,14 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Abstractions;
 
+/// <summary>
+/// Interface used to generate ado gen mapper and sql helper class.
+/// </summary>
 public interface ISqlResult;
 
+/// <summary>
+/// Interface used by ado gen to make mapping extension to work.
+/// </summary>
 public interface ISqlResult<out T> where T : ISqlResult<T>
 {
     /// <summary>
@@ -17,8 +23,14 @@ public interface ISqlResult<out T> where T : ISqlResult<T>
     static abstract T Map(SqlDataReader reader);
 }
 
+/// <summary>
+/// Interface used to generate ado gen domain operations class.
+/// </summary>
 public interface ISqlDomainModel : ISqlResult;
 
+/// <summary>
+/// Interface used by ado gen to make domain operations class to work.
+/// </summary>
 public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
 {
     /// <summary>

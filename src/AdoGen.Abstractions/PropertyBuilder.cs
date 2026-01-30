@@ -5,13 +5,11 @@ using System.Linq.Expressions;
 namespace AdoGen.Abstractions;
 
 /// <summary>
-/// Constructor configured SQL profiles.
 /// The generator inspects the constructor body and reads calls to RuleFor(...).
+/// It should be used to configure db types and properties.
 /// </summary>
 public abstract class SqlProfile<T>
 {
-    protected SqlProfile() { }
-
     /// <summary>
     /// Entry-point for configuring a property.
     /// The generator parses the fluent calls that follow.
@@ -39,7 +37,12 @@ public abstract class SqlProfile<T>
     /// <returns></returns>
     protected SqlProfile<T> Key<TProp>(Expression<Func<T, TProp>> selector) => this;
     
-    
+    /// <summary>
+    /// Configuration of identity fields.
+    /// </summary>
+    /// <param name="selector"></param>
+    /// <typeparam name="TProp"></typeparam>
+    /// <returns></returns>
     protected SqlProfile<T> Identity<TProp>(Expression<Func<T, TProp>> selector) => this;
 }
 
@@ -143,5 +146,10 @@ public sealed class PropertyBuilder<TProp>
     /// <returns></returns>
     public PropertyBuilder<TProp> NotNull() => this;
     
-    public PropertyBuilder<TProp> Default(string sqlExpression) => this;
+    /// <summary>
+    /// Sets default value.
+    /// </summary>
+    /// <param name="sqlExpression"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
 }

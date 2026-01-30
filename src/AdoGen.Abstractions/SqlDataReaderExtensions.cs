@@ -6,6 +6,9 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Abstractions;
 
+/// <summary>
+/// Extensions class for SqlDataReader.
+/// </summary>
 public static class SqlDataReaderExtensions
 {
     extension(SqlDataReader reader)

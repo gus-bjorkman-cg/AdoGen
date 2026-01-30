@@ -6,6 +6,9 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Abstractions;
 
+/// <summary>
+/// Extensions class for SqlCommand. 
+/// </summary>
 public static class SqlCommandExtensions
 {
     extension(SqlCommand command)

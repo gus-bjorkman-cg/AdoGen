@@ -16,7 +16,7 @@ public sealed class TestContext : IAsyncLifetime
     
     async ValueTask IAsyncLifetime.InitializeAsync()
     {
-        _msSqlContainer = new MsSqlBuilder().Build();
+        _msSqlContainer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
         await _msSqlContainer.StartAsync(CancellationToken);
         ConnectionString = _msSqlContainer.GetConnectionString();
         await using var connection = new SqlConnection(ConnectionString);

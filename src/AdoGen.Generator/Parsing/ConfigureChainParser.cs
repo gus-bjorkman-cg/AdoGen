@@ -145,7 +145,7 @@ internal static class ConfigureChainParser
                         spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "Default":
+                case "DefaultValue":
                     if (args.Count == 1 && model.TryGetConstString(args[0].Expression, CancellationToken.None, out var expr) && !string.IsNullOrWhiteSpace(expr))
                         cfg.DefaultSqlExpression = expr!;
                     else
