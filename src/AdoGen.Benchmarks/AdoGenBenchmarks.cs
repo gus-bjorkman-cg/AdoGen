@@ -3,6 +3,7 @@ using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
 using Bogus;
+using Bogus.Extensions;
 using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Benchmarks;
@@ -12,8 +13,8 @@ public class AdoGenBenchmarks : TestBase
 {
     private static readonly Faker<User> UserFaker = new Faker<User>()
         .RuleFor(x => x.Id, Guid.CreateVersion7)
-        .RuleFor(x => x.Name, y => y.Random.String2(20))
-        .RuleFor(x => x.Email, y => y.Random.String2(50))
+        .RuleFor(x => x.Name, y => y.Person.FullName.ClampLength(1, 20))
+        .RuleFor(x => x.Email, y => y.Person.Email.ClampLength(1, 50))
         .WithDefaultConstructor();
     
     private static readonly IEnumerator<User> UserStream = UserFaker.GenerateForever().GetEnumerator();
