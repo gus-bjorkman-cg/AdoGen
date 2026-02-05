@@ -22,7 +22,7 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 class Build : NukeBuild
 {
     const string TagPath = "refs/tags/";
-    const string LocalBuild = "0.0.0.0-localbuild";
+    const string LocalBuild = "0.0.0-localbuild";
     const string NugetSource = "https://api.nuget.org/v3/index.json";
     
     [Solution(GenerateProjects = true)]
@@ -135,7 +135,7 @@ class Build : NukeBuild
         .Executes(() =>
         {
             var version = ResolveVersion();
-            var numericVersion = version.Split('-', 2)[0];
+            var numericVersion = version.Split('-', 2)[0] + ".0";
             var notes = ExtractReleaseNotes(version);
             
             DotNetPack(s => s
