@@ -1,39 +1,40 @@
 using AdoGen.Abstractions;
-using AdoGen.Sample.Features.Users;
 using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
-public sealed class Insert(TestContext testContext) : TestBase(testContext)
+public sealed class Update(TestContext testContext) : TestBase(testContext)
 {
-    private readonly User _user = UserFaker.Generate();
-    
     [Fact]
-    public async Task User_ShouldBeInserted()
+    public async Task User_ShouldBeUpdated()
     {
+        // Arrange
+        var user = DefaultUsers[0] with { Name = "other name" };
+        
         // Act
-        await Connection.InsertAsync(_user, Ct);
+        await Connection.UpdateAsync(user, Ct);
         
         // Assert
-        (await GetUser(_user.Id)).Should().BeEquivalentTo(_user);
+        (await GetUser(user.Id)).Should().Be(user);
     }
 
     [Fact]
-    public async Task Insert_ShouldRespectDbTransaction()
+    public async Task Update_ShouldRespectDbTransaction()
     {
         // Arrange
         await using var transaction = Connection.BeginTransaction();
+        var user = DefaultUsers[0] with { Name = "other name" };
         
         // Act
-        await Connection.InsertAsync(_user, Ct, transaction);
+        await Connection.UpdateAsync(user, Ct, transaction);
         transaction.Rollback();
 
         // Assert
-        (await GetUser(_user.Id)).Should().BeNull();
+        (await GetUser(user.Id)).Should().Be(DefaultUsers[0]);
     }
 
     [Fact]
-    public async Task Insert_ShouldRespectCommandTimeout()
+    public async Task Update_ShouldRespectCommandTimeout()
     {
         // Arrange
         await using var transaction = await LockUserTable();
@@ -42,7 +43,7 @@ public sealed class Insert(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.InsertAsync(_user, Ct, commandTimeout: 1);
+            await Connection.UpdateAsync(DefaultUsers[0], Ct, commandTimeout: 1);
         };
 
         // Assert

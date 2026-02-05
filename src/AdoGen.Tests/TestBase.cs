@@ -41,6 +41,10 @@ public abstract class TestBase : IAsyncLifetime
         return transaction;
     }
 
+    private const string GetUserSql = "SELECT TOP(1) * FROM Users WHERE Id = @Id"; 
+    protected async ValueTask<User?> GetUser(Guid id) =>
+        await Connection.QueryFirstOrDefaultAsync<User>(GetUserSql, UserSql.CreateParameterId(id), Ct);
+
     protected virtual ValueTask InitializeAsync() => ValueTask.CompletedTask;
     protected virtual ValueTask DisposeAsync() => ValueTask.CompletedTask;
     

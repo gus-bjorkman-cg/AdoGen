@@ -1,39 +1,36 @@
 using AdoGen.Abstractions;
-using AdoGen.Sample.Features.Users;
 using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
-public sealed class Insert(TestContext testContext) : TestBase(testContext)
+public sealed class Delete(TestContext testContext) : TestBase(testContext)
 {
-    private readonly User _user = UserFaker.Generate();
-    
     [Fact]
-    public async Task User_ShouldBeInserted()
+    public async Task User_ShouldBeDeleted()
     {
         // Act
-        await Connection.InsertAsync(_user, Ct);
+        await Connection.DeleteAsync(DefaultUsers[0], Ct);
         
         // Assert
-        (await GetUser(_user.Id)).Should().BeEquivalentTo(_user);
+        (await GetUser(DefaultUsers[0].Id)).Should().BeNull();
     }
 
     [Fact]
-    public async Task Insert_ShouldRespectDbTransaction()
+    public async Task Delete_ShouldRespectDbTransaction()
     {
         // Arrange
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await Connection.InsertAsync(_user, Ct, transaction);
+        await Connection.DeleteAsync(DefaultUsers[0], Ct, transaction);
         transaction.Rollback();
 
         // Assert
-        (await GetUser(_user.Id)).Should().BeNull();
+        (await GetUser(DefaultUsers[0].Id)).Should().Be(DefaultUsers[0]);
     }
 
     [Fact]
-    public async Task Insert_ShouldRespectCommandTimeout()
+    public async Task Delete_ShouldRespectCommandTimeout()
     {
         // Arrange
         await using var transaction = await LockUserTable();
@@ -42,7 +39,7 @@ public sealed class Insert(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.InsertAsync(_user, Ct, commandTimeout: 1);
+            await Connection.DeleteAsync(DefaultUsers[0], Ct, commandTimeout: 1);
         };
 
         // Assert
