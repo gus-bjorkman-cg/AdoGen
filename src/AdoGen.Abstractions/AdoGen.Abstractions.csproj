@@ -11,6 +11,7 @@
         <IncludeSymbols>true</IncludeSymbols>
         <Description>Abstractions for AdoGen source generator.</Description>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
 
     <ItemGroup>

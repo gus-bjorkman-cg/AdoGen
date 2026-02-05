@@ -1,0 +1,56 @@
+using AdoGen.Abstractions;
+using AdoGen.Sample.Features.Users;
+using Microsoft.Data.SqlClient;
+
+namespace AdoGen.Tests.Features;
+
+public sealed class Truncate(TestContext testContext) : TestBase(testContext)
+{
+    [Fact]
+    public async Task UsersCount_ShouldBeZero_WhenTruncated()
+    {
+        // Act
+        await Connection.TruncateAsync<User>(Ct);
+        
+        // Assert
+        (await GetUsersCount()).Should().Be(0);
+    }
+    
+    [Fact]
+    public async Task Truncate_ShouldRespectDbTransaction()
+    {
+        // Arrange
+        await using var transaction = Connection.BeginTransaction();
+        
+        // Act
+        await Connection.TruncateAsync<User>(Ct, transaction);
+        transaction.Rollback();
+
+        // Assert
+        (await GetUsersCount()).Should().BeGreaterThan(0);
+    }
+    
+    [Fact]
+    public async Task Truncate_ShouldRespectCommandTimeout()
+    {
+        // Arrange
+        await using var transaction = await LockUserTable();
+        
+        // Act
+        var act = async () =>
+        {
+            await using var connectionB = new SqlConnection(ConnectionString);
+            await connectionB.TruncateAsync<User>(Ct, commandTimeout: 1);
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<SqlException>();
+        transaction.Rollback();
+    }
+
+    private async ValueTask<int> GetUsersCount()
+    {
+        await using var command = Connection.CreateCommand("SELECT COUNT(*) FROM Users");
+        return (int)await command.ExecuteScalarAsync(Ct);
+    }
+}

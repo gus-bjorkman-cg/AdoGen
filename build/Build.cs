@@ -22,7 +22,7 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 class Build : NukeBuild
 {
     const string TagPath = "refs/tags/";
-    const string LocalBuild = "0.0.0-localbuild";
+    const string LocalBuild = "0.0.0.0-localbuild";
     const string NugetSource = "https://api.nuget.org/v3/index.json";
     
     [Solution(GenerateProjects = true)]
@@ -37,9 +37,6 @@ class Build : NukeBuild
     [Parameter("NuGet API key (from GH secret or env NUGET_API_KEY)")]
     [Secret]
     readonly string NuGetApiKey;
-
-    [Parameter("Package version to produce. Default: 0.1.0.0")]
-    readonly string PackageVersion = "0.1.0.0";
     
     static AbsolutePath OutputDirectory => RootDirectory / "output";
     static AbsolutePath SourceDirectory => RootDirectory / "src";
@@ -51,7 +48,7 @@ class Build : NukeBuild
 
     bool IsTagBuild;
     
-    public static int Main () => Execute<Build>(x => x.Compile);
+    public static int Main() => Execute<Build>(x => x.Compile);
     
     protected override void OnBuildInitialized()
     {
@@ -67,7 +64,7 @@ class Build : NukeBuild
     {
         if (!File.Exists(Changelog)) return string.Empty;
 
-        // Headings should look like: "## [0.1.0] - 2026-01-29"
+        // Headings should look like: "## [0.1.0.0-alpha] - 2026-01-29"
         var lines = File.ReadAllLines(Changelog);
         var header = $"## [{tagVersion}]";
         var sb = new StringBuilder();
@@ -92,14 +89,13 @@ class Build : NukeBuild
     
     string ResolveVersion()
     {
-        if (!string.IsNullOrWhiteSpace(PackageVersion)) return PackageVersion.Trim();
         if (!IsTagBuild) return LocalBuild;
         
         var tag = GitRepo!.Branch![TagPath.Length..];
         
         if (tag.StartsWith("v", StringComparison.OrdinalIgnoreCase)) tag = tag[1..];
 
-        return tag == "" ? LocalBuild : tag;
+        return tag != "" ? tag : LocalBuild;
     }
     
     Target CI => x => x
@@ -139,6 +135,7 @@ class Build : NukeBuild
         .Executes(() =>
         {
             var version = ResolveVersion();
+            var numericVersion = version.Split('-', 2)[0];
             var notes = ExtractReleaseNotes(version);
             
             DotNetPack(s => s
@@ -148,10 +145,12 @@ class Build : NukeBuild
                 .SetNoBuild(true)
                 .EnableNoLogo()
                 .EnableNoRestore()
+                .EnableContinuousIntegrationBuild()
                 .SetProperty("Version", version)
                 .SetProperty("PackageVersion", version)
-                .SetProperty("AssemblyVersion", version)
-                .SetProperty("FileVersion", version)
+                .SetProperty("InformationalVersion", version)
+                .SetProperty("AssemblyVersion", numericVersion)
+                .SetProperty("FileVersion", numericVersion)
                 .SetProperty("IncludeSymbols", "true")
                 .SetProperty("SymbolPackageFormat", "snupkg")
                 .SetProperty("PackageReleaseNotes", notes));
@@ -160,13 +159,15 @@ class Build : NukeBuild
                 .SetProject(GeneratorProject)
                 .SetConfiguration(Configuration)
                 .SetOutputDirectory(OutputDirectory)
+                .EnableContinuousIntegrationBuild()
                 .SetNoBuild(true)
                 .EnableNoLogo()
                 .EnableNoRestore()
                 .SetProperty("Version", version)
                 .SetProperty("PackageVersion", version)
-                .SetProperty("AssemblyVersion", version)
-                .SetProperty("FileVersion", version)
+                .SetProperty("InformationalVersion", version)
+                .SetProperty("AssemblyVersion", numericVersion)
+                .SetProperty("FileVersion", numericVersion)
                 .SetProperty("IncludeSymbols", "false")
                 .SetProperty("SymbolPackageFormat", "snupkg")
                 .SetProperty("PackageReleaseNotes", notes));
