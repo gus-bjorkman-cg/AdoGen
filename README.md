@@ -33,12 +33,17 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 | Dapper       | ToList         |   493.7 us |  13.97 us |  41.19 us |   508.9 us |  0.9766 |      - |   8.58 KB |
 | EfCompiled   | ToList         |   495.9 us |  14.67 us |  43.26 us |   516.2 us |  9.7656 | 0.9766 |  82.79 KB |
 | EfCore       | ToList         |   514.0 us |  13.86 us |  40.88 us |   525.2 us | 10.7422 | 0.9766 |  91.22 KB |
-| DapperNoType | Insert         |   683.8 us |  16.51 us |  48.69 us |   699.4 us |       - |      - |   6.26 KB |
-| EfCore       | Insert         |   803.9 us |  36.31 us | 107.08 us |   758.7 us |  9.7656 |      - |  92.52 KB |
-| AdoGen       | Insert         |   879.3 us |  60.15 us | 177.36 us |   865.8 us |       - |      - |   6.71 KB |
-| AdoGen       | InsertMulti    |   912.9 us |  42.81 us | 125.56 us |   927.5 us |  1.9531 |      - |  28.36 KB |
-| EfCore       | InsertMulti    | 1,107.8 us |  35.74 us | 105.38 us | 1,160.0 us | 17.5781 | 1.9531 | 155.59 KB |
-| DapperNoType | InsertMulti    | 6,679.3 us | 304.40 us | 897.53 us | 6,647.7 us |       - |      - |  43.12 KB |
+| AdoGen       | Insert         |   733.1 us |  14.24 us |  16.95 us |   733.8 us |  2.9297 |      - |   25.5 KB |                                                                                                                                                          
+| Dapper       | Insert         |   739.0 us |  14.69 us |  20.11 us |   737.3 us |  2.9297 |      - |  26.11 KB |
+| DapperNoType | Insert         |   771.4 us |  15.28 us |  23.33 us |   772.2 us |  2.9297 |      - |  25.43 KB |
+| EfCore       | Insert         |   996.8 us |  19.79 us |  46.64 us | 1,006.1 us | 11.7188 |      - | 111.44 KB |
+| AdoGen       | InsertMulti    | 1,569.0 us | 117.72 us | 347.11 us | 1,486.9 us | 25.3906 |      - | 217.38 KB |
+| EfCore       | InsertMulti    | 2,394.8 us | 112.83 us | 332.69 us | 2,546.0 us | 39.0625 | 3.9063 | 345.11 KB |
+| DapperNoType | InsertMulti    | 6,856.3 us |  78.31 us |  73.25 us | 6,843.6 us | 23.4375 |      - | 233.15 KB |
+| Dapper       | InsertMulti    | 6,933.2 us | 134.85 us | 160.53 us | 6,921.4 us | 23.4375 |      - | 241.85 KB |
+| DapperNoType | Update         |   678.5 us |  13.39 us |  22.37 us |          - |       - |      - |   5.72 KB |                                                                                                                                                                                          
+| AdoGen       | Update         |   689.5 us |  13.77 us |  21.44 us |          - |       - |      - |   5.75 KB |
+| EfCore       | Update         |   939.0 us |  18.05 us |  24.70 us |          - |       - | 9.7656 |  92.31 KB |
 ```
 
 Example usage

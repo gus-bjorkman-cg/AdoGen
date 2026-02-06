@@ -10,14 +10,15 @@ namespace AdoGen.Benchmarks;
 [BenchmarkCategory("EfCore")]
 public class EfCoreBenchmarks : TestBase
 {
-    private static readonly Faker<UserModel> UserFaker = new Faker<UserModel>()
+    private static readonly Faker<UserModel> UserModelFaker = new Faker<UserModel>()
         .RuleFor(x => x.Id, Guid.CreateVersion7)
         .RuleFor(x => x.Name, y => y.Person.FullName.ClampLength(1, 20))
         .RuleFor(x => x.Email, y => y.Person.Email.ClampLength(1, 50))
         .WithDefaultConstructor();
     
-    private static readonly IEnumerator<UserModel> UserStream = UserFaker.GenerateForever().GetEnumerator();
+    private static readonly IEnumerator<UserModel> UserModelStream = UserModelFaker.GenerateForever().GetEnumerator();
     private IDbContextFactory<TestDbContext> _factory = null!;
+    private UserModel _firstUser = null!;
     
     protected override ValueTask Initialize()
     {
@@ -25,6 +26,7 @@ public class EfCoreBenchmarks : TestBase
         services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlServer(ConnectionString));
         var provider = services.BuildServiceProvider();
         _factory = provider.GetRequiredService<IDbContextFactory<TestDbContext>>();
+        _firstUser = new UserModel(FirstUser.Id, FirstUser.Name, FirstUser.Email);
         
         return ValueTask.CompletedTask;
     }
@@ -57,8 +59,8 @@ public class EfCoreBenchmarks : TestBase
     public async Task Insert()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
-        UserStream.MoveNext();
-        var user = UserStream.Current;
+        UserModelStream.MoveNext();
+        var user = UserModelStream.Current;
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(CancellationToken);
     }
@@ -68,8 +70,20 @@ public class EfCoreBenchmarks : TestBase
     public async Task InsertMulti()
     {
         await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
-        var users = UserFaker.Generate(10);
+        var users = UserModelFaker.Generate(10);
         dbContext.Users.AddRange(users);
+        await dbContext.SaveChangesAsync(CancellationToken);
+    }
+
+    [Benchmark]
+    [BenchmarkCategory("Update")]
+    public async Task Update()
+    {
+        await using var dbContext = await _factory.CreateDbContextAsync(CancellationToken);
+        var name = Index.ToString();
+        Index++;
+        var user = _firstUser with { Name = name };
+        dbContext.Users.Update(user);
         await dbContext.SaveChangesAsync(CancellationToken);
     }
 }

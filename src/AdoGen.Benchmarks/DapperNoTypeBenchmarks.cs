@@ -1,7 +1,5 @@
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
-using Bogus;
-using Bogus.Extensions;
 using Dapper;
 using Microsoft.Data.SqlClient;
 
@@ -10,14 +8,6 @@ namespace AdoGen.Benchmarks;
 [BenchmarkCategory("DapperNT")]
 public class DapperNoTypeBenchmarks : TestBase
 {
-    private static readonly Faker<User> UserFaker = new Faker<User>()
-        .RuleFor(x => x.Id, Guid.CreateVersion7)
-        .RuleFor(x => x.Name, y => y.Person.FullName.ClampLength(1, 20))
-        .RuleFor(x => x.Email, y => y.Person.Email.ClampLength(1, 50))
-        .WithDefaultConstructor();
-    
-    private static readonly IEnumerator<User> UserStream = UserFaker.GenerateForever().GetEnumerator();
-    
     [Benchmark]
     [BenchmarkCategory("FirstOrDefault")]
     public async Task FirstOrDefault()
@@ -58,5 +48,18 @@ public class DapperNoTypeBenchmarks : TestBase
         await using var sqlConnection = new SqlConnection(ConnectionString);
         var users = UserFaker.Generate(10);
         await sqlConnection.ExecuteAsync(SqlInsert, users);
+    }
+
+    private const string SqlUpdate = "UPDATE [dbo].[Users] SET Name = @Name, Email = @Email WHERE Id = @Id";
+    
+    [Benchmark]
+    [BenchmarkCategory("Update")]
+    public async Task Update()
+    {
+        await using var sqlConnection = new SqlConnection(ConnectionString);
+        var name = Index.ToString();
+        Index++;
+        var user = FirstUser with { Name = name };
+        await sqlConnection.ExecuteAsync(SqlUpdate, user);
     }
 }
