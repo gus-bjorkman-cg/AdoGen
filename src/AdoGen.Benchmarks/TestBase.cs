@@ -4,6 +4,8 @@ using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
 using Bogus;
 using Bogus.Extensions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
 
 namespace AdoGen.Benchmarks;
@@ -11,11 +13,14 @@ namespace AdoGen.Benchmarks;
 public abstract class TestBase
 {
     private static MsSqlContainer? _msSqlContainer;
+    private IDbContextFactory<TestDbContext> _dbContextFactory = null!;
+    private string _connectionString = "";
+    
     private static readonly CancellationTokenSource CancellationTokenSource = new();
     protected static CancellationToken CancellationToken => CancellationTokenSource.Token;
     
-    protected static string ConnectionString { get; private set; } = "";
-    protected User FirstUser { get; private set; } = null!;
+    protected SqlConnection Connection { get; private set; } = null!;
+    protected TestDbContext DbContext { get; private set; } = null!;
 
     protected static int Index { get; set => field = field == 1000 ? 0 : value; }
 
@@ -29,32 +34,53 @@ public abstract class TestBase
         .RuleFor(x => x.Email, y => y.Person.Email.ClampLength(1, 50))
         .WithDefaultConstructor();
     
-    protected static readonly IEnumerator<User> UserStream = UserFaker.GenerateForever().GetEnumerator();
-    
     [GlobalSetup]
     public async Task InitializeAsync()
     {
         _msSqlContainer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
         await _msSqlContainer.StartAsync(CancellationToken);
-        ConnectionString = _msSqlContainer.GetConnectionString();
-        await using var connection = new SqlConnection(ConnectionString);
+        _connectionString = _msSqlContainer.GetConnectionString();
+        await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync(CancellationToken);
         await using var command = connection.CreateCommand(SqlCreateDb);
         await command.ExecuteNonQueryAsync(CancellationToken);
         
-        ConnectionString = new SqlConnectionStringBuilder(ConnectionString) { InitialCatalog = "TestDb" }.ConnectionString;
+        _connectionString = new SqlConnectionStringBuilder(_connectionString) { InitialCatalog = "TestDb" }.ConnectionString;
         
-        var sqlConnection = new SqlConnection(ConnectionString);
-        await sqlConnection.OpenAsync(CancellationToken);
-        await using var createTableCommand = sqlConnection.CreateCommand(CreateUsersSql);
+        Connection = new SqlConnection(_connectionString);
+        await Connection.OpenAsync(CancellationToken);
+        await using var createTableCommand = Connection.CreateCommand(CreateUsersSql);
         await createTableCommand.ExecuteNonQueryAsync(CancellationToken);
-        await using var seedCommand = sqlConnection.CreateCommand(SeedUsersSql);
+        await using var seedCommand = Connection.CreateCommand(SeedUsersSql);
         await seedCommand.ExecuteNonQueryAsync(CancellationToken);
-        FirstUser = (await sqlConnection.QueryFirstOrDefaultAsync<User>(SqlGetOne, UserSql.CreateParameterName("0"), CancellationToken))!;
+        
+        var services = new ServiceCollection();
+        services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlServer(_connectionString));
+        var provider = services.BuildServiceProvider();
+        _dbContextFactory = provider.GetRequiredService<IDbContextFactory<TestDbContext>>();
+        
         await Initialize();
     }
 
     protected virtual ValueTask Initialize() => ValueTask.CompletedTask;
+
+    [IterationSetup]
+    public void SetUp()
+    {
+        DbContext = _dbContextFactory.CreateDbContext();
+        IterationSetup();
+    }
+    
+    protected virtual void IterationSetup() { }
+    
+    [IterationCleanup]
+    public void CleanUp()
+    {
+        IterationCleanup();
+        DbContext.Dispose();
+    }
+    
+    protected virtual void IterationCleanup() { }
 
     private const string CreateUsersSql =
         """
@@ -83,6 +109,7 @@ public abstract class TestBase
     public async Task DisposeAsync()
     {
         await Dispose();
+        await Connection.DisposeAsync();
         if (_msSqlContainer is not null) await _msSqlContainer.DisposeAsync();
         CancellationTokenSource.Dispose();
     }
