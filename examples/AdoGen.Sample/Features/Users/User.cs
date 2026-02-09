@@ -1,6 +1,6 @@
 namespace AdoGen.Sample.Features.Users;
 
-public sealed partial record User(Guid Id, string Name, string Email) : ISqlDomainModel;
+public sealed partial record User(Guid Id, string Name, string Email) : ISqlBulkModel;
 
 public sealed class UserProfile : SqlProfile<User>
 {

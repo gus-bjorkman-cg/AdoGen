@@ -1,0 +1,427 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using AdoGen.Generator.Diagnostics;
+using Microsoft.CodeAnalysis;
+using System.Linq;
+using System.Text;
+using AdoGen.Generator.Extensions;
+using AdoGen.Generator.Models;
+using AdoGen.Generator.Parsing;
+
+namespace AdoGen.Generator.Emitters;
+
+public static class BulkEmitter
+{
+    public static void Emit(
+        SourceProductionContext spc,
+        (((INamedTypeSymbol dto, bool _, bool missingInterface) domain,
+            ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)> profilesIndex) input,
+            Compilation compilation) data)
+    {
+        var ((domain, profilesIndex), compilation) = data;
+        var (dto, _, missingInterface) = domain;
+
+        if (missingInterface)
+        {
+            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingBulkInterface, Location.None));
+            return;
+        }
+        
+        // Try to find SqlProfile<T> for this DTO from precomputed index
+        var profileEntry = profilesIndex.FirstOrDefault(p => SymbolEqualityComparer.Default.Equals(p.Dto, dto));
+        ProfileInfo info;
+
+        if (profileEntry.Profile is null)
+        {
+            info = BuildDefaultProfileInfo(dto);
+        }
+        else
+        {
+            var collected = ProfileInfoCollector.Collect(profileEntry.Profile, dto, profileEntry.Model, spc);
+
+            if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
+            {
+                spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingKey,
+                    profileEntry.Profile.Locations.FirstOrDefault() ?? dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Name));
+            }
+
+            info = collected;
+        }
+
+        EmitWithInfo(spc, dto, info);
+    }
+
+    private static ProfileInfo BuildDefaultProfileInfo(INamedTypeSymbol dto)
+    {
+        var props = dto.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .ToArray();
+
+        var dict = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
+
+        foreach (var p in props)
+        {
+            dict[p.Name] = new ParamConfig
+            {
+                PropertyName = p.Name,
+                PropertyType = p.Type,
+                ParameterName = "@" + p.Name,
+                DbType = p.Type.MapDefaultSqlDbType()
+            };
+        }
+
+        var idName = props.FirstOrDefault(p => string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase))?.Name;
+        var keys = idName is null ? ImmutableArray<string>.Empty : [idName];
+
+        return new ProfileInfo(
+            Schema: "dbo",
+            Table: dto.Name.PluralizeSimple(),
+            Keys: keys,
+            IdentityKeys: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
+            ParamsByProperty: dict.ToImmutableDictionary(StringComparer.Ordinal)
+        );
+    }
+
+    private static void EmitWithInfo(SourceProductionContext spc, INamedTypeSymbol dto, ProfileInfo info)
+    {
+        var dtoProps = dto.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .ToArray();
+
+        var ns = dto.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dto.ContainingNamespace.ToDisplayString();
+        var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+        // --- Bulk metadata ---
+        // Temp table name is stable per DTO type
+        var tempTableName = $"#AdoGen_{dto.Name}";
+        var bulkTypeName = dto.Name + "Bulk";
+
+        // Keys / join predicate
+        var keys = info.Keys.ToArray();
+        if (keys.Length == 0)
+        {
+            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingKey, dto.Locations.FirstOrDefault() ?? Location.None, dto.Name));
+            return;
+        }
+
+        var joinOn = string.Join(" AND ", keys.Select(k => $"S.[{k}] = T.[{k}]"));
+        var idxCols = string.Join(", ", keys.Select(k => $"[{k}]"));
+        var idxClause = $"        CREATE INDEX [IX_AdoGen_{info.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
+
+        // INSERT columns: skip identity keys (same rule as DomainOpsEmitter)
+        var insertCols = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"[{p.Name}]").ToArray();
+        var insertSelect = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"S.[{p.Name}]").ToArray();
+
+        // UPDATE SET: non-key, non-identity (same as DomainOpsEmitter)
+        var nonKeyNonIdentity = dtoProps
+            .Where(p => !info.Keys.Contains(p.Name) && !info.IdentityKeys.Contains(p.Name))
+            .ToArray();
+        var updateSet = string.Join(",\n        ", nonKeyNonIdentity.Select(p => $"    T.[{p.Name}] = S.[{p.Name}]"));
+
+        // CREATE TEMP TABLE (no identity clause here; it's just staging)
+        var sbColDefs = new StringBuilder();
+        for (var i = 0; i < dtoProps.Length; i++)
+        {
+            var p = dtoProps[i];
+            var cfg = info.ParamsByProperty[p.Name];
+            var sqlType = SqlTypeLiterals.ToSqlTypeLiteral(cfg);
+            var isNullable = p.IsNullableProperty(cfg);
+            var nullability = isNullable ? "NULL" : "NOT NULL";
+
+            const string spaces = "            ";
+            sbColDefs.AppendLine($"{spaces}[{p.Name}] {sqlType} {nullability},");
+        }
+        sbColDefs.AppendLine("            [Operation] CHAR(1) NOT NULL");
+
+        var tempTableSql =
+            $"""
+            CREATE TABLE {tempTableName}(
+            {sbColDefs.ToString().TrimEnd()});
+            """;
+
+        // APPLY SQL variants
+        var schemaTable = $"[{info.Schema}].[{info.Table}]";
+
+        var applyNoIndex = BuildApplySql(withIndex: false);
+        var applyWithIndex = BuildApplySql(withIndex: true);
+
+        // Generated file
+        var src = $$$""""
+            // <auto-generated />
+            #nullable enable
+            using System;
+            using System.Data;
+            using System.Collections.Generic;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Microsoft.Data.SqlClient;
+            using AdoGen.Abstractions;
+
+            namespace {{{ns}}};
+
+            public sealed class {{{bulkTypeName}}} : ISqlBulkModel
+            {
+                private const int IndexThresholdRows = 500;
+                private const int BulkCopyBatchSize = 5000;
+                private const int DefaultTimeoutSeconds = 30;
+                private const string TempTableName = "{{{tempTableName}}}";
+
+                private const string SqlCreateTempTable =
+                    """
+                    {{{tempTableSql}}}
+                    """;
+
+                private const string SqlApply_NoIndex =
+                    """
+                    {{{applyNoIndex}}}
+                    """;
+
+                private const string SqlApply_WithIndex =
+                    """
+                    {{{applyWithIndex}}}
+                    """;
+
+                public static async ValueTask<BulkApplyResult> SaveChangesAsync(
+                    SqlConnection connection,
+                    BulkBatch<{{{dtoTypeName}}}> batch,
+                    CancellationToken ct,
+                    SqlTransaction? transaction = null,
+                    int? commandTimeout = null)
+                {
+                    if (batch is null) throw new ArgumentNullException(nameof(batch));
+                    if (transaction is null) throw new ArgumentNullException(nameof(transaction));
+
+                    if (batch.Count == 0) return new BulkApplyResult(0, 0, 0);
+
+                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+
+                    // 1) create temp table
+                    await using (var create = connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, commandTimeout))
+                    {
+                        await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    }
+
+                    using (var bulk = new SqlBulkCopy(connection, SqlBulkCopyOptions.KeepNulls, transaction)
+                    {
+                        DestinationTableName = TempTableName,
+                        BatchSize = BulkCopyBatchSize,
+                        BulkCopyTimeout = commandTimeout ?? DefaultTimeoutSeconds
+                    })
+                    {
+            {{{BulkCopyMappings()}}}
+                        bulk.ColumnMappings.Add("Operation", "Operation");
+
+                        using var reader = new __BulkReader(batch);
+                        await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
+                    }
+
+                    // 3) apply
+                    var sql = batch.Count >= IndexThresholdRows ? SqlApply_WithIndex : SqlApply_NoIndex;
+                    await using var cmd = connection.CreateCommand(sql, CommandType.Text, transaction, commandTimeout);
+                    await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                    
+                    if (!await resultReader.ReadAsync(ct).ConfigureAwait(false))
+                        throw new InvalidOperationException("Bulk apply did not return result row.");
+
+                    return new BulkApplyResult(
+                        Inserted: resultReader.GetInt32(0),
+                        Updated: resultReader.GetInt32(1),
+                        Deleted: resultReader.GetInt32(2));
+                }
+
+                private sealed class __BulkReader : BulkDataReaderBase
+                {
+                    private readonly BulkBatch<{{{dtoTypeName}}}> _batch;
+                    private int _index = -1;
+
+                    public __BulkReader(BulkBatch<{{{dtoTypeName}}}> batch) => _batch = batch;
+
+                    public override bool Read() => ++_index < _batch.Count;
+                    public override int FieldCount => {{{dtoProps.Length + 1}}};
+
+                    public override object GetValue(int i)
+                    {
+                        var item = _batch.Items[_index];
+                        var op = _batch.Operations[_index].Value;
+
+                        return i switch
+                        {
+            {{{GetValueSwitch()}}}
+                            {{{dtoProps.Length}}} => op,
+                            _ => throw new IndexOutOfRangeException()
+                        };
+                    }
+
+                    public override string GetName(int i) => i switch
+                    {
+            {{{GetNameSwitch()}}}
+                        {{{dtoProps.Length}}} => "Operation",
+                        _ => throw new IndexOutOfRangeException()
+                    };
+
+                    public override Type GetFieldType(int i) => i switch
+                    {
+            {{{GetTypeSwitch()}}}
+                        {{{dtoProps.Length}}} => typeof(char),
+                        _ => throw new IndexOutOfRangeException()
+                    };
+
+                    
+                    public override int GetOrdinal(string name) => name switch
+                    {
+            {{{GetOrdinalSwitch()}}}
+                        _ => -1
+                    };
+                }
+            }
+            """";
+
+        spc.AddSource($"{dto.Name}Bulk.g.cs", src);
+        return;
+
+        string BuildApplySql(bool withIndex)
+        {
+            var sb = new StringBuilder();
+            
+            sb.AppendLine("BEGIN TRY");
+            sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;");
+
+            if (withIndex)
+            {
+                sb.AppendLine(idxClause);
+            }
+            
+            sb.AppendLine();
+            
+            if (nonKeyNonIdentity.Length > 0)
+            {
+                sb.AppendLine("        UPDATE T");
+                sb.AppendLine("        SET");
+                sb.AppendLine("        " + updateSet);
+                sb.AppendLine($"        FROM {schemaTable} AS T");
+                sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
+                sb.AppendLine("        WHERE S.[Operation] = 'U';");
+                sb.AppendLine("        SET @updated = @@ROWCOUNT;");
+                sb.AppendLine();
+            }
+
+            if (insertCols.Length > 0)
+            {
+                sb.AppendLine($"        INSERT INTO {schemaTable} ({string.Join(", ", insertCols)})");
+                sb.AppendLine($"        SELECT {string.Join(", ", insertSelect)}");
+                sb.AppendLine($"        FROM {tempTableName} AS S");
+                sb.AppendLine("        WHERE S.[Operation] = 'I';");
+                sb.AppendLine("        SET @inserted = @@ROWCOUNT;");
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("        DELETE T");
+            sb.AppendLine($"        FROM {schemaTable} AS T");
+            sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
+            sb.AppendLine("        WHERE S.[Operation] = 'D';");
+            sb.AppendLine("        SET @deleted = @@ROWCOUNT;");
+            sb.AppendLine();
+
+            sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;");
+            sb.AppendLine();
+            
+            sb.AppendLine("        END TRY");
+            sb.AppendLine("        BEGIN CATCH");
+            sb.AppendLine($"    {DropGuard(tempTableName)}");
+            sb.AppendLine("            THROW;");
+            sb.AppendLine("        END CATCH;");
+            
+            sb.AppendLine(DropGuard(tempTableName));
+
+            return sb.ToString().TrimEnd();
+        }
+
+        string BulkCopyMappings()
+        {
+            var sb = new StringBuilder();
+            foreach (var p in dtoProps)
+                sb.AppendLine($"            bulk.ColumnMappings.Add(\"{p.Name}\", \"{p.Name}\");");
+            return sb.ToString().TrimEnd();
+        }
+
+        string GetNameSwitch()
+        {
+            var sb = new StringBuilder();
+            for (var i = 0; i < dtoProps.Length; i++)
+                sb.AppendLine($"            {i} => \"{dtoProps[i].Name}\",");
+            return sb.ToString().TrimEnd();
+        }
+
+        string GetTypeSwitch()
+        {
+            var sb = new StringBuilder();
+            for (var i = 0; i < dtoProps.Length; i++)
+            {
+                var p = dtoProps[i];
+                var t = GetUnderlyingTypeSymbol(p.Type);
+                var typeName = t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                sb.AppendLine($"            {i} => typeof({typeName}),");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        string GetValueSwitch()
+        {
+            var sb = new StringBuilder();
+            for (var i = 0; i < dtoProps.Length; i++)
+            {
+                var p = dtoProps[i];
+                var cfg = info.ParamsByProperty[p.Name];
+                var isNullable = p.IsNullableProperty(cfg);
+
+                var expr = GetValueExpression(p, isNullable);
+                sb.AppendLine($"                {i} => {expr},");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        static ITypeSymbol GetUnderlyingTypeSymbol(ITypeSymbol type)
+        {
+            if (type is INamedTypeSymbol nts &&
+                nts.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
+                nts.TypeArguments.Length == 1)
+            {
+                return nts.TypeArguments[0];
+            }
+            return type;
+        }
+
+        static string GetValueExpression(IPropertySymbol p, bool isNullable)
+        {
+            // Reference nullable: item.Prop ?? (object)DBNull.Value
+            if (isNullable && p.Type.IsReferenceType)
+                return $"item.{p.Name} ?? (object)DBNull.Value";
+
+            // Nullable value type: item.Prop.HasValue ? item.Prop.Value : DBNull.Value
+            if (isNullable && p.Type is INamedTypeSymbol nts &&
+                nts.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+            {
+                return $"item.{p.Name}.HasValue ? item.{p.Name}.Value : DBNull.Value";
+            }
+
+            // Non-nullable
+            return $"item.{p.Name}";
+        }
+        
+        string GetOrdinalSwitch()
+        {
+            var sb = new StringBuilder();
+            for (var i = 0; i < dtoProps.Length; i++)
+                sb.AppendLine($"                        \"{dtoProps[i].Name}\" => {i},");
+            sb.AppendLine($"            \"Operation\" => {dtoProps.Length},");
+            return sb.ToString().TrimEnd();
+        }
+        
+        static string DropGuard(string tempTableName)
+            => $"        IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName};";
+    }
+}

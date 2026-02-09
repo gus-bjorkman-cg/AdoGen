@@ -108,3 +108,7 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <returns></returns>
     static abstract ValueTask TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
 }
+
+public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted);
+
+public interface ISqlBulkModel : ISqlDomainModel;

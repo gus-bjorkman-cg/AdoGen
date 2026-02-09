@@ -16,7 +16,6 @@ internal static class SqlTypeLiterals
             SqlDbType.Char => cfg.Size is int s4 && s4 > 0 ? $"CHAR({s4})" : "CHAR(1)",
             SqlDbType.VarBinary => cfg.Size is int s5 && s5 > 0 ? $"VARBINARY({s5})" : "VARBINARY(MAX)",
             SqlDbType.Decimal => $"DECIMAL({(cfg.Precision ?? 18)},{(cfg.Scale ?? 2)})",
-            SqlDbType.DateTime2 => "DATETIME2",
             _ => dbt.ToString().ToUpperInvariant()
         };
     }

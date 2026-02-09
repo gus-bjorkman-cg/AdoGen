@@ -10,6 +10,7 @@ internal static class Discovery
     private const string AbstractionsLib = "AdoGen.Abstractions";
     private const string SqlResultInterface = $"{AbstractionsLib}.ISqlResult";
     private const string SqlDomainInterface = $"{AbstractionsLib}.ISqlDomainModel";
+    private const string SqlBulkInterface = $"{AbstractionsLib}.ISqlBulkModel";
     private const string SqlProfile = nameof(SqlProfile);
 
     public static IncrementalValuesProvider<INamedTypeSymbol> CreateDtoCandidates(IncrementalGeneratorInitializationContext context)
@@ -53,6 +54,24 @@ internal static class Discovery
                 if (sqlDomainInterface is null) return (typeSymbol, implements: false, missingInterface: true);
 
                 var implements = typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlDomainInterface));
+                
+                return (typeSymbol, implements, missingInterface: false);
+            })
+            .Where(static p => p.implements);
+    
+    public static IncrementalValuesProvider<(INamedTypeSymbol dto, bool implements, bool missingInterface)>
+        FilterBySqlBulkInterface(IncrementalGeneratorInitializationContext context,
+            IncrementalValuesProvider<INamedTypeSymbol> candidates)
+        => candidates
+            .Combine(context.CompilationProvider)
+            .Select(static (pair, _) =>
+            {
+                var (typeSymbol, compilation) = pair;
+                var sqlBulkInterface = compilation.GetTypeByMetadataName(SqlBulkInterface);
+                
+                if (sqlBulkInterface is null) return (typeSymbol, implements: false, missingInterface: true);
+
+                var implements = typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlBulkInterface));
                 
                 return (typeSymbol, implements, missingInterface: false);
             })

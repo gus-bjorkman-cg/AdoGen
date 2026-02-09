@@ -79,4 +79,11 @@ internal static class SqlDiagnostics
         "Type '{0}' has no non-identity key to match on for MERGE. RuleFor Key(...) not also marked Identity(...).",
         category: "Reliability",
         DiagnosticSeverity.Warning, true);
+    
+    public static readonly DiagnosticDescriptor MissingBulkInterface = new(
+        id: "AG011",
+        title: "Cannot find ISqlBulkModel<T>",
+        messageFormat: "Could not resolve ISqlBulkModel<T>. Ensure AdoGen.Abstractions is referenced.",
+        category: "Usage",
+        DiagnosticSeverity.Error, true);
 }
