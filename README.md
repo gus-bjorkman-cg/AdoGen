@@ -75,7 +75,7 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 
 | BenchType     | Method | Mean     | Error    | StdDev   | Median   | Gen0      | Gen1      | Allocated |
 |-------------- |------- |---------:|---------:|---------:|---------:|----------:|----------:|----------:|
-| BulkInsert10K | AdoGen | 120.0 ms |  2.47 ms |  7.01 ms | 117.5 ms |         - |         - |   1.38 MB |                                                                                                                                                                                                  
+| BulkInsert10K | AdoGen | 120.0 ms |  2.47 ms |  7.01 ms | 117.5 ms |         - |         - |   1.38 MB |
 | BulkInsert10K | EfCore | 425.2 ms | 14.83 ms | 43.74 ms | 421.9 ms | 7000.0000 | 1000.0000 |  61.41 MB |
 ```
 
