@@ -6,6 +6,7 @@ using Dapper;
 
 namespace AdoGen.Benchmarks.CommandBenchmarks;
 
+[BenchmarkCategory(nameof(Delete))]
 public class Delete : TestBase
 {
     private User _user = null!;

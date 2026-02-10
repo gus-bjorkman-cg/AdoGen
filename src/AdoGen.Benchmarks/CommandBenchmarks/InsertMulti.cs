@@ -6,20 +6,31 @@ using Dapper;
 
 namespace AdoGen.Benchmarks.CommandBenchmarks;
 
-[BenchmarkCategory("InsertMulti")]
+[BenchmarkCategory(nameof(InsertMulti))]
 public class InsertMulti : TestBase
 {
     private List<User> _users = null!;
     private List<UserModel> _userModels = null!;
+    private readonly UserBulk _bulk = new();
 
     protected override void IterationSetup()
     {
+        _bulk.Clear();
         _users = UserFaker.Generate(10);
         _userModels = _users.Select(x => new UserModel(x.Id, x.Name, x.Email)).ToList();
     }
   
     [Benchmark]
     public async Task AdoGen() => await Connection.InsertAsync(_users, CancellationToken);
+
+    [Benchmark]
+    public async Task AdoGenBulk()
+    {
+        _bulk.AddRange(_users);
+        await using var transaction = Connection.BeginTransaction();
+        await _bulk.SaveChangesAsync(Connection, CancellationToken, transaction);
+        await transaction.CommitAsync(CancellationToken);
+    }
 
     private const string SqlInsert = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES (@Id, @Name, @Email);";
     

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdoGen.Benchmarks.QueryBenchmarks;
 
-[BenchmarkCategory("ToList")]
+[BenchmarkCategory(nameof(ToList))]
 public class ToList : TestBase
 {
     protected override void IterationCleanup() => Index += 10;

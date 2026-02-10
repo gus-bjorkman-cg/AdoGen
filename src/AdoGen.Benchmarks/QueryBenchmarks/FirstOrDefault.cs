@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdoGen.Benchmarks.QueryBenchmarks;
 
-[BenchmarkCategory("FirstOrDefault")]
+[BenchmarkCategory(nameof(FirstOrDefault))]
 public class FirstOrDefault : TestBase
 {
     private string _name = null!;

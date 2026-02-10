@@ -6,7 +6,7 @@ using Dapper;
 
 namespace AdoGen.Benchmarks.CommandBenchmarks;
 
-[BenchmarkCategory("Update")]
+[BenchmarkCategory(nameof(Update))]
 public class Update : TestBase
 {
     private User _user = null!;
