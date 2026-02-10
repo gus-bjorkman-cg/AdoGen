@@ -15,10 +15,10 @@ public sealed class UpdateUserCommandHandlerTests(TestContext testContext) : Tes
         var user = DefaultUsers[0] with { Name = "SomeOtherName"};
         
         // Act
-        await _sut.Handle(new UpdateUserCommand(user), Ct);
+        await _sut.Handle(new UpdateUserCommand(user), CancellationToken);
         
         // Assert
-        var dbUser = await Connection.QueryFirstOrDefaultAsync<User>(Sql, UserSql.CreateParameterId(user.Id), Ct);
+        var dbUser = await Connection.QueryFirstOrDefaultAsync<User>(Sql, UserSql.CreateParameterId(user.Id), CancellationToken);
         dbUser.Should().Be(user);
     }
 }

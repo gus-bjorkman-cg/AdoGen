@@ -14,7 +14,7 @@ public abstract class TestBase : IAsyncLifetime
     protected List<User> DefaultUsers { get; }
     protected List<Order> DefaultOrders { get; }
     protected readonly SqlConnection Connection;
-    protected static CancellationToken Ct => TestContext.CancellationToken;
+    protected static CancellationToken CancellationToken => TestContext.CancellationToken;
 
     protected static readonly Faker<User> UserFaker = new Faker<User>()
         .RuleFor(x => x.Id, Guid.CreateVersion7)
@@ -36,29 +36,29 @@ public abstract class TestBase : IAsyncLifetime
     {
         var transaction = Connection.BeginTransaction();
         await using var cmd = new SqlCommand("SELECT * FROM Users WITH (TABLOCKX)", Connection, transaction);
-        await cmd.ExecuteNonQueryAsync(Ct);
+        await cmd.ExecuteNonQueryAsync(CancellationToken);
         
         return transaction;
     }
 
     private const string GetUserSql = "SELECT TOP(1) * FROM Users WHERE Id = @Id"; 
     protected async ValueTask<User?> GetUser(Guid id) =>
-        await Connection.QueryFirstOrDefaultAsync<User>(GetUserSql, UserSql.CreateParameterId(id), Ct);
+        await Connection.QueryFirstOrDefaultAsync<User>(GetUserSql, UserSql.CreateParameterId(id), CancellationToken);
 
     protected virtual ValueTask InitializeAsync() => ValueTask.CompletedTask;
     protected virtual ValueTask DisposeAsync() => ValueTask.CompletedTask;
     
     async ValueTask IAsyncLifetime.InitializeAsync()
     {
-        await Connection.InsertAsync(DefaultUsers, Ct);
-        await Connection.InsertAsync(DefaultOrders, Ct);
+        await Connection.InsertAsync(DefaultUsers, CancellationToken);
+        await Connection.InsertAsync(DefaultOrders, CancellationToken);
         await InitializeAsync();
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync()
     {
-        await Connection.TruncateAsync<User>(Ct);
-        await Connection.TruncateAsync<Order>(Ct);
+        await Connection.TruncateAsync<User>(CancellationToken);
+        await Connection.TruncateAsync<Order>(CancellationToken);
         await DisposeAsync();
         Connection.Dispose();
         GC.SuppressFinalize(this);

@@ -4,18 +4,18 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
-public sealed class Insert(TestContext testContext) : TestBase(testContext)
+public sealed class InsertListTests(TestContext testContext) : TestBase(testContext)
 {
-    private readonly User _user = UserFaker.Generate();
+    private readonly List<User> _users = UserFaker.Generate(2);
     
     [Fact]
     public async Task User_ShouldBeInserted()
     {
         // Act
-        await Connection.InsertAsync(_user, Ct);
+        await Connection.InsertAsync(_users, CancellationToken);
         
         // Assert
-        (await GetUser(_user.Id)).Should().BeEquivalentTo(_user);
+        (await GetUsers()).Should().BeEquivalentTo(_users);
     }
 
     [Fact]
@@ -25,11 +25,11 @@ public sealed class Insert(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await Connection.InsertAsync(_user, Ct, transaction);
+        await Connection.InsertAsync(_users, CancellationToken, transaction);
         transaction.Rollback();
 
         // Assert
-        (await GetUser(_user.Id)).Should().BeNull();
+        (await GetUsers()).Should().BeEmpty();
     }
 
     [Fact]
@@ -42,11 +42,16 @@ public sealed class Insert(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.InsertAsync(_user, Ct, commandTimeout: 1);
+            await Connection.InsertAsync(_users, CancellationToken, commandTimeout: 1);
         };
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();
         transaction.Rollback();
     }
+    
+    private async ValueTask<List<User>> GetUsers() =>
+        await Connection.QueryAsync<User>("SELECT * FROM Users WHERE Id IN (@Id, @Id2)",
+            [UserSql.CreateParameterId(_users[0].Id), UserSql.CreateParameterId(_users[1].Id, "Id2")]
+            , CancellationToken);
 }

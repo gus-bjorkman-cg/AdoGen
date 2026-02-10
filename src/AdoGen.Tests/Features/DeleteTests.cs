@@ -3,13 +3,13 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
-public sealed class Delete(TestContext testContext) : TestBase(testContext)
+public sealed class DeleteTests(TestContext testContext) : TestBase(testContext)
 {
     [Fact]
     public async Task User_ShouldBeDeleted()
     {
         // Act
-        await Connection.DeleteAsync(DefaultUsers[0], Ct);
+        await Connection.DeleteAsync(DefaultUsers[0], CancellationToken);
         
         // Assert
         (await GetUser(DefaultUsers[0].Id)).Should().BeNull();
@@ -22,7 +22,7 @@ public sealed class Delete(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await Connection.DeleteAsync(DefaultUsers[0], Ct, transaction);
+        await Connection.DeleteAsync(DefaultUsers[0], CancellationToken, transaction);
         transaction.Rollback();
 
         // Assert
@@ -39,7 +39,7 @@ public sealed class Delete(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.DeleteAsync(DefaultUsers[0], Ct, commandTimeout: 1);
+            await Connection.DeleteAsync(DefaultUsers[0], CancellationToken, commandTimeout: 1);
         };
 
         // Assert

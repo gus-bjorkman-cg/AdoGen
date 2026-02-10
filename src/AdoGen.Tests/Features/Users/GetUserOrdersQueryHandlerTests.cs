@@ -19,5 +19,5 @@ public sealed class GetUserOrdersQueryHandlerTests : TestBase
 
     [Fact]
     public async Task UserOrders_ShouldBeReturned() => 
-        (await _sut.Handle(GetUserOrdersQuery.Instance, Ct)) .Should().BeEquivalentTo(_expected);
+        (await _sut.Handle(GetUserOrdersQuery.Instance, CancellationToken)) .Should().BeEquivalentTo(_expected);
 }

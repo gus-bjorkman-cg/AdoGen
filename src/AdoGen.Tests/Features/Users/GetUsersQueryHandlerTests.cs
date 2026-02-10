@@ -8,5 +8,5 @@ public sealed class GetUsersQueryHandlerTests(TestContext testContext) : TestBas
 
     [Fact]
     public async Task GetUsersQueryHandler_ShouldReturnAllUsers() => 
-        (await _sut.Handle(GetUsersQuery.Instance, Ct)).Should().BeEquivalentTo(DefaultUsers);
+        (await _sut.Handle(GetUsersQuery.Instance, CancellationToken)).Should().BeEquivalentTo(DefaultUsers);
 }

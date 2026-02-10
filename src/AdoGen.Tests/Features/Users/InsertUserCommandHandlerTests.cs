@@ -13,11 +13,11 @@ public sealed class InsertUserCommandHandlerTests(TestContext testContext) : Tes
     public async Task InsertUser_ShouldInsertUser()
     {
         // Act
-        var insertedId = (await _sut.Handle(new InsertUserCommand(_user.Name, _user.Email), Ct)).Id;
+        var insertedId = (await _sut.Handle(new InsertUserCommand(_user.Name, _user.Email), CancellationToken)).Id;
         
         // Assert
         var user = await Connection.QueryFirstOrDefaultAsync<User>(SqlGetUser, 
-            UserSql.CreateParameterId(insertedId), Ct);
+            UserSql.CreateParameterId(insertedId), CancellationToken);
 
         user.Should().BeEquivalentTo(_user, e => e.Excluding(x => x.Id));
     }
@@ -26,7 +26,7 @@ public sealed class InsertUserCommandHandlerTests(TestContext testContext) : Tes
     public async Task InsertedUser_ShouldBeReturned()
     {
         // Act
-        var actual = await _sut.Handle(new InsertUserCommand(_user.Name, _user.Email), Ct);
+        var actual = await _sut.Handle(new InsertUserCommand(_user.Name, _user.Email), CancellationToken);
         
         // Assert
         actual.Should().BeEquivalentTo(_user, e => e.Excluding(x => x.Id));

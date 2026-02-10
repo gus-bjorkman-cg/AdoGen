@@ -163,7 +163,7 @@ public static class BulkEmitter
 
             namespace {{{ns}}};
 
-            public sealed class {{{bulkTypeName}}} : ISqlBulkModel
+            public sealed class {{{bulkTypeName}}} : BulkBatch<{{{dtoTypeName}}}>
             {
                 private const int IndexThresholdRows = 500;
                 private const int BulkCopyBatchSize = 5000;
@@ -185,18 +185,14 @@ public static class BulkEmitter
                     {{{applyWithIndex}}}
                     """;
 
-                public static async ValueTask<BulkApplyResult> SaveChangesAsync(
+                public override async ValueTask<BulkApplyResult> SaveChangesAsync(
                     SqlConnection connection,
-                    BulkBatch<{{{dtoTypeName}}}> batch,
                     CancellationToken ct,
                     SqlTransaction? transaction = null,
                     int? commandTimeout = null)
                 {
-                    if (batch is null) throw new ArgumentNullException(nameof(batch));
+                    if (Count == 0) return new BulkApplyResult(0, 0, 0);
                     if (transaction is null) throw new ArgumentNullException(nameof(transaction));
-
-                    if (batch.Count == 0) return new BulkApplyResult(0, 0, 0);
-
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
                     // 1) create temp table
@@ -215,12 +211,12 @@ public static class BulkEmitter
             {{{BulkCopyMappings()}}}
                         bulk.ColumnMappings.Add("Operation", "Operation");
 
-                        using var reader = new __BulkReader(batch);
+                        using var reader = new __BulkReader(this);
                         await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
                     }
 
                     // 3) apply
-                    var sql = batch.Count >= IndexThresholdRows ? SqlApply_WithIndex : SqlApply_NoIndex;
+                    var sql = Count >= IndexThresholdRows ? SqlApply_WithIndex : SqlApply_NoIndex;
                     await using var cmd = connection.CreateCommand(sql, CommandType.Text, transaction, commandTimeout);
                     await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
                     
@@ -416,7 +412,7 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             for (var i = 0; i < dtoProps.Length; i++)
-                sb.AppendLine($"                        \"{dtoProps[i].Name}\" => {i},");
+                sb.AppendLine($"            \"{dtoProps[i].Name}\" => {i},");
             sb.AppendLine($"            \"Operation\" => {dtoProps.Length},");
             return sb.ToString().TrimEnd();
         }
