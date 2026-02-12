@@ -51,8 +51,8 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="ct"></param>
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
-    /// <returns></returns>
-    static abstract ValueTask InsertAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+    /// <returns>Number of affected rows</returns>
+    static abstract ValueTask<int> InsertAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
     
     /// <summary>
     /// Inserts multiple database records in one roundtrip.
@@ -62,8 +62,8 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="ct"></param>
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
-    /// <returns></returns>
-    static abstract ValueTask InsertAsync(List<T> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+    /// <returns>Number of affected rows</returns>
+    static abstract ValueTask<int> InsertAsync(List<T> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
     
     /// <summary>
     /// Updates a database record.
@@ -73,8 +73,8 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="ct"></param>
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
-    /// <returns></returns>
-    static abstract ValueTask UpdateAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+    /// <returns>Number of affected rows</returns>
+    static abstract ValueTask<int> UpdateAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
     
     /// <summary>
     /// Inserts or updates a database record.
@@ -85,7 +85,7 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
     /// <returns></returns>
-    static abstract ValueTask UpsertAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+    static abstract ValueTask<int> UpsertAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
     
     /// <summary>
     /// Deletes a database record.
@@ -95,8 +95,8 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="ct"></param>
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
-    /// <returns></returns>
-    static abstract ValueTask DeleteAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+    /// <returns>Number of affected rows</returns>
+    static abstract ValueTask<int> DeleteAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
     
     /// <summary>
     /// Truncates a database table.
@@ -105,10 +105,17 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="ct"></param>
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
-    /// <returns></returns>
-    static abstract ValueTask TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+    /// <returns>Number of affected rows</returns>
+    static abstract ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
 }
 
-public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted);
+public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted)
+{
+    /// <summary>
+    /// Static property that represents an empty result.
+    /// </summary>
+    public static BulkApplyResult Empty { get; } = new(0, 0, 0);
+}
 
 public interface ISqlBulkModel : ISqlDomainModel;
+public interface ISqlBulkModel<T> : ISqlBulkModel, ISqlDomainModel<T> where T : ISqlBulkModel<T>;

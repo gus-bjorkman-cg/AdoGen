@@ -6,7 +6,7 @@ built around source‑generated mappings and explicit parameter metadata.
 AdoGen focuses on **predictable performance**, **Native AOT compatibility**,  
 and **doing parameter binding correctly**—without magic, reflection, or runtime code generation.
 
-AdoGen outperforms others in multi insert.
+AdoGen outperforms others in multi insert & bulk operations.
 For single operations, dapper and AdoGen are too close to measure mean. 
 Either can win mean for a given run, but AdoGen always win in allocations. 
 ---
@@ -39,11 +39,11 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 ```
 | Type           | Method         | Mean       | Error     | StdDev    | Allocated  |
 |--------------- |--------------- |-----------:|----------:|----------:|-----------:|
-| FirstOrDefault | Dapper         |   1.993 ms | 0.2068 ms | 0.6066 ms |     6.9 KB |
-| FirstOrDefault | AdoGen         |   2.282 ms | 0.1691 ms | 0.4934 ms |    5.77 KB |
-| FirstOrDefault | DapperNoType   |   2.514 ms | 0.1980 ms | 0.5808 ms |    6.51 KB |
-| FirstOrDefault | EfCore         |   3.104 ms | 0.1528 ms | 0.4433 ms |  140.38 KB |
-| FirstOrDefault | EfCoreCompiled |   3.309 ms | 0.1463 ms | 0.4245 ms |  132.11 KB |
+| FirstOrDefault | AdoGen         |   389.4 us |  15.36 us |  45.29 us |    2.82 KB |
+| FirstOrDefault | Dapper         |   397.3 us |  13.74 us |  40.50 us |    6.05 KB |
+| FirstOrDefault | EfCoreCompiled |   402.7 us |  13.57 us |  40.01 us |     7.8 KB |
+| FirstOrDefault | EfCore         |   418.2 us |  15.40 us |  45.40 us |   15.08 KB |
+| FirstOrDefault | DapperNoType   |   433.8 us |  13.71 us |  40.43 us |    5.89 KB |
 | ToList         | AdoGen         |   2.562 ms | 0.2021 ms | 0.5863 ms |    6.97 KB |
 | ToList         | DapperNoType   |   2.635 ms | 0.1950 ms | 0.5720 ms |    8.01 KB |
 | ToList         | Dapper         |   2.724 ms | 0.1595 ms | 0.4653 ms |    8.46 KB |
@@ -61,17 +61,19 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 | Insert         | DapperNoType   |   3.394 ms | 0.2149 ms | 0.6301 ms |    5.59 KB |
 | Insert         | AdoGen         |   3.437 ms | 0.2221 ms | 0.6548 ms |    5.34 KB |
 | Insert         | EfCore         |   3.881 ms | 0.3081 ms | 0.8890 ms |  141.57 KB |
-| InsertMulti 10 | AdoGen         |   3.370 ms | 0.2852 ms | 0.8366 ms |   20.62 KB |
-| InsertMulti 10 | EfCore         |   4.154 ms | 0.2739 ms | 0.8034 ms |  199.86 KB |
-| InsertMulti 10 | DapperNoType   |   8.777 ms | 0.2661 ms | 0.7636 ms |   35.45 KB |
-| InsertMulti 10 | Dapper         |   8.844 ms | 0.2848 ms | 0.7987 ms |   43.71 KB |
-| InsertMulti 10 | AdoGenBulk     |   8.941 ms | 0.2378 ms | 0.6936 ms |   26.99 KB |
+| InsertMulti 10 | AdoGen         |   2.123 ms | 0.1919 ms | 0.5627 ms |    21.2 KB |
+| InsertMulti 10 | AdoGenBulk     |   2.210 ms | 0.1240 ms | 0.3537 ms |   21.41 KB |
+| InsertMulti 10 | EfCore         |   3.454 ms | 0.2932 ms | 0.8506 ms |   76.71 KB |
+| InsertMulti 10 | Dapper         |   7.907 ms | 0.9379 ms | 2.6453 ms |   43.56 KB |
+| InsertMulti 10 | DapperNoType   |   7.991 ms | 0.9167 ms | 2.6153 ms |   35.42 KB |
 | BulkInsert  1K | AdoGen         |   24.58 ms |  0.918 ms |  2.618 ms |  162.32 KB |
 | BulkInsert  1K | EfCore         |   47.65 ms |  5.246 ms | 15.302 ms | 6414.42 KB |
 | BulkUpdate  1K | AdoGen         |   22.34 ms |  0.759 ms |  2.154 ms |   143.3 KB |
 | BulkUpdate  1K | EfCore         |   47.15 ms |  3.398 ms |  9.748 ms | 7179.33 KB |
-| BulkDelete  1K | EfCore         |   455.6 us |  23.90 us |  68.58 us |  123.68 KB |
-| BulkDelete  1K | AdoGen         | 2,293.6 us | 146.40 us | 415.32 us |    1.02 KB |
+| BulkDelete  1K | AdoGenBulk     |   27.34 ms |  0.881 ms |  2.455 ms |  131.46 KB |
+| BulkDelete  1K | EfCore         |   34.73 ms |  3.116 ms |  8.890 ms | 4829.72 KB |
+| BulkDelete  1K | AdoGen         |   78.22 ms |  1.218 ms |  0.951 ms |   459.7 KB |
+
 
 | BenchType     | Method | Mean     | Error    | StdDev   | Median   | Gen0      | Gen1      | Allocated |
 |-------------- |------- |---------:|---------:|---------:|---------:|----------:|----------:|----------:|

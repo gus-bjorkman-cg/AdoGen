@@ -11,46 +11,84 @@ namespace AdoGen.Benchmarks.QueryBenchmarks;
 [BenchmarkCategory(nameof(ToList))]
 public class ToList : TestBase
 {
-    protected override void IterationCleanup() => Index += 10;
-
-    [Benchmark]
-    public async Task AdoGen()
+    private const int OperationCount = 100;
+    
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> AdoGen()
     {
-        var param = new SqlParameter
+        await using var command = new SqlCommand(SqlGetTen, Connection);
+        var parameter = new SqlParameter
         {
             ParameterName = "offset",
-            Value = Index,
+            Value = i,
             Direction = ParameterDirection.Input,
             DbType = DbType.Int32
         };
-        await Connection.QueryAsync<User>(SqlGetTen, param, CancellationToken);
+        command.Parameters.Add(parameter);
+        command.Prepare();
+        
+        for (var i = 0; i < OperationCount; i+= 10)
+        {
+            parameter.Value = i;
+            await command.QueryAsync<User>(CancellationToken);    
+        }
+        
+        return OperationCount;
     }
 
-    [Benchmark]
-    public async Task Dapper()
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> Dapper()
     {
         var parameters = new DynamicParameters();
-        parameters.Add("offset", Index, DbType.Int32);
+        parameters.Add("offset", i, DbType.Int32);
         var command = new CommandDefinition(
             commandText: SqlGetTen,
-            commandType: CommandType.Text, 
+            commandType: CommandType.Text,
             parameters: parameters,
             cancellationToken: CancellationToken);
-        (await Connection.QueryAsync<User>(command)).AsList();
+        
+        for (var i = 0; i < OperationCount; i+= 10)
+        {
+            
+            (await Connection.QueryAsync<User>(command)).AsList();
+        }
+        
+        return OperationCount;
     }
 
-    [Benchmark]
-    public async Task DapperNoType() => 
-        (await Connection.QueryAsync<User>(SqlGetTen, new { offset = Index })).AsList();
-    
-    [Benchmark]
-    public async Task EfCore() =>
-        await DbContext.Users.AsNoTracking().OrderBy(x => x.Id).Take(10).Skip(Index).ToListAsync(CancellationToken);
-    
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> DapperNoType()
+    {
+        for (var i = 0; i < OperationCount; i+= 10)
+        {
+            (await Connection.QueryAsync<User>(SqlGetTen, new { offset = i })).AsList();
+        }
+        
+        return OperationCount;
+    }
+
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> EfCore()
+    {
+        for (var i = 0; i < OperationCount; i += 10)
+        {
+            await DbContext.Users.AsNoTracking().OrderBy(x => x.Id).Take(10).Skip(i).ToListAsync(CancellationToken);
+        }
+        
+        return OperationCount;
+    }
+
     private static readonly Func<TestDbContext, int, IAsyncEnumerable<UserModel>> CompiledUsersAll =
         EF.CompileAsyncQuery((TestDbContext context, int skip) => context.Users.AsNoTracking().OrderBy(x => x.Id).Take(10).Skip(skip));
     
-    [Benchmark]
-    public async Task EfCoreCompiled() =>
-        await CompiledUsersAll(DbContext, Index).ToListAsync(CancellationToken);
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> EfCoreCompiled()
+    {
+        for (var i = 0; i < OperationCount; i += 10)
+        {
+            await CompiledUsersAll(DbContext, i).ToListAsync(CancellationToken);
+        }
+        
+        return OperationCount;
+    }
 }

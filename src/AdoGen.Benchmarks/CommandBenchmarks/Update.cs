@@ -3,6 +3,8 @@ using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
 using Dapper;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 
 namespace AdoGen.Benchmarks.CommandBenchmarks;
 
@@ -11,22 +13,24 @@ public class Update : TestBase
 {
     private User _user = null!;
     private UserModel _userModel = null!;
+    private SqlTransaction _transaction = null!;
     
     protected override async ValueTask Initialize()
     {
-        _user = (await Connection.QueryFirstOrDefaultAsync<User>(SqlGetOne, UserSql.CreateParameterName("0"), CancellationToken))!;
+        _user = (await Connection.QueryFirstOrDefaultAsync<User>(SqlGetOne, UserSql.CreateParameterName("512"), CancellationToken))!;
         _userModel = new UserModel(_user.Id, _user.Name, _user.Email);
-    }
-
-    protected override void IterationCleanup()
-    {
-        Index++;
-        _user = _user with { Name = Index.ToString(), Email = Index.ToString() };
-        _userModel = _userModel with { Name = Index.ToString(), Email =  Index.ToString() };
+        _transaction = Connection.BeginTransaction(IsolationLevel.ReadCommitted);
+        await DbContext.Database.UseTransactionAsync(_transaction);
     }
     
+    [IterationSetup]
+    public void IterationSetup() => _transaction.Save("s");
+    
+    [IterationCleanup]
+    public void IterationCleanup() => _transaction.Rollback("s");
+    
     [Benchmark]
-    public async Task AdoGen() => await Connection.UpdateAsync(_user, CancellationToken);
+    public async Task AdoGen() => await Connection.UpdateAsync(_user, CancellationToken, _transaction);
     
     private const string SqlUpdate = "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id;";
         
@@ -51,18 +55,20 @@ public class Update : TestBase
         var command = new CommandDefinition(
             commandText: SqlUpdate,
             parameters: parameters,
+            transaction: _transaction,
             cancellationToken: CancellationToken);
         
         await Connection.ExecuteAsync(command);
     }
     
     [Benchmark]
-    public async Task DapperNoType() => await Connection.ExecuteAsync(SqlUpdate, _user);
+    public async Task DapperNoType() => await Connection.ExecuteAsync(SqlUpdate, _user, _transaction);
 
     [Benchmark]
     public async Task EfCore()
     {
         DbContext.Users.Update(_userModel);
         await DbContext.SaveChangesAsync(CancellationToken);
+        DbContext.ChangeTracker.Clear();
     }
 }

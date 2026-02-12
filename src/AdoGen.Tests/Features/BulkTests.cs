@@ -17,7 +17,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction(); 
         
         // Act
-        await _bulk.SaveChangesAsync(Connection, CancellationToken, transaction);
+        await _bulk.SaveChangesAsync(Connection, transaction, CancellationToken);
         await transaction.CommitAsync(CancellationToken);
         
         // Assert
@@ -34,7 +34,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await _bulk.SaveChangesAsync(Connection, CancellationToken, transaction);
+        await _bulk.SaveChangesAsync(Connection, transaction, CancellationToken);
         await transaction.CommitAsync(CancellationToken);
         
         // Assert
@@ -50,7 +50,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await _bulk.SaveChangesAsync(Connection, CancellationToken, transaction);
+        await _bulk.SaveChangesAsync(Connection, transaction, CancellationToken);
         await transaction.CommitAsync(CancellationToken);
         
         // Assert
@@ -71,7 +71,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await _bulk.SaveChangesAsync(Connection, CancellationToken, transaction);
+        await _bulk.SaveChangesAsync(Connection, transaction, CancellationToken);
         await transaction.CommitAsync(CancellationToken);
         
         // Assert

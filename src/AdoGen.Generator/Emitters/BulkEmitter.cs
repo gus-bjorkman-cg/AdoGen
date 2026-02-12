@@ -148,6 +148,7 @@ public static class BulkEmitter
 
         var applyNoIndex = BuildApplySql(withIndex: false);
         var applyWithIndex = BuildApplySql(withIndex: true);
+        var typeKeyword = dto.IsRecord ? "record" : "class";
 
         // Generated file
         var src = $$$""""
@@ -163,70 +164,49 @@ public static class BulkEmitter
 
             namespace {{{ns}}};
 
+            public sealed partial {{{typeKeyword}}} {{{dto.Name}}} : ISqlBulkModel<{{{dtoTypeName}}}>;
+            
             public sealed class {{{bulkTypeName}}} : BulkBatch<{{{dtoTypeName}}}>
             {
-                private const int IndexThresholdRows = 500;
-                private const int BulkCopyBatchSize = 5000;
-                private const int DefaultTimeoutSeconds = 30;
-                private const string TempTableName = "{{{tempTableName}}}";
+                private const string _tempTableName = "{{{tempTableName}}}";
 
-                private const string SqlCreateTempTable =
+                private const string _sqlCreateTempTable =
                     """
                     {{{tempTableSql}}}
                     """;
 
-                private const string SqlApply_NoIndex =
+                private const string _sqlApply_NoIndex =
                     """
                     {{{applyNoIndex}}}
                     """;
 
-                private const string SqlApply_WithIndex =
+                private const string _sqlApply_WithIndex =
                     """
                     {{{applyWithIndex}}}
                     """;
 
-                public override async ValueTask<BulkApplyResult> SaveChangesAsync(
-                    SqlConnection connection,
-                    CancellationToken ct,
-                    SqlTransaction? transaction = null,
-                    int? commandTimeout = null)
+                protected override string SqlCreateTempTable => _sqlCreateTempTable;
+                protected override string TempTableName => _tempTableName;
+                protected override string SqlApplyWithIndex => _sqlApply_WithIndex;
+                protected override string SqlApplyNoIndex => _sqlApply_NoIndex;
+                protected override int FieldCount => {{{dtoProps.Length + 1}}};
+            
+                /// <summary>
+                /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
+                /// the items and operations lists.
+                /// </summary>
+                /// <param name="capacity"></param>
+                public {{{bulkTypeName}}}(int capacity = 0) : base(capacity) { }
+            
+                protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
                 {
-                    if (Count == 0) return new BulkApplyResult(0, 0, 0);
-                    if (transaction is null) throw new ArgumentNullException(nameof(transaction));
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
-
-                    // 1) create temp table
-                    await using (var create = connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, commandTimeout))
-                    {
-                        await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                    }
-
-                    using (var bulk = new SqlBulkCopy(connection, SqlBulkCopyOptions.KeepNulls, transaction)
-                    {
-                        DestinationTableName = TempTableName,
-                        BatchSize = BulkCopyBatchSize,
-                        BulkCopyTimeout = commandTimeout ?? DefaultTimeoutSeconds
-                    })
-                    {
+                    using var reader = new __BulkReader(this);
+                    await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
+                }
+                
+                protected override void ApplyColumnMappings(SqlBulkCopy bulk)
+                {
             {{{BulkCopyMappings()}}}
-                        bulk.ColumnMappings.Add("Operation", "Operation");
-
-                        using var reader = new __BulkReader(this);
-                        await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
-                    }
-
-                    // 3) apply
-                    var sql = Count >= IndexThresholdRows ? SqlApply_WithIndex : SqlApply_NoIndex;
-                    await using var cmd = connection.CreateCommand(sql, CommandType.Text, transaction, commandTimeout);
-                    await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
-                    
-                    if (!await resultReader.ReadAsync(ct).ConfigureAwait(false))
-                        throw new InvalidOperationException("Bulk apply did not return result row.");
-
-                    return new BulkApplyResult(
-                        Inserted: resultReader.GetInt32(0),
-                        Updated: resultReader.GetInt32(1),
-                        Deleted: resultReader.GetInt32(2));
                 }
 
                 private sealed class __BulkReader : BulkDataReaderBase
@@ -236,7 +216,7 @@ public static class BulkEmitter
 
                     public __BulkReader(BulkBatch<{{{dtoTypeName}}}> batch) => _batch = batch;
 
-                    public override bool Read() => ++_index < _batch.Count;
+                    public override bool Read() => ++_index < _batch.Items.Count;
                     public override int FieldCount => {{{dtoProps.Length + 1}}};
 
                     public override object GetValue(int i)
@@ -266,7 +246,6 @@ public static class BulkEmitter
                         _ => throw new IndexOutOfRangeException()
                     };
 
-                    
                     public override int GetOrdinal(string name) => name switch
                     {
             {{{GetOrdinalSwitch()}}}
@@ -340,7 +319,7 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             foreach (var p in dtoProps)
-                sb.AppendLine($"            bulk.ColumnMappings.Add(\"{p.Name}\", \"{p.Name}\");");
+                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{p.Name}\", \"{p.Name}\");");
             return sb.ToString().TrimEnd();
         }
 

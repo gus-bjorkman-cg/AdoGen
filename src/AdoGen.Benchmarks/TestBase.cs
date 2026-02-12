@@ -5,7 +5,6 @@ using BenchmarkDotNet.Attributes;
 using Bogus;
 using Bogus.Extensions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
 
 namespace AdoGen.Benchmarks;
@@ -13,7 +12,6 @@ namespace AdoGen.Benchmarks;
 public abstract class TestBase
 {
     private static MsSqlContainer? _msSqlContainer;
-    private IDbContextFactory<TestDbContext> _dbContextFactory = null!;
     private string _connectionString = "";
     
     private static readonly CancellationTokenSource CancellationTokenSource = new();
@@ -21,8 +19,6 @@ public abstract class TestBase
     
     protected SqlConnection Connection { get; private set; } = null!;
     protected TestDbContext DbContext { get; private set; } = null!;
-
-    protected static int Index { get; set => field = field == 1000 ? 0 : value; }
 
     private const string SqlCreateDb = "CREATE DATABASE [TestDb]";
     protected const string SqlGetOne = "SELECT TOP(1) * FROM Users WHERE Name = @Name";
@@ -54,33 +50,12 @@ public abstract class TestBase
         await using var seedCommand = Connection.CreateCommand(SeedUsersSql);
         await seedCommand.ExecuteNonQueryAsync(CancellationToken);
         
-        var services = new ServiceCollection();
-        services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlServer(_connectionString));
-        var provider = services.BuildServiceProvider();
-        _dbContextFactory = provider.GetRequiredService<IDbContextFactory<TestDbContext>>();
-        
+        var dbContextOptions = new DbContextOptionsBuilder<TestDbContext>().UseSqlServer(Connection).Options;
+        DbContext = new TestDbContext(dbContextOptions);
         await Initialize();
     }
 
     protected virtual ValueTask Initialize() => ValueTask.CompletedTask;
-
-    [IterationSetup]
-    public void SetUp()
-    {
-        DbContext = _dbContextFactory.CreateDbContext();
-        IterationSetup();
-    }
-    
-    protected virtual void IterationSetup() { }
-    
-    [IterationCleanup]
-    public void CleanUp()
-    {
-        IterationCleanup();
-        DbContext.Dispose();
-    }
-    
-    protected virtual void IterationCleanup() { }
 
     private const string CreateUsersSql =
         """
@@ -93,7 +68,7 @@ public abstract class TestBase
         CREATE NONCLUSTERED INDEX IX_Users_Name ON dbo.Users (Name);
         """;
 
-        private const string SeedUsersSql =
+    private const string SeedUsersSql =
         """
         SET NoCount ON;
         DECLARE @index INT = 0;
@@ -110,6 +85,7 @@ public abstract class TestBase
     {
         await Dispose();
         await Connection.DisposeAsync();
+        await DbContext.DisposeAsync();
         if (_msSqlContainer is not null) await _msSqlContainer.DisposeAsync();
         CancellationTokenSource.Dispose();
     }

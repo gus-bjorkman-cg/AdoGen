@@ -3,6 +3,7 @@ using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
 using Dapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdoGen.Benchmarks.QueryBenchmarks;
@@ -10,57 +11,95 @@ namespace AdoGen.Benchmarks.QueryBenchmarks;
 [BenchmarkCategory(nameof(FirstOrDefault))]
 public class FirstOrDefault : TestBase
 {
-    private string _name = null!;
+    private const int OperationCount = 1000;
+    private string[] _names = null!;
 
-    protected override void IterationCleanup()
+    protected override ValueTask Initialize()
     {
-        Index++;
-        _name = Index.ToString();
+        _names = Enumerable.Range(0, OperationCount).Select(x => x.ToString()).ToArray();
+        return ValueTask.CompletedTask;
     }
-    
-    [Benchmark]
-    public async Task AdoGen() => 
-        await Connection.QueryFirstOrDefaultAsync<User>(
-            SqlGetOne, 
-            UserSql.CreateParameterName(_name), 
-            CancellationToken);
 
-    [Benchmark]
-    public async Task Dapper()
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> AdoGen()
+    {
+        await using var command = new SqlCommand(SqlGetOne, Connection);
+        var parameter = UserSql.CreateParameterName("");
+        command.Parameters.Add(parameter);
+        command.Prepare();
+        
+        for (var i = 0; i < _names.Length; i++)
+        {
+            parameter.Value = _names[i];
+            await command.QueryFirstOrDefaultAsync<User>(CancellationToken);
+        }
+        
+        return OperationCount;
+    }
+
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> Dapper()
     {
         var parameters = new DynamicParameters();
-        parameters.Add("Name", new DbString
+        var dbString = new DbString
         {
             IsAnsi = true,
             Length = 20,
-            Value = _name
-        });
-        
+            Value = ""
+        };
+        parameters.Add("Name", dbString);
+
         var command = new CommandDefinition(
             commandText: SqlGetOne,
             parameters: parameters,
-            commandType: CommandType.Text, 
+            commandType: CommandType.Text,
             cancellationToken: CancellationToken);
         
-        await Connection.QueryFirstOrDefaultAsync<User>(command);
+        for (var i = 0; i < _names.Length; i++)
+        {
+            dbString.Value = _names[i];
+            await Connection.QueryFirstOrDefaultAsync<User>(command);
+        }
+        
+        return OperationCount;
     }
 
-    [Benchmark]
-    public async Task DapperNoType() => 
-        await Connection.QueryFirstOrDefaultAsync<User>(SqlGetOne, new { Name = _name });
-    
-    [Benchmark]
-    public async Task EfCore() =>
-        await DbContext.Users
-            .AsNoTracking()
-            .Where(x => x.Name == _name)
-            .FirstOrDefaultAsync(CancellationToken);
-    
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> DapperNoType()
+    {
+        for (var i = 0; i < _names.Length; i++)
+            await Connection.QueryFirstOrDefaultAsync<User>(SqlGetOne, new { Name = i });
+        
+        return OperationCount;
+    }
+
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> EfCore()
+    {
+        for (var i = 0; i < _names.Length; i++)
+        {
+            var name = _names[i]; // avoid closure capture
+            await DbContext.Users
+                .AsNoTracking()
+                .Where(x => x.Name == name)
+                .FirstOrDefaultAsync(CancellationToken);    
+        }
+        
+        return OperationCount;
+    }
+
     private static readonly Func<TestDbContext, string, IAsyncEnumerable<UserModel>> CompiledByName =
         EF.CompileAsyncQuery((TestDbContext context, string name) =>
             context.Users.AsNoTracking().Where(x => x.Name == name));
     
-    [Benchmark]
-    public async Task EfCoreCompiled() =>
-        await CompiledByName(DbContext, _name).FirstOrDefaultAsync(CancellationToken);
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public async Task<int> EfCoreCompiled()
+    {
+        for (var i = 0; i < _names.Length; i++)
+        {
+            await CompiledByName(DbContext, _names[i]).FirstOrDefaultAsync(CancellationToken);
+        }
+        
+        return OperationCount;
+    }
 }
