@@ -14,10 +14,10 @@ public sealed class UpsertUserCommandHandlerTests(TestContext testContext) : Tes
     public async Task User_ShouldBeCreated_WhenNotExisting()
     {
         // Act
-        await _sut.Handle(new UpsertUserCommand(_user), Ct);
+        await _sut.Handle(new UpsertUserCommand(_user), CancellationToken);
         
         // Assert
-        var user = await Connection.QueryFirstOrDefaultAsync<User>(Sql, UserSql.CreateParameterId(_user.Id), Ct);
+        var user = await Connection.QueryFirstOrDefaultAsync<User>(Sql, UserSql.CreateParameterId(_user.Id), CancellationToken);
         user.Should().Be(_user);
     }
     
@@ -28,10 +28,10 @@ public sealed class UpsertUserCommandHandlerTests(TestContext testContext) : Tes
         var user = _user with{Id = DefaultUsers[0].Id};
         
         // Act
-        await _sut.Handle(new UpsertUserCommand(user), Ct);
+        await _sut.Handle(new UpsertUserCommand(user), CancellationToken);
         
         // Assert
-        var dbUser = await Connection.QueryFirstOrDefaultAsync<User>(Sql, UserSql.CreateParameterId(user.Id), Ct);
+        var dbUser = await Connection.QueryFirstOrDefaultAsync<User>(Sql, UserSql.CreateParameterId(user.Id), CancellationToken);
         dbUser.Should().Be(user);
     }
 }

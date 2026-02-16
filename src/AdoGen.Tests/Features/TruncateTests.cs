@@ -4,13 +4,13 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
-public sealed class Truncate(TestContext testContext) : TestBase(testContext)
+public sealed class TruncateTests(TestContext testContext) : TestBase(testContext)
 {
     [Fact]
     public async Task UsersCount_ShouldBeZero_WhenTruncated()
     {
         // Act
-        await Connection.TruncateAsync<User>(Ct);
+        await Connection.TruncateAsync<User>(CancellationToken);
         
         // Assert
         (await GetUsersCount()).Should().Be(0);
@@ -23,7 +23,7 @@ public sealed class Truncate(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await Connection.TruncateAsync<User>(Ct, transaction);
+        await Connection.TruncateAsync<User>(CancellationToken, transaction);
         transaction.Rollback();
 
         // Assert
@@ -40,7 +40,7 @@ public sealed class Truncate(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await connectionB.TruncateAsync<User>(Ct, commandTimeout: 1);
+            await connectionB.TruncateAsync<User>(CancellationToken, commandTimeout: 1);
         };
 
         // Assert
@@ -51,6 +51,6 @@ public sealed class Truncate(TestContext testContext) : TestBase(testContext)
     private async ValueTask<int> GetUsersCount()
     {
         await using var command = Connection.CreateCommand("SELECT COUNT(*) FROM Users");
-        return (int)await command.ExecuteScalarAsync(Ct);
+        return (int)await command.ExecuteScalarAsync(CancellationToken);
     }
 }

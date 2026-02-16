@@ -168,6 +168,48 @@ internal static class DomainOpsEmitter
                         WHEN NOT MATCHED THEN INSERT ({string.Join(", ", insertCols2)}) VALUES ({string.Join(", ", insertValues2)});
              """;
 
+        var deleteSrc = "";
+        if (info.Keys.Length == 1)
+        {
+            var keyName = info.Keys[0];
+            var keyType = info.ParamsByProperty[keyName].PropertyType
+                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var deleteBatchSql = $"DELETE FROM [{info.Schema}].[{info.Table}] WHERE [{keyName}] IN (";
+            
+            deleteSrc =
+                $$""""
+                  
+                  public sealed partial {{typeKeyword}} {{dto.Name}} : ISingleIdModel<{{dtoTypeName}}, {{keyType}}>
+                  {
+                      private const string SqlDeleteBatchTemplate = "{{deleteBatchSql}}";
+                  
+                      public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                      {
+                          if (ids is null || ids.Count == 0) return 0;
+                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          
+                          var sb = new StringBuilder(SqlDeleteBatchTemplate);
+                          for (var i = 0; i < ids.Count; i++)
+                          {
+                              if (i > 0) sb.Append(',');
+                              sb.Append($"@p{i}");
+                          }
+                          sb.Append(')');
+                          
+                          await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
+                          
+                          for (var i = 0; i < ids.Count; i++)
+                          {
+                              cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
+                          }
+                          
+                          return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                      }
+                  }
+                  
+                  """";
+        }
+
         var truncateSql = $"TRUNCATE TABLE [{info.Schema}].[{info.Table}];";
         
         var src = $$""""
@@ -184,7 +226,7 @@ internal static class DomainOpsEmitter
             using AdoGen.Abstractions;
 
             namespace {{ns}};
-
+            {{deleteSrc}}
             public sealed partial {{typeKeyword}} {{dto.Name}} : ISqlDomainModel<{{dtoTypeName}}>
             {
                 private const string SqlCreateTable = 
@@ -210,18 +252,30 @@ internal static class DomainOpsEmitter
                     await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask InsertAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> InsertAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
             {{ParamAdd("model")}}
-                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                // TODO: batching over 2100 parameters is not supported yet
-                public static async ValueTask InsertAsync(List<{{dtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                /// <summary>
+                /// Inserts multiple database records in one roundtrip. 
+                /// Will throw if parameter count exceeds SQL Server limit (2100).
+                /// For type {{dtoTypeName}}, each record will use {{nonIdentityPropCount}} parameters.
+                /// Resulting in a max insert count of {{2100 / nonIdentityPropCount}} per batch.
+                /// For larger inserts, consider using SqlBulkCopy or multiple batches.
+                /// </summary>
+                /// <param name="models"></param>
+                /// <param name="connection"></param>
+                /// <param name="ct"></param>
+                /// <param name="transaction"></param>
+                /// <param name="commandTimeout"></param>
+                /// <returns>Number of affected rows</returns>
+                public static async ValueTask<int> InsertAsync(List<{{dtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (models is null || models.Count == 0) return;
+                    if (models is null || models.Count == 0) return 0;
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     
                     var sb = new StringBuilder(SqlInsertBatchTemplate);
@@ -235,9 +289,7 @@ internal static class DomainOpsEmitter
                 
                         for (var columnIndex = 0; columnIndex < NonIdentityPropertyCount; columnIndex++)
                         {
-                            if (columnIndex > 0)
-                                sb.Append(',');
-                
+                            if (columnIndex > 0) sb.Append(',');
                             sb.Append($"@p{paramIndex + columnIndex}");
                         }
                 
@@ -254,38 +306,38 @@ internal static class DomainOpsEmitter
             {{ParamAddBatchFlat("model", "paramIndex")}}
                     }
             
-                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask UpdateAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> UpdateAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
             {{ParamAddForUpdate("model")}}
-                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask DeleteAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> DeleteAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
             {{ParamAddForDelete("model")}}
-                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask UpsertAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> UpsertAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
             {{ParamAdd("model")}}
-                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlTruncate, CommandType.Text, transaction, commandTimeout);
-                    await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
             }
             """";

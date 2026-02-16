@@ -28,7 +28,15 @@ public sealed class SqlBuilderGenerator : IIncrementalGenerator
         var domainInputs = domainTypes
             .Combine(profilesIndex)
             .Combine(context.CompilationProvider);
-
+        
         context.RegisterSourceOutput(domainInputs, DomainOpsEmitter.Emit);
+        
+        // --- Bulk model ops (ISqlBulkModel<T>) ---
+        var bulkTypes = Discovery.FilterBySqlBulkInterface(context, candidates);
+        var bulkInputs = bulkTypes
+            .Combine(profilesIndex)
+            .Combine(context.CompilationProvider);
+        
+        context.RegisterSourceOutput(bulkInputs, BulkEmitter.Emit);
     }
 }

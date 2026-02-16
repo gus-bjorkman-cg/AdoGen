@@ -1,19 +1,33 @@
-Ado code gen for C#, reflection free and AOT compatible db querying.
-======================
+# AdoGen
+
+**A high‑performance, reflection‑free micro‑ORM for .NET**  
+built around source‑generated mappings and explicit parameter metadata.
+
+AdoGen focuses on **predictable performance**, **Native AOT compatibility**,  
+and **doing parameter binding correctly**—without magic, reflection, or runtime code generation.
+
+AdoGen outperforms others in multi insert & bulk operations.
+---
 
 Project description
 -------------------
-Alfa release, only supporting .net 10.
+Alfa release, only supporting .net 10 & Sql server.
 Configuration inspired by [`FluentValidation`](https://github.com/JeremySkinner/FluentValidation).
 Querying inspired by [`Dapper`](https://github.com/DapperLib/Dapper)
 
-Implement ISqlResult on a partial class or record and the source generator will implement Sql and mapper help 
-class. Or ISqlDomainModel if you also want some standard crud implementations.
+Implementing ISqlResult triggers source generation for mapper helper classes.
+Implementing ISqlDomainModel triggers source generation of standard crud implementations.
+Creating a SqlProfile triggers db parameter generation.
+
+Class or record must be partial to trigger source generation.
+SqlProfile must be imlpemented for ISqlDomainModel to work.
+ISqlDomainModel inherits from ISqlResult, so it can be used for query results as well.
 
 Benchmarks
 -------------------
-DapperNoType = dapper with parameter as object and no cancellation token.
+DapperNoType (NT) = dapper with parameter as object and no cancellation token.
 Dapper = dapper with typed parameters and cancellation token.
+InsertMulti is benchmarked on insert of 10 records.
 
 BenchmarkDotNet v0.15.8, macOS Tahoe 26.2 (25C56) [Darwin 25.2.0]
 Apple M4, 1 CPU, 10 logical and 10 physical cores                                                                                                                                  
@@ -21,24 +35,48 @@ Apple M4, 1 CPU, 10 logical and 10 physical cores
 [Host]     : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a                                                                                                         
 DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 ```
-| BenchType    | Method         | Mean       | Error     | StdDev    | Median     | Gen0    | Gen1   | Allocated |
-|------------- |--------------- |-----------:|----------:|----------:|-----------:|--------:|-------:|----------:|
-| AdoGen       | FirstOrDefault |   445.9 us |  15.14 us |  44.64 us |   465.3 us |       - |      - |   6.29 KB |
-| Dapper       | FirstOrDefault |   448.0 us |  14.96 us |  44.12 us |   454.1 us |       - |      - |   7.06 KB |
-| DapperNoType | FirstOrDefault |   494.6 us |  15.27 us |  45.01 us |   511.7 us |       - |      - |   6.55 KB |
-| EfCompiled   | FirstOrDefault |   512.7 us |  15.23 us |  44.92 us |   530.2 us |  9.7656 | 0.9766 |  82.75 KB |
-| EfCore       | FirstOrDefault |   537.4 us |  14.27 us |  42.08 us |   551.8 us | 10.7422 | 0.9766 |  90.33 KB |
-| AdoGen       | ToList         |   468.1 us |   9.25 us |  21.79 us |   476.4 us |  0.4883 |      - |   7.62 KB |
-| DapperNoType | ToList         |   490.7 us |  14.29 us |  42.12 us |   499.1 us |  0.9766 |      - |   8.13 KB |
-| Dapper       | ToList         |   493.7 us |  13.97 us |  41.19 us |   508.9 us |  0.9766 |      - |   8.58 KB |
-| EfCompiled   | ToList         |   495.9 us |  14.67 us |  43.26 us |   516.2 us |  9.7656 | 0.9766 |  82.79 KB |
-| EfCore       | ToList         |   514.0 us |  13.86 us |  40.88 us |   525.2 us | 10.7422 | 0.9766 |  91.22 KB |
-| DapperNoType | Insert         |   683.8 us |  16.51 us |  48.69 us |   699.4 us |       - |      - |   6.26 KB |
-| EfCore       | Insert         |   803.9 us |  36.31 us | 107.08 us |   758.7 us |  9.7656 |      - |  92.52 KB |
-| AdoGen       | Insert         |   879.3 us |  60.15 us | 177.36 us |   865.8 us |       - |      - |   6.71 KB |
-| AdoGen       | InsertMulti    |   912.9 us |  42.81 us | 125.56 us |   927.5 us |  1.9531 |      - |  28.36 KB |
-| EfCore       | InsertMulti    | 1,107.8 us |  35.74 us | 105.38 us | 1,160.0 us | 17.5781 | 1.9531 | 155.59 KB |
-| DapperNoType | InsertMulti    | 6,679.3 us | 304.40 us | 897.53 us | 6,647.7 us |       - |      - |  43.12 KB |
+| Type           | Method     | Mean       | Error     | StdDev    | Gen0   | Allocated  |
+|--------------- |----------- |-----------:|----------:|----------:|-------:|-----------:|
+| FirstOrDefault | AdoGen     |   389.4 us |  15.36 us |  45.29 us |      - |    2.82 KB |
+| FirstOrDefault | Dapper     |   397.3 us |  13.74 us |  40.50 us |      - |    6.05 KB |
+| FirstOrDefault | EfCoreComp |   402.7 us |  13.57 us |  40.01 us |      - |     7.8 KB |
+| FirstOrDefault | EfCore     |   418.2 us |  15.40 us |  45.40 us |      - |   15.08 KB |
+| FirstOrDefault | DapperNT   |   433.8 us |  13.71 us |  40.43 us |      - |    5.89 KB |
+| ToList         | AdoGen     |   38.80 us |  0.771 us |  0.825 us |      - |      453 B |
+| ToList         | EfCore     |   39.98 us |  0.444 us |  0.393 us | 0.1563 |     1705 B |
+| ToList         | DapperNT   |   39.99 us |  0.691 us |  0.768 us | 0.0781 |      778 B |
+| ToList         | EfCoreComp |   39.99 us |  0.793 us |  1.187 us | 0.0781 |      835 B |
+| ToList         | Dapper     |   40.12 us |  0.787 us |  1.024 us | 0.0781 |      825 B |
+| Delete         | Dapper     |   1.835 ms | 0.1778 ms | 0.5129 ms |      - |    5.25 KB |
+| Delete         | AdoGen     |   1.837 ms | 0.1543 ms | 0.4477 ms |      - |    4.34 KB |
+| Delete         | DapperNT   |   1.870 ms | 0.2065 ms | 0.6088 ms |      - |     4.8 KB |
+| Delete         | EfCore     |   2.411 ms | 0.2269 ms | 0.6692 ms |      - |   19.52 KB |
+| Update         | AdoGen     |   1.728 ms | 0.1309 ms | 0.3819 ms |      - |    5.17 KB |
+| Update         | Dapper     |   1.777 ms | 0.1286 ms | 0.3712 ms |      - |    6.32 KB |
+| Update         | DapperNT   |   1.957 ms | 0.0966 ms | 0.2755 ms |      - |    5.52 KB |
+| Update         | EfCore     |   2.373 ms | 0.1987 ms | 0.5734 ms |      - |  142.53 KB |
+| Insert         | AdoGen     |   1.830 ms | 0.1178 ms | 0.3454 ms |      - |     5.3 KB |
+| Insert         | DapperNT   |   1.902 ms | 0.1093 ms | 0.3170 ms |      - |    5.59 KB |
+| Insert         | Dapper     |   1.986 ms | 0.1130 ms | 0.3279 ms |      - |    6.48 KB |
+| Insert         | EfCore     |   2.642 ms | 0.1911 ms | 0.5575 ms |      - |   20.09 KB |
+| InsertMulti 10 | AdoGen     |   2.012 ms | 0.1370 ms | 0.3974 ms |      - |    21.2 KB |
+| InsertMulti 10 | AdoGenBulk |   2.030 ms | 0.1248 ms | 0.3580 ms |      - |   21.63 KB |
+| InsertMulti 10 | EfCore     |   2.964 ms | 0.2426 ms | 0.7076 ms |      - |   76.87 KB |
+| InsertMulti 10 | DapperNT   |   5.997 ms | 0.3707 ms | 1.0516 ms |      - |   35.44 KB |
+| InsertMulti 10 | Dapper     |   6.618 ms | 0.6183 ms | 1.7839 ms |      - |   43.69 KB |
+| BulkInsert  1K | AdoGen     |   20.90 ms |  0.519 ms |  1.481 ms |      - |  161.98 KB |
+| BulkInsert  1K | EfCore     |   37.02 ms |  2.751 ms |  7.893 ms |      - | 6091.48 KB |
+| BulkUpdate  1K | AdoGen     |   22.34 ms |  0.759 ms |  2.154 ms |      - |   143.3 KB |
+| BulkUpdate  1K | EfCore     |   47.15 ms |  3.398 ms |  9.748 ms |      - | 7179.33 KB |
+| BulkDelete  1K | AdoGenBulk |  21.183 ms | 0.4218 ms | 1.0186 ms |      - |   131.4 KB |
+| BulkDelete  1K | EfCore     |  33.528 ms | 3.0904 ms | 8.9165 ms |      - | 4829.72 KB |
+| BulkDelete  1K | AdoGen     |  74.423 ms | 1.4864 ms | 2.0346 ms |      - |   459.7 KB |
+
+
+| Type          | Method | Mean      | Error    | StdDev    | Median    | Gen0      | Gen1      | Allocated   |
+|-------------- |------- |----------:|---------:|----------:|----------:|----------:|----------:|------------:|
+| BulkInsert10K | AdoGen |  83.97 ms | 1.648 ms |  3.292 ms |  82.85 ms |         - |         - |  1412.44 KB |
+| BulkInsert10K | EfCore | 337.39 ms | 7.844 ms | 23.004 ms | 329.94 ms | 7000.0000 | 2000.0000 | 60923.84 KB |
 ```
 
 Example usage

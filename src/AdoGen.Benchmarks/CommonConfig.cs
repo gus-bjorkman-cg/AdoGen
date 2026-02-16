@@ -17,14 +17,14 @@ public sealed class CommonConfig : ManualConfig
         AddDiagnoser(MemoryDiagnoser.Default);
         AddLogger(ConsoleLogger.Default);
         AddColumnProvider(DefaultColumnProviders.Instance);
-        AddColumn(new BenchTypeColum());
+        AddColumn(new BenchTypeColumn());
         Orderer = new DefaultOrderer(SummaryOrderPolicy.FastestToSlowest);
         Options |= ConfigOptions.JoinSummary;
     }
     
-    private sealed class BenchTypeColum : IColumn
+    private sealed class BenchTypeColumn : IColumn
     {
-        public string Id => nameof(BenchTypeColum);
+        public string Id => nameof(BenchTypeColumn);
         public string ColumnName => "BenchType";
         public string Legend => "The tested bench type";
         public bool IsAvailable(Summary _) => true;
@@ -36,7 +36,7 @@ public sealed class CommonConfig : ManualConfig
         public bool IsDefault(Summary _, BenchmarkCase __) => false;
         
         public string GetValue(Summary _, BenchmarkCase benchmarkCase) => 
-            benchmarkCase.Descriptor.WorkloadMethod.DeclaringType!.Name.Replace("Benchmarks", "");
+            benchmarkCase.Descriptor.WorkloadMethod.DeclaringType!.Name;
         
         public string GetValue(Summary summary, BenchmarkCase benchmarkCase, SummaryStyle _) => 
             GetValue(summary, benchmarkCase);

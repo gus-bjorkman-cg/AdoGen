@@ -4,18 +4,18 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
-public sealed class InsertList(TestContext testContext) : TestBase(testContext)
+public sealed class InsertTests(TestContext testContext) : TestBase(testContext)
 {
-    private readonly List<User> _users = UserFaker.Generate(2);
+    private readonly User _user = UserFaker.Generate();
     
     [Fact]
     public async Task User_ShouldBeInserted()
     {
         // Act
-        await Connection.InsertAsync(_users, Ct);
+        await Connection.InsertAsync(_user, CancellationToken);
         
         // Assert
-        (await GetUsers()).Should().BeEquivalentTo(_users);
+        (await GetUser(_user.Id)).Should().BeEquivalentTo(_user);
     }
 
     [Fact]
@@ -25,11 +25,11 @@ public sealed class InsertList(TestContext testContext) : TestBase(testContext)
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await Connection.InsertAsync(_users, Ct, transaction);
+        await Connection.InsertAsync(_user, CancellationToken, transaction);
         transaction.Rollback();
 
         // Assert
-        (await GetUsers()).Should().BeEmpty();
+        (await GetUser(_user.Id)).Should().BeNull();
     }
 
     [Fact]
@@ -42,16 +42,11 @@ public sealed class InsertList(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.InsertAsync(_users, Ct, commandTimeout: 1);
+            await Connection.InsertAsync(_user, CancellationToken, commandTimeout: 1);
         };
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();
         transaction.Rollback();
     }
-    
-    private async ValueTask<List<User>> GetUsers() =>
-        await Connection.QueryAsync<User>("SELECT * FROM Users WHERE Id IN (@Id, @Id2)",
-            [UserSql.CreateParameterId(_users[0].Id), UserSql.CreateParameterId(_users[1].Id, "Id2")]
-            , Ct);
 }

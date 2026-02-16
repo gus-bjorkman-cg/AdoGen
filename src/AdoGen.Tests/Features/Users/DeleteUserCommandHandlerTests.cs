@@ -16,10 +16,10 @@ public sealed class DeleteUserCommandHandlerTests(TestContext testContext) : Tes
         var id = DefaultUsers[0].Id;
         
         // Act
-        await _sut.Handle(new DeleteUserCommand(id), Ct);
+        await _sut.Handle(new DeleteUserCommand(id), CancellationToken);
         
         // Assert
-        var user = await Connection.QueryFirstOrDefaultAsync<User>(SqlSelectById, UserSql.CreateParameterId(id), Ct);
+        var user = await Connection.QueryFirstOrDefaultAsync<User>(SqlSelectById, UserSql.CreateParameterId(id), CancellationToken);
         user.Should().BeNull();
     }
 }

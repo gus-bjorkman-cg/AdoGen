@@ -3,43 +3,30 @@ using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
-public sealed class Upsert(TestContext testContext) : TestBase(testContext)
+public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
 {
     [Fact]
-    public async Task User_ShouldBeUpdated_WhenExisting()
+    public async Task User_ShouldBeUpdated()
     {
         // Arrange
         var user = DefaultUsers[0] with { Name = "other name" };
         
         // Act
-        await Connection.UpsertAsync(user, Ct);
-        
-        // Assert
-        (await GetUser(user.Id)).Should().Be(user);
-    }
-    
-    [Fact]
-    public async Task User_ShouldBeCreated_WhenNotExisting()
-    {
-        // Arrange
-        var user = UserFaker.Generate();
-        
-        // Act
-        await Connection.UpsertAsync(user, Ct);
+        await Connection.UpdateAsync(user, CancellationToken);
         
         // Assert
         (await GetUser(user.Id)).Should().Be(user);
     }
 
     [Fact]
-    public async Task Upsert_ShouldRespectDbTransaction()
+    public async Task Update_ShouldRespectDbTransaction()
     {
         // Arrange
         await using var transaction = Connection.BeginTransaction();
         var user = DefaultUsers[0] with { Name = "other name" };
         
         // Act
-        await Connection.UpsertAsync(user, Ct, transaction);
+        await Connection.UpdateAsync(user, CancellationToken, transaction);
         transaction.Rollback();
 
         // Assert
@@ -47,7 +34,7 @@ public sealed class Upsert(TestContext testContext) : TestBase(testContext)
     }
 
     [Fact]
-    public async Task Upsert_ShouldRespectCommandTimeout()
+    public async Task Update_ShouldRespectCommandTimeout()
     {
         // Arrange
         await using var transaction = await LockUserTable();
@@ -56,7 +43,7 @@ public sealed class Upsert(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.UpsertAsync(DefaultUsers[0], Ct, commandTimeout: 1);
+            await Connection.UpdateAsync(DefaultUsers[0], CancellationToken, commandTimeout: 1);
         };
 
         // Assert
