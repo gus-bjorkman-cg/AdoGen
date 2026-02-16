@@ -109,6 +109,13 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     static abstract ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
 }
 
+/// <summary>
+/// Struct that represents the result of a bulk apply operation,
+/// containing the number of inserted, updated, and deleted records.
+/// </summary>
+/// <param name="Inserted"></param>
+/// <param name="Updated"></param>
+/// <param name="Deleted"></param>
 public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted)
 {
     /// <summary>
@@ -117,5 +124,13 @@ public readonly record struct BulkApplyResult(int Inserted, int Updated, int Del
     public static BulkApplyResult Empty { get; } = new(0, 0, 0);
 }
 
+/// <summary>
+/// Interface used to generate ado gen bulk operations class.
+/// </summary>
 public interface ISqlBulkModel : ISqlDomainModel;
+
+/// <summary>
+/// Interface used by ado gen to make bulk operations class to work.
+/// </summary>
+/// <typeparam name="T"></typeparam>
 public interface ISqlBulkModel<T> : ISqlBulkModel, ISqlDomainModel<T> where T : ISqlBulkModel<T>;

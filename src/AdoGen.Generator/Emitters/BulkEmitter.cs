@@ -213,7 +213,7 @@ public static class BulkEmitter
                 {
                     private readonly BulkBatch<{{{dtoTypeName}}}> _batch;
                     private int _index = -1;
-                    private {{{dtoTypeName}}} _item;
+                    private {{{dtoTypeName}}} _item = null!;
                     private char _op;
 
                     public __BulkReader(BulkBatch<{{{dtoTypeName}}}> batch) => _batch = batch;
