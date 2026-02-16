@@ -20,7 +20,7 @@ public class ToList : TestBase
         var parameter = new SqlParameter
         {
             ParameterName = "offset",
-            Value = i,
+            Value = "",
             Direction = ParameterDirection.Input,
             DbType = DbType.Int32
         };
@@ -39,16 +39,15 @@ public class ToList : TestBase
     [Benchmark(OperationsPerInvoke = OperationCount)]
     public async Task<int> Dapper()
     {
-        var parameters = new DynamicParameters();
-        parameters.Add("offset", i, DbType.Int32);
-        var command = new CommandDefinition(
-            commandText: SqlGetTen,
-            commandType: CommandType.Text,
-            parameters: parameters,
-            cancellationToken: CancellationToken);
-        
         for (var i = 0; i < OperationCount; i+= 10)
         {
+            var parameters = new DynamicParameters();
+            parameters.Add("offset", i, DbType.Int32);
+            var command = new CommandDefinition(
+                commandText: SqlGetTen,
+                commandType: CommandType.Text,
+                parameters: parameters,
+                cancellationToken: CancellationToken);
             
             (await Connection.QueryAsync<User>(command)).AsList();
         }

@@ -40,24 +40,23 @@ public class FirstOrDefault : TestBase
     [Benchmark(OperationsPerInvoke = OperationCount)]
     public async Task<int> Dapper()
     {
-        var parameters = new DynamicParameters();
-        var dbString = new DbString
-        {
-            IsAnsi = true,
-            Length = 20,
-            Value = ""
-        };
-        parameters.Add("Name", dbString);
-
-        var command = new CommandDefinition(
-            commandText: SqlGetOne,
-            parameters: parameters,
-            commandType: CommandType.Text,
-            cancellationToken: CancellationToken);
-        
         for (var i = 0; i < _names.Length; i++)
         {
-            dbString.Value = _names[i];
+            var parameters = new DynamicParameters();
+            var dbString = new DbString
+            {
+                IsAnsi = true,
+                Length = 20,
+                Value = _names[i]
+            };
+            parameters.Add("Name", dbString);
+
+            var command = new CommandDefinition(
+                commandText: SqlGetOne,
+                parameters: parameters,
+                commandType: CommandType.Text,
+                cancellationToken: CancellationToken);
+            
             await Connection.QueryFirstOrDefaultAsync<User>(command);
         }
         
