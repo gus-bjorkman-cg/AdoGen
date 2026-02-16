@@ -213,24 +213,29 @@ public static class BulkEmitter
                 {
                     private readonly BulkBatch<{{{dtoTypeName}}}> _batch;
                     private int _index = -1;
+                    private {{{dtoTypeName}}} _item;
+                    private char _op;
 
                     public __BulkReader(BulkBatch<{{{dtoTypeName}}}> batch) => _batch = batch;
 
-                    public override bool Read() => ++_index < _batch.Items.Count;
+                    public override bool Read() 
+                    {
+                        ++_index;
+                        if (_index >= _batch.Items.Count) return false;
+                        
+                        _item = _batch.Items[_index];
+                        _op = _batch.Operations[_index].Value;
+                        return true;
+                    }
+                     
                     public override int FieldCount => {{{dtoProps.Length + 1}}};
 
-                    public override object GetValue(int i)
+                    public override object GetValue(int i) => i switch
                     {
-                        var item = _batch.Items[_index];
-                        var op = _batch.Operations[_index].Value;
-
-                        return i switch
-                        {
             {{{GetValueSwitch()}}}
-                            {{{dtoProps.Length}}} => op,
-                            _ => throw new IndexOutOfRangeException()
-                        };
-                    }
+                        {{{dtoProps.Length}}} => _op,
+                        _ => throw new IndexOutOfRangeException()
+                    };
 
                     public override string GetName(int i) => i switch
                     {
@@ -354,7 +359,7 @@ public static class BulkEmitter
                 var isNullable = p.IsNullableProperty(cfg);
 
                 var expr = GetValueExpression(p, isNullable);
-                sb.AppendLine($"                {i} => {expr},");
+                sb.AppendLine($"            {i} => {expr},");
             }
             return sb.ToString().TrimEnd();
         }
@@ -374,17 +379,17 @@ public static class BulkEmitter
         {
             // Reference nullable: item.Prop ?? (object)DBNull.Value
             if (isNullable && p.Type.IsReferenceType)
-                return $"item.{p.Name} ?? (object)DBNull.Value";
+                return $"_item.{p.Name} ?? (object)DBNull.Value";
 
             // Nullable value type: item.Prop.HasValue ? item.Prop.Value : DBNull.Value
             if (isNullable && p.Type is INamedTypeSymbol nts &&
                 nts.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
             {
-                return $"item.{p.Name}.HasValue ? item.{p.Name}.Value : DBNull.Value";
+                return $"_item.{p.Name}.HasValue ? _item.{p.Name}.Value : DBNull.Value";
             }
 
             // Non-nullable
-            return $"item.{p.Name}";
+            return $"_item.{p.Name}";
         }
         
         string GetOrdinalSwitch()

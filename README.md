@@ -64,8 +64,8 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 | InsertMulti 10 | EfCore     |   2.964 ms | 0.2426 ms | 0.7076 ms |      - |   76.87 KB |
 | InsertMulti 10 | DapperNT   |   5.997 ms | 0.3707 ms | 1.0516 ms |      - |   35.44 KB |
 | InsertMulti 10 | Dapper     |   6.618 ms | 0.6183 ms | 1.7839 ms |      - |   43.69 KB |
-| BulkInsert  1K | AdoGen     |   24.58 ms |  0.918 ms |  2.618 ms |      - |  162.32 KB |
-| BulkInsert  1K | EfCore     |   47.65 ms |  5.246 ms | 15.302 ms |      - | 6414.42 KB |
+| BulkInsert  1K | AdoGen     |   20.90 ms |  0.519 ms |  1.481 ms |      - |  161.98 KB |
+| BulkInsert  1K | EfCore     |   37.02 ms |  2.751 ms |  7.893 ms |      - | 6091.48 KB |
 | BulkUpdate  1K | AdoGen     |   22.34 ms |  0.759 ms |  2.154 ms |      - |   143.3 KB |
 | BulkUpdate  1K | EfCore     |   47.15 ms |  3.398 ms |  9.748 ms |      - | 7179.33 KB |
 | BulkDelete  1K | AdoGenBulk |  21.183 ms | 0.4218 ms | 1.0186 ms |      - |   131.4 KB |
@@ -73,10 +73,10 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 | BulkDelete  1K | AdoGen     |  74.423 ms | 1.4864 ms | 2.0346 ms |      - |   459.7 KB |
 
 
-| Type          | Method | Mean       | Error     | StdDev     | Median     | Gen0      | Gen1      | Allocated   |
-|-------------- |------- |-----------:|----------:|-----------:|-----------:|----------:|----------:|------------:|
-| BulkInsert10K | AdoGen |  87.899 ms | 2.1780 ms |  6.1073 ms |  85.308 ms |         - |         - |  1411.64 KB |
-| BulkInsert10K | EfCore | 352.770 ms | 8.2940 ms | 24.4550 ms | 355.557 ms | 7000.0000 | 2000.0000 | 60929.05 KB |
+| Type          | Method | Mean      | Error    | StdDev    | Median    | Gen0      | Gen1      | Allocated   |
+|-------------- |------- |----------:|---------:|----------:|----------:|----------:|----------:|------------:|
+| BulkInsert10K | AdoGen |  83.97 ms | 1.648 ms |  3.292 ms |  82.85 ms |         - |         - |  1412.44 KB |
+| BulkInsert10K | EfCore | 337.39 ms | 7.844 ms | 23.004 ms | 329.94 ms | 7000.0000 | 2000.0000 | 60923.84 KB |
 ```
 
 Example usage
