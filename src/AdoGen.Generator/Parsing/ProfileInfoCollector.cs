@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using AdoGen.Generator.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
+using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Parsing;
 
@@ -13,7 +15,67 @@ internal static class ProfileInfoCollector
 {
     private const string RuleFor = nameof(RuleFor);
     
-    public static ProfileInfo Collect(
+    internal static ProfileInfo Resolve(
+        SourceProductionContext spc,
+        DiscoveryDto discoveryDto)
+    {
+        var dto = discoveryDto.Dto;
+
+        var profile = discoveryDto.Profile;
+        var model = discoveryDto.ProfileSemanticModel;
+
+        if (profile is null || model is null)
+            return BuildDefaultProfileInfo(dto);
+
+        var collected = ProfileInfoCollector.Collect(profile, dto, model, spc);
+
+        if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
+        {
+            var location = profile.Locations.FirstOrDefault()
+                           ?? dto.Locations.FirstOrDefault()
+                           ?? Location.None;
+
+            spc.ReportDiagnostic(Diagnostic.Create(
+                SqlDiagnostics.MissingKey,
+                location, dto.Name));
+        }
+
+        return collected;
+    }
+
+    private static ProfileInfo BuildDefaultProfileInfo(INamedTypeSymbol dto)
+    {
+        var props = dto.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .ToArray();
+
+        var dict = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
+
+        foreach (var p in props)
+        {
+            dict[p.Name] = new ParamConfig
+            {
+                PropertyName = p.Name,
+                PropertyType = p.Type,
+                ParameterName = p.Name,
+                DbType = p.Type.MapDefaultSqlDbType()
+            };
+        }
+
+        var idName = props.FirstOrDefault(p => string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase))?.Name;
+        var keys = idName is null ? ImmutableArray<string>.Empty : [idName];
+
+        return new ProfileInfo(
+            Schema: "dbo",
+            Table: dto.Name.PluralizeSimple(),
+            Keys: keys,
+            IdentityKeys: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
+            ParamsByProperty: dict.ToImmutableDictionary(StringComparer.Ordinal)
+        );
+    }
+    
+    private static ProfileInfo Collect(
         INamedTypeSymbol profileSymbol,
         INamedTypeSymbol dtoType,
         SemanticModel model,

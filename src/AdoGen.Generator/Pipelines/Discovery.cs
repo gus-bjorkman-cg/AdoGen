@@ -12,8 +12,15 @@ internal static class Discovery
     private const string SqlDomainInterface = $"{AbstractionsLib}.ISqlDomainModel";
     private const string SqlBulkInterface = $"{AbstractionsLib}.ISqlBulkModel";
     private const string SqlProfile = nameof(SqlProfile);
-
-    public static IncrementalValuesProvider<INamedTypeSymbol> CreateDtoCandidates(IncrementalGeneratorInitializationContext context)
+    
+    public static IncrementalValuesProvider<DiscoveryDto> DiscoverDtos(
+        IncrementalGeneratorInitializationContext context)
+        => FilterTypes(
+            context,
+            CreateDtoCandidates(context),
+            BuildProfilesIndex(FindSqlProfiles(context)));
+    
+    private static IncrementalValuesProvider<INamedTypeSymbol> CreateDtoCandidates(IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax,
                 static (ctx, ct) => ctx.SemanticModel.GetDeclaredSymbol((TypeDeclarationSyntax)ctx.Node, ct) as INamedTypeSymbol)
@@ -22,62 +29,58 @@ internal static class Discovery
             .Where(static x => !x!.IsStatic)
             .Select(static (x, _) => x!)
             .WithComparer(SymbolEqualityComparer.Default);
-
-    public static IncrementalValuesProvider<(INamedTypeSymbol dto, bool implements, bool missingInterface)>
-        FilterBySqlResultInterface(IncrementalGeneratorInitializationContext context,
-                          IncrementalValuesProvider<INamedTypeSymbol> candidates)
-        => candidates
+    
+    private static IncrementalValuesProvider<DiscoveryDto> FilterTypes(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<INamedTypeSymbol> candidates,
+        IncrementalValueProvider<ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)>> profilesIndex) =>
+        candidates
+            .Collect()
+            .Combine(profilesIndex)
             .Combine(context.CompilationProvider)
-            .Select(static (pair, _) =>
+            .SelectMany(static (input, ct) =>
             {
-                var (typeSymbol, compilation) = pair;
+                var ((types, profiles), compilation) = input;
+
                 var sqlResultInterface = compilation.GetTypeByMetadataName(SqlResultInterface);
-                
-                if (sqlResultInterface is null) return (typeSymbol, implements: false, missingInterface: true);
-
-                var implements = typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlResultInterface));
-                
-                return (typeSymbol, implements, missingInterface: false);
-            })
-            .Where(static p => p.implements);
-
-    public static IncrementalValuesProvider<(INamedTypeSymbol dto, bool implements, bool missingInterface)>
-        FilterBySqlDomainInterface(IncrementalGeneratorInitializationContext context,
-            IncrementalValuesProvider<INamedTypeSymbol> candidates)
-        => candidates
-            .Combine(context.CompilationProvider)
-            .Select(static (pair, _) =>
-            {
-                var (typeSymbol, compilation) = pair;
                 var sqlDomainInterface = compilation.GetTypeByMetadataName(SqlDomainInterface);
-                
-                if (sqlDomainInterface is null) return (typeSymbol, implements: false, missingInterface: true);
-
-                var implements = typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlDomainInterface));
-                
-                return (typeSymbol, implements, missingInterface: false);
-            })
-            .Where(static p => p.implements);
-    
-    public static IncrementalValuesProvider<(INamedTypeSymbol dto, bool implements, bool missingInterface)>
-        FilterBySqlBulkInterface(IncrementalGeneratorInitializationContext context,
-            IncrementalValuesProvider<INamedTypeSymbol> candidates)
-        => candidates
-            .Combine(context.CompilationProvider)
-            .Select(static (pair, _) =>
-            {
-                var (typeSymbol, compilation) = pair;
                 var sqlBulkInterface = compilation.GetTypeByMetadataName(SqlBulkInterface);
-                
-                if (sqlBulkInterface is null) return (typeSymbol, implements: false, missingInterface: true);
 
-                var implements = typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlBulkInterface));
+                if (sqlResultInterface is null || sqlDomainInterface is null || sqlBulkInterface is null)
+                    return ImmutableArray<DiscoveryDto>.Empty;
                 
-                return (typeSymbol, implements, missingInterface: false);
-            })
-            .Where(static p => p.implements);
+                var builder = ImmutableArray.CreateBuilder<DiscoveryDto>(types.Length);
+
+                foreach (var typeSymbol in types)
+                {
+                    var kind =
+                        typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlBulkInterface)) ? SqlModelKind.Bulk :
+                        typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlDomainInterface)) ? SqlModelKind.Domain :
+                        typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlResultInterface)) ? SqlModelKind.Result :
+                        SqlModelKind.None;
+
+                    if (kind == SqlModelKind.None)
+                        continue;
+
+                    INamedTypeSymbol? profile = null;
+                    SemanticModel? model = null;
+                    for (var i = 0; i < profiles.Length; i++)
+                    {
+                        if (!SymbolEqualityComparer.Default.Equals(profiles[i].Dto, typeSymbol))
+                            continue;
+
+                        profile = profiles[i].Profile;
+                        model = profiles[i].Model;
+                        break;
+                    }
+
+                    builder.Add(new DiscoveryDto(typeSymbol, kind, profile, model));
+                }
+                
+                return builder.ToImmutable();
+            });
     
-    public static IncrementalValuesProvider<(INamedTypeSymbol Profile, SemanticModel Model)>
+    private static IncrementalValuesProvider<(INamedTypeSymbol Profile, SemanticModel Model)>
         FindSqlProfiles(IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax,
@@ -99,9 +102,23 @@ internal static class Discovery
             .Where(static x => x.symbol is not null)
             .Select(static (x, _) => (x.symbol!, x.SemanticModel));
 
-    public static IncrementalValueProvider<ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)>>
+    private static IncrementalValueProvider<ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)>>
         BuildProfilesIndex(IncrementalValuesProvider<(INamedTypeSymbol Profile, SemanticModel Model)> profiles)
         => profiles
             .Select(static (p, _) => (Dto: (INamedTypeSymbol)p.Profile.BaseType!.TypeArguments[0], p.Profile, p.Model))
             .Collect();
 }
+
+internal enum SqlModelKind : byte
+{
+    None = 0,
+    Result = 1,
+    Domain = 2,
+    Bulk = 3
+}
+
+internal readonly record struct DiscoveryDto(
+    INamedTypeSymbol Dto,
+    SqlModelKind Kind,
+    INamedTypeSymbol? Profile,
+    SemanticModel? ProfileSemanticModel);

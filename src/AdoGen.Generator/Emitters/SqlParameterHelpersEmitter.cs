@@ -9,6 +9,7 @@ using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
 using AdoGen.Generator.Parsing;
+using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
@@ -16,11 +17,12 @@ internal static class SqlParameterHelpersEmitter
 {
     private const string RuleFor = nameof(RuleFor);
     
-    public static void Emit(
-        SourceProductionContext spc,
-        ((INamedTypeSymbol Profile, SemanticModel Model) profile, Compilation compilation) data)
+    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto)
     {
-        var ((profileSymbol, model), compilation) = data;
+        var (dto, kind, profileSymbol, model) = discoveryDto;
+        
+        if (kind == SqlModelKind.None) return;
+        
         var baseType = profileSymbol.BaseType!;
         var dtoType = (INamedTypeSymbol)baseType.TypeArguments[0];
 

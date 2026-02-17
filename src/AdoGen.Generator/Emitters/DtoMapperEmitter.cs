@@ -3,8 +3,8 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
+using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
@@ -13,15 +13,11 @@ internal static class DtoMapperEmitter
     private const string AbstractionsLib = "AdoGen.Abstractions";
     private const string InterfaceSqlResult = $"{AbstractionsLib}.ISqlResult";
 
-    public static void Emit(SourceProductionContext spc, (INamedTypeSymbol dto, bool _, bool missingInterface) data)
+    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto)
     {
-        var (dto, _, missingInterface) = data;
+        var (dto, kind, _, _) = discoveryDto;
 
-        if (missingInterface)
-        {
-            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingSqlResultInterface, Location.None, InterfaceSqlResult));
-            return;
-        }
+        if (kind == SqlModelKind.None) return;
 
         var isPartial = dto.DeclaringSyntaxReferences
             .Select(r => r.GetSyntax())

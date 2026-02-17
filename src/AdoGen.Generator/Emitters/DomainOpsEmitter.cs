@@ -1,95 +1,25 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
 using AdoGen.Generator.Parsing;
+using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
 internal static class DomainOpsEmitter
 {
-    public static void Emit(
-        SourceProductionContext spc,
-        (((INamedTypeSymbol dto, bool _, bool missingInterface) domain, ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)> profilesIndex) input, Compilation compilation) data)
+    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto)
     {
-        var ((domain, profilesIndex), compilation) = data;
-        var (dto, _, missingInterface) = domain;
+        var (dto, kind, _, _) = discoveryDto;
 
-        if (missingInterface)
-        {
-            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingDomainInterface, Location.None));
-            return;
-        }
+        if (kind < SqlModelKind.Domain) return;
 
-        var isPartial = dto.DeclaringSyntaxReferences
-            .Select(r => r.GetSyntax())
-            .OfType<TypeDeclarationSyntax>()
-            .Any(t => t.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)));
-        if (!isPartial)
-        {
-            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NotPartial, dto.Locations.FirstOrDefault() ?? Location.None, dto.ToDisplayString()));
-            return;
-        }
-
-        // Try to find SqlProfile<T> for this DTO from precomputed index
-        var profileEntry = profilesIndex.FirstOrDefault(p => SymbolEqualityComparer.Default.Equals(p.Dto, dto));
-        ProfileInfo info;
-        if (profileEntry.Profile is null)
-        {
-            // Build defaults (dbo, pluralized name, Id key if present, default type mappings)
-            info = BuildDefaultProfileInfo(dto);
-        }
-        else
-        {
-            var collected = ProfileInfoCollector.Collect(profileEntry.Profile, dto, profileEntry.Model, spc);
-
-            if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
-            {
-                spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingKey, profileEntry.Profile.Locations.FirstOrDefault() ?? dto.Locations.FirstOrDefault() ?? Location.None, dto.Name));
-            }
-            info = collected;
-        }
+        var info = ProfileInfoCollector.Resolve(spc, discoveryDto);
 
         EmitWithInfo(spc, dto, info);
-    }
-
-    private static ProfileInfo BuildDefaultProfileInfo(INamedTypeSymbol dto)
-    {
-        var props = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .ToArray();
-
-        var dict = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
-        
-        foreach (var p in props)
-        {
-            dict[p.Name] = new ParamConfig
-            {
-                PropertyName = p.Name,
-                PropertyType = p.Type,
-                ParameterName = p.Name,
-                DbType = p.Type.MapDefaultSqlDbType()
-            };
-        }
-
-        var idName = props.FirstOrDefault(p => string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase))?.Name;
-        var keys = idName is null ? ImmutableArray<string>.Empty : [idName];
-
-        return new ProfileInfo(
-            Schema: "dbo",
-            Table: dto.Name.PluralizeSimple(),
-            Keys: keys,
-            IdentityKeys: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
-            ParamsByProperty: dict.ToImmutableDictionary(StringComparer.Ordinal)
-        );
     }
 
     private static void EmitWithInfo(SourceProductionContext spc, INamedTypeSymbol dto, ProfileInfo info)
