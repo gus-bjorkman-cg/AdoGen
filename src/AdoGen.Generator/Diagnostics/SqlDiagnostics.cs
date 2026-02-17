@@ -35,14 +35,6 @@ internal static class SqlDiagnostics
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
-
-    public static readonly DiagnosticDescriptor UsesFallbackGetFieldValue = new(
-        id: "AG005",
-        title: "Mapper uses GetFieldValue<T>",
-        messageFormat: "Mapper for '{0}.{1}' uses GetFieldValue<T>; prefer a typed getter for primitives for better performance",
-        category: "Performance",
-        defaultSeverity: DiagnosticSeverity.Info,
-        isEnabledByDefault: true);
     
     public static readonly DiagnosticDescriptor MissingSqlResultInterface = new(
         id: "AG006",

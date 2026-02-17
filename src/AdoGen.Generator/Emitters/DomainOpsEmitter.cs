@@ -75,7 +75,7 @@ internal static class DomainOpsEmitter
             {
                 PropertyName = p.Name,
                 PropertyType = p.Type,
-                ParameterName = "@" + p.Name,
+                ParameterName = p.Name,
                 DbType = p.Type.MapDefaultSqlDbType()
             };
         }
@@ -118,7 +118,7 @@ internal static class DomainOpsEmitter
 
             const string spaces = "            ";
             var comma = i == dtoProps.Length - 1 ? "" : ",";
-            var line = $"{spaces}[{p.Name}] {sqlType}{identity}{defaultClause} {nullability}{comma}";
+            var line = $"{spaces}[{cfg.ParameterName}] {sqlType}{identity}{defaultClause} {nullability}{comma}";
             sbColDefs.AppendLine(line);
         }
 
@@ -133,30 +133,78 @@ internal static class DomainOpsEmitter
             """;
 
         // INSERT (skip identity)
-        var insertCols = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"[{p.Name}]").ToArray();
-        var insertParams = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => "@" + p.Name).ToArray();
-        var insertSql = $"INSERT INTO [{info.Schema}].[{info.Table}] ({string.Join(", ", insertCols)}) VALUES ({string.Join(", ", insertParams)});";
+        var insertCols = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+
+        var insertParams = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => "@" + info.ParamsByProperty[p.Name].ParameterName)
+            .ToArray();
+
+        var insertSql =
+            $"INSERT INTO [{info.Schema}].[{info.Table}] ({string.Join(", ", insertCols)}) VALUES ({string.Join(", ", insertParams)});";
+
         var insertBatchSql = $"INSERT INTO [{info.Schema}].[{info.Table}] ({string.Join(", ", insertCols)}) VALUES";
 
         // UPDATE (non-key, non-identity)
-        var nonKeyNonIdentity = dtoProps.Where(p => !info.Keys.Contains(p.Name) && !info.IdentityKeys.Contains(p.Name)).ToArray();
-        var updateSet = string.Join(", ", nonKeyNonIdentity.Select(p => $"[{p.Name}] = @{p.Name}"));
-        var whereClause = string.Join(" AND ", info.Keys.Select(k => $"[{k}] = @{k}"));
+        var nonKeyNonIdentity = dtoProps
+            .Where(p => !info.Keys.Contains(p.Name) && !info.IdentityKeys.Contains(p.Name))
+            .ToArray();
+
+        var updateSet = string.Join(", ", nonKeyNonIdentity.Select(p =>
+        {
+            var col = info.ParamsByProperty[p.Name].ParameterName;
+            return $"[{col}] = @{col}";
+        }));
+
+        var whereClause = string.Join(" AND ", info.Keys.Select(k =>
+        {
+            var col = info.ParamsByProperty[k].ParameterName;
+            return $"[{col}] = @{col}";
+        }));
+
         var updateSql = $"UPDATE [{info.Schema}].[{info.Table}] SET {updateSet} WHERE {whereClause};";
         var deleteSql = $"DELETE FROM [{info.Schema}].[{info.Table}] WHERE {whereClause};";
 
         // UPSERT via MERGE
-        var matchKeys = info.Keys.Where(k => !info.IdentityKeys.Contains(k)).Select(k => $"T.[{k}] = S.[{k}]");
-        var allCols = dtoProps.Select(p => $"[{p.Name}]").ToArray();
-        var allParams = dtoProps.Select(p => "@" + p.Name).ToArray();
+        var matchKeys = info.Keys
+            .Where(k => !info.IdentityKeys.Contains(k))
+            .Select(k =>
+            {
+                var col = info.ParamsByProperty[k].ParameterName;
+                return $"T.[{col}] = S.[{col}]";
+            });
+
+        var allCols = dtoProps
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+
+        var allParams = dtoProps
+            .Select(p => "@" + info.ParamsByProperty[p.Name].ParameterName)
+            .ToArray();
+
         var usingColumns = string.Join(", ", allCols);
-        var usingValues  = string.Join(", ", allParams);
+        var usingValues = string.Join(", ", allParams);
         var onExpr = string.Join(" AND ", matchKeys);
-        var updateSetFromS = string.Join(", ", dtoProps.Where(p => !info.Keys.Contains(p.Name)).Select(p => $"T.[{p.Name}] = S.[{p.Name}]"));
+
+        var updateSetFromS = string.Join(", ", dtoProps
+            .Where(p => !info.Keys.Contains(p.Name))
+            .Select(p =>
+            {
+                var col = info.ParamsByProperty[p.Name].ParameterName;
+                return $"T.[{col}] = S.[{col}]";
+            }));
+
         var nonIdentityProp = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).ToArray();
         var nonIdentityPropCount = nonIdentityProp.Length;
 
-        var insertCols2 = allCols.Where(c => !info.IdentityKeys.Contains(c.Trim('[', ']'))).ToArray();
+        var insertCols2 = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+
         var insertValues2 = insertCols2.Select(c => $"S.{c}").ToArray();
 
         var upsertSql =

@@ -28,7 +28,7 @@ internal static class ConfigureChainParser
         {
             PropertyName = propName,
             PropertyType = propSymbol.Type,
-            ParameterName = "@" + propName
+            ParameterName = propName
         };
 
         var chainMethods = new List<ChainMethod>();
@@ -63,14 +63,14 @@ internal static class ConfigureChainParser
                     break;
 
                 case "Precision":
-                    if (args.Count == 1 && model.TryGetConstByte(args[0].Expression, CancellationToken.None, out var prec))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var prec))
                         cfg.Precision = prec;
                     else
                         spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Scale":
-                    if (args.Count == 1 && model.TryGetConstByte(args[0].Expression, CancellationToken.None, out var sc))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var sc))
                         cfg.Scale = sc;
                     else
                         spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));

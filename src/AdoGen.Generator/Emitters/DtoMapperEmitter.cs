@@ -1,10 +1,10 @@
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Diagnostics;
+using AdoGen.Generator.Extensions;
 
 namespace AdoGen.Generator.Emitters;
 
@@ -52,18 +52,7 @@ internal static class DtoMapperEmitter
             var ordinalField = $"{p.Name}Ordinal";
             var isLast = i == props.Length - 1;
             
-            var getterExpr = EmitReaderGet(p, ordinalField, out bool usedFallback, out bool needsEnumCastForThis);
-
-            if (usedFallback)
-            {
-                // Report analyzer diagnostic for the fallback path
-                var loc = p.Locations.FirstOrDefault() ?? dto.Locations.FirstOrDefault() ?? Location.None;
-                spc.ReportDiagnostic(Diagnostic.Create(
-                    SqlDiagnostics.UsesFallbackGetFieldValue,
-                    loc,
-                    p.Name,
-                    p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
-            }
+            var getterExpr = EmitReaderGet(p, ordinalField, out bool needsEnumCastForThis);
 
             if (needsEnumCastForThis) needsEnumCastHelper = true;
             
@@ -119,135 +108,68 @@ internal static class DtoMapperEmitter
     private static string EmitReaderGet(
         IPropertySymbol p,
         string ordinalField,
-        out bool usedFallback,
         out bool needsEnumCastHelper)
     {
-        usedFallback = false;
-        needsEnumCastHelper = false;
+        var (underlying, isNullable) = p.Type.UnwrapNullable();
 
-        var type = p.Type;
-        var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-
-        // Nullable<T> handling
-        if (type is INamedTypeSymbol nts &&
-            nts.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        if (underlying.TypeKind == TypeKind.Enum)
         {
-            var inner = nts.TypeArguments[0];
-            var innerName = inner.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            needsEnumCastHelper = true; // you can do it inline; no helper needed
+            var enumUnderlying = ((INamedTypeSymbol)underlying).EnumUnderlyingType!;
 
-            // Enum? special-case: read underlying & cast
-            if (inner.TypeKind == TypeKind.Enum)
+            // Re-enter the same switch using the enum's underlying type
+            var (eu, _) = enumUnderlying.UnwrapNullable(); // not nullable in practice
+            var coreGetterName = eu.SpecialType switch
             {
-                var (underlyingGetter, canUnsafeCast, fallback) = EmitEnumGet(inner, ordinalField);
-                usedFallback = fallback;
-                needsEnumCastHelper = true;
-                // reader.IsDBNull ? null : EnumCast<underlying, Enum>(reader.GetUnderlying(...))
-                var underlyingName = ((INamedTypeSymbol)inner).EnumUnderlyingType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                return $"reader.IsDBNull({ordinalField}) ? (global::System.Nullable<{innerName}>)null : EnumCast<{underlyingName}, {innerName}>({underlyingGetter})";
-            }
+                SpecialType.System_SByte => "GetSByte",
+                SpecialType.System_Byte => "GetByte",
+                SpecialType.System_Int16 => "GetInt16",
+                SpecialType.System_UInt16 => "GetInt16",
+                SpecialType.System_Int32 => "GetInt32",
+                SpecialType.System_UInt32 => "GetInt32",
+                SpecialType.System_Int64 => "GetInt64",
+                SpecialType.System_UInt64 => "GetInt64",
+                _ => null
+            };
 
-            // DateOnly? / TimeOnly?
-            if (innerName == "global::System.DateOnly")
+            if (coreGetterName is not null)
             {
-                return $"reader.IsDBNull({ordinalField}) ? (global::System.DateOnly?)null : global::System.DateOnly.FromDateTime(reader.GetDateTime({ordinalField}))";
-            }
-            if (innerName == "global::System.TimeOnly")
-            {
-                return $"reader.IsDBNull({ordinalField}) ? (global::System.TimeOnly?)null : global::System.TimeOnly.FromTimeSpan(reader.GetTimeSpan({ordinalField}))";
-            }
+                var read = $"reader.{coreGetterName}({ordinalField})";
+                var cast = $"({underlying.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat)}){read}";
 
-            // CLR fast-path (nullable)
-            if (ClrGetters.TryGetValue(innerName, out var clrGetterName))
-            {
-                return $"reader.IsDBNull({ordinalField}) ? (global::System.Nullable<{innerName}>)null : reader.Get{clrGetterName}({ordinalField})";
+                return isNullable
+                    ? $"reader.IsDBNull({ordinalField}) ? default : {cast}"
+                    : cast;
             }
             
-            // string?
-            if (innerName == "global::System.String")
-                return $"reader.IsDBNull({ordinalField}) ? null : reader.GetString({ordinalField})";
-
-            // Fallback for unknown nullable types
-            usedFallback = true;
-            return $"reader.IsDBNull({ordinalField}) ? (global::System.Nullable<{innerName}>)null : reader.GetFieldValue<{innerName}>({ordinalField})";
+            var enumKey = underlying.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat);
+            var fv = $"reader.GetFieldValue<{enumKey}>({ordinalField})";
+            return isNullable ? $"reader.IsDBNull({ordinalField}) ? default : {fv}" : fv;
         }
 
-        // Non-nullable enum
-        if (type.TypeKind == TypeKind.Enum)
+        var getter = underlying.SpecialType switch
         {
-            var (underlyingGetter, canUnsafeCast, fallback) = EmitEnumGet(type, ordinalField);
-            usedFallback = fallback;
-            needsEnumCastHelper = true;
-            var underlyingName = ((INamedTypeSymbol)type).EnumUnderlyingType!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var enumName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            return $"EnumCast<{underlyingName}, {enumName}>({underlyingGetter})";
-        }
-
-        // string?
-        if (typeName == "string")
-            return $"reader.IsDBNull({ordinalField}) ? null : reader.GetString({ordinalField})";
-        if (typeName == "string?")
-            return $"reader.IsDBNull({ordinalField}) ? null : reader.GetString({ordinalField})";
+            SpecialType.System_Boolean => "GetBoolean",
+            SpecialType.System_Byte => "GetByte",
+            SpecialType.System_Int16 => "GetInt16",
+            SpecialType.System_Int32 => "GetInt32",
+            SpecialType.System_Int64 => "GetInt64",
+            SpecialType.System_Single => "GetFloat",
+            SpecialType.System_Double => "GetDouble",
+            SpecialType.System_Decimal => "GetDecimal",
+            SpecialType.System_String => "GetString",
+            _ => underlying.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat) switch
+            {
+                "global::System.Guid" => "GetGuid",
+                "global::System.DateTime" => "GetDateTime",
+                "global::System.DateTimeOffset" => "GetDateTimeOffset",
+                var key => $"GetFieldValue<{key}>"
+            }
+        };
         
-        // DateOnly / TimeOnly (non-nullable)
-        if (typeName == "global::System.DateOnly")
-            return $"global::System.DateOnly.FromDateTime(reader.GetDateTime({ordinalField}))";
-        if (typeName == "global::System.TimeOnly")
-            return $"global::System.TimeOnly.FromTimeSpan(reader.GetTimeSpan({ordinalField}))";
-
-        // CLR fast-path
-        if (ClrGetters.TryGetValue(typeName, out var clrGetter))
-            return $"reader.Get{clrGetter}({ordinalField})";
-
-        // Fallback (rare)
-        usedFallback = true;
-        return $"reader.GetFieldValue<{typeName}>({ordinalField})";
+        getter = $"reader.{getter}({ordinalField})";
+        needsEnumCastHelper = false;
+        
+        return isNullable ? $"reader.IsDBNull({ordinalField}) ? default : {getter}" : getter;
     }
-
-    /// <summary>
-    /// Emits the getter expression for an enum type by reading its underlying storage.
-    /// Returns (getterExpression, canUnsafeCast, usedFallback).
-    /// </summary>
-    private static (string expr, bool canUnsafeCast, bool usedFallback) EmitEnumGet(
-        ITypeSymbol enumType,
-        string ordinalField)
-    {
-        var underlying = ((INamedTypeSymbol)enumType).EnumUnderlyingType!;
-        switch (underlying.SpecialType)
-        {
-            case SpecialType.System_Byte:
-                return ($"reader.GetByte({ordinalField})", true, false);
-            case SpecialType.System_Int16:
-                return ($"reader.GetInt16({ordinalField})", true, false);
-            case SpecialType.System_Int32:
-                return ($"reader.GetInt32({ordinalField})", true, false);
-            case SpecialType.System_Int64:
-                return ($"reader.GetInt64({ordinalField})", true, false);
-
-            // Unsigned / sbyte: no direct SqlDataReader getters that are robust across SQL types
-            // We fall back to GetFieldValue<TUnderlying> to avoid accidental value corruption.
-            case SpecialType.System_SByte:
-            case SpecialType.System_UInt16:
-            case SpecialType.System_UInt32:
-            case SpecialType.System_UInt64:
-            default:
-                var underlyingName = underlying.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                return ($"reader.GetFieldValue<{underlyingName}>({ordinalField})", true, true);
-        }
-    }
-    
-    private static readonly Dictionary<string, string> ClrGetters = new()
-    {
-        ["global::System.Boolean"] = "Boolean",
-        ["global::System.Byte"] = "Byte",
-        ["global::System.Int16"] = "Int16",
-        ["global::System.Int32"] = "Int32",
-        ["global::System.Int64"] = "Int64",
-        ["global::System.Single"] = "Float",
-        ["global::System.Double"] = "Double",
-        ["global::System.Decimal"] = "Decimal",
-        ["global::System.String"] = "String",
-        ["global::System.DateTime"] = "DateTime",
-        ["global::System.Guid"] = "Guid"
-        // DateOnly / TimeOnly are special-cased (not direct Get* methods)
-    };
 }

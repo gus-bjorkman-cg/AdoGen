@@ -68,7 +68,7 @@ public static class BulkEmitter
             {
                 PropertyName = p.Name,
                 PropertyType = p.Type,
-                ParameterName = "@" + p.Name,
+                ParameterName = p.Name,
                 DbType = p.Type.MapDefaultSqlDbType()
             };
         }
@@ -113,14 +113,24 @@ public static class BulkEmitter
         var idxClause = $"        CREATE INDEX [IX_AdoGen_{info.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
 
         // INSERT columns: skip identity keys (same rule as DomainOpsEmitter)
-        var insertCols = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"[{p.Name}]").ToArray();
-        var insertSelect = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"S.[{p.Name}]").ToArray();
+        var insertCols = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+        
+        var insertSelect = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"S.[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
 
         // UPDATE SET: non-key, non-identity (same as DomainOpsEmitter)
         var nonKeyNonIdentity = dtoProps
             .Where(p => !info.Keys.Contains(p.Name) && !info.IdentityKeys.Contains(p.Name))
             .ToArray();
-        var updateSet = string.Join(",\n        ", nonKeyNonIdentity.Select(p => $"    T.[{p.Name}] = S.[{p.Name}]"));
+        
+        var updateSet = string.Join(",\n        ", nonKeyNonIdentity
+            .Select(x => info.ParamsByProperty[x.Name].ParameterName)
+            .Select(x => $"    T.[{x}] = S.[{x}]"));
 
         // CREATE TEMP TABLE (no identity clause here; it's just staging)
         var sbColDefs = new StringBuilder();
@@ -133,7 +143,7 @@ public static class BulkEmitter
             var nullability = isNullable ? "NULL" : "NOT NULL";
 
             const string spaces = "            ";
-            sbColDefs.AppendLine($"{spaces}[{p.Name}] {sqlType} {nullability},");
+            sbColDefs.AppendLine($"{spaces}[{cfg.ParameterName}] {sqlType} {nullability},");
         }
         sbColDefs.AppendLine("            [Operation] CHAR(1) NOT NULL");
 
@@ -324,7 +334,7 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             foreach (var p in dtoProps)
-                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{p.Name}\", \"{p.Name}\");");
+                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{p.Name}\", \"{info.ParamsByProperty[p.Name].ParameterName}\");");
             return sb.ToString().TrimEnd();
         }
 
@@ -332,7 +342,7 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             for (var i = 0; i < dtoProps.Length; i++)
-                sb.AppendLine($"            {i} => \"{dtoProps[i].Name}\",");
+                sb.AppendLine($"            {i} => \"{info.ParamsByProperty[dtoProps[i].Name].ParameterName}\",");
             return sb.ToString().TrimEnd();
         }
 
@@ -375,7 +385,7 @@ public static class BulkEmitter
             return type;
         }
 
-        static string GetValueExpression(IPropertySymbol p, bool isNullable)
+        string GetValueExpression(IPropertySymbol p, bool isNullable)
         {
             // Reference nullable: item.Prop ?? (object)DBNull.Value
             if (isNullable && p.Type.IsReferenceType)
@@ -396,7 +406,7 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             for (var i = 0; i < dtoProps.Length; i++)
-                sb.AppendLine($"            \"{dtoProps[i].Name}\" => {i},");
+                sb.AppendLine($"            \"{info.ParamsByProperty[dtoProps[i].Name].ParameterName}\" => {i},");
             sb.AppendLine($"            \"Operation\" => {dtoProps.Length},");
             return sb.ToString().TrimEnd();
         }

@@ -106,7 +106,7 @@ internal static class ProfileInfoCollector
                 {
                     PropertyName = prop.Name,
                     PropertyType = prop.Type,
-                    ParameterName = "@" + prop.Name,
+                    ParameterName = prop.Name,
                     DbType = prop.Type.MapDefaultSqlDbType()   
                 };
             }

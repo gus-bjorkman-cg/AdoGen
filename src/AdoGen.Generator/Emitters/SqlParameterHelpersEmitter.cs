@@ -97,7 +97,7 @@ internal static class SqlParameterHelpersEmitter
                     {
                         PropertyName = name,
                         PropertyType = t, 
-                        ParameterName = "@" + name,
+                        ParameterName = name,
                         DbType = t.MapDefaultSqlDbType()
                     };
                 }
@@ -152,7 +152,7 @@ internal static class SqlParameterHelpersEmitter
                                   SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
     private static string CreateSqlParameterConst(ParamConfig cfg)
-        => $"""    public const string Parameter{cfg.PropertyName} = "{cfg.PropertyName}";""";
+        => $"""    public const string Parameter{cfg.PropertyName} = "{cfg.ParameterName}";""";
 
     private static string CreateSqlParameterMethod(ParamConfig cfg)
     {
@@ -161,7 +161,7 @@ internal static class SqlParameterHelpersEmitter
         var typeName = cfg.PropertyType.ToDisplayString(TypeDisplay);
 
         var isNullableValueType = cfg.PropertyType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
-        var valueExpr = cfg.PropertyType.IsReferenceType || isNullableValueType ? "(object)value ?? DBNull.Value" : "value";
+        var valueExpr = cfg.PropertyType.IsReferenceType || isNullableValueType ? "value is null ? DBNull.Value : value" : "value";
 
         var optional = new StringBuilder();
         if (cfg.Size is { } size) optional.AppendLine($"        Size = {size},");
