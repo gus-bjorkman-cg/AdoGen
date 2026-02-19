@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Data;
@@ -57,6 +58,7 @@ internal static class DiscoveryValidation
             var props = dto.Dto.GetMembers()
                 .OfType<IPropertySymbol>()
                 .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+                .OrderBy(x => x.Name, StringComparer.Ordinal)
                 .ToArray();
 
             var propsNeedingConfig = new List<IPropertySymbol>(props.Length);

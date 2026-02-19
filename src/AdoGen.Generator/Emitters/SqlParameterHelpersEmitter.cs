@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using AdoGen.Generator.Models;
@@ -14,11 +16,11 @@ internal static class SqlParameterHelpersEmitter
         var constBuilder = new StringBuilder();
         var methodBuilder = new StringBuilder();
 
-        foreach (var kvp in profileInfo.ParamsByProperty)
+        var paramConfigs = profileInfo.ParamsByProperty.Select(x => x.Value).OrderBy(x => x.PropertyName);
+        foreach (var kvp in paramConfigs)
         {
-            var cfg = kvp.Value!;
-            constBuilder.AppendLine(CreateSqlParameterConst(cfg));
-            methodBuilder.AppendLine(CreateSqlParameterMethod(cfg));
+            constBuilder.AppendLine(CreateSqlParameterConst(kvp));
+            methodBuilder.AppendLine(CreateSqlParameterMethod(kvp));
             methodBuilder.AppendLine();
         }
         

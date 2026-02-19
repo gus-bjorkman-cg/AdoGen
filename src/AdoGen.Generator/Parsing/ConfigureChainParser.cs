@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Data;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -45,7 +47,7 @@ internal static class ConfigureChainParser
             else break;
         }
         
-        foreach (var (methodName, args, node) in chainMethods)
+        foreach (var (methodName, args, node) in chainMethods.OrderBy(x => x.Name, StringComparer.Ordinal))
         {
             switch (methodName)
             {

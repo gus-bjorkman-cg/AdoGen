@@ -382,25 +382,25 @@ namespace AdoGen.Generator.Tests;
 public sealed partial record User : ISqlResult<global::AdoGen.Generator.Tests.User>
 {
     private static bool IsInitialized;
+    private static int EmailOrdinal;
     private static int IdOrdinal;
     private static int NameOrdinal;
-    private static int EmailOrdinal;
 
     public static global::AdoGen.Generator.Tests.User Map(SqlDataReader reader)
     {
         if (!IsInitialized)
         {
+            EmailOrdinal = reader.GetOrdinal("Email");
             IdOrdinal = reader.GetOrdinal("Id");
             NameOrdinal = reader.GetOrdinal("Name");
-            EmailOrdinal = reader.GetOrdinal("Email");
 
             IsInitialized = true;
         }
 
         return new global::AdoGen.Generator.Tests.User(
+            Email : reader.GetString(EmailOrdinal),
             Id : reader.GetGuid(IdOrdinal),
-            Name : reader.GetString(NameOrdinal),
-            Email : reader.GetString(EmailOrdinal)
+            Name : reader.GetString(NameOrdinal)
         );
     }
 }
@@ -422,20 +422,9 @@ namespace AdoGen.Abstractions;
 /// </summary>
 public static class UserSql
 {
-    public const string ParameterId = "Id";
     public const string ParameterEmail = "Email";
+    public const string ParameterId = "Id";
     public const string ParameterName = "Name";
-
-    /// <summary>
-    /// Creates a SqlParameter with the configured db type and size/precision/scale.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SqlParameter CreateParameterId(global::System.Guid value, string? propertyName = null) => new()
-    {
-        ParameterName = propertyName ?? ParameterId,
-        SqlDbType = SqlDbType.UniqueIdentifier,
-        Value = value,
-    };
 
     /// <summary>
     /// Creates a SqlParameter with the configured db type and size/precision/scale.
@@ -447,6 +436,17 @@ public static class UserSql
         SqlDbType = SqlDbType.VarChar,
         Value = value is null ? DBNull.Value : value,
         Size = 50,
+    };
+
+    /// <summary>
+    /// Creates a SqlParameter with the configured db type and size/precision/scale.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SqlParameter CreateParameterId(global::System.Guid value, string? propertyName = null) => new()
+    {
+        ParameterName = propertyName ?? ParameterId,
+        SqlDbType = SqlDbType.UniqueIdentifier,
+        Value = value,
     };
 
     /// <summary>

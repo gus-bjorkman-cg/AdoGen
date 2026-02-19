@@ -18,11 +18,11 @@ internal static class ProfileInfoCollector
     internal static ProfileInfo Resolve(DiscoveryDto discoveryDto, ImmutableArray<Diagnostic>.Builder diagnostics)
     {
         var (dto, _, profile, model) = discoveryDto;
-        var collected = Collect(profile, dto, model, diagnostics);
+        var collected = Collect(profile!, dto, model!, diagnostics);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
         {
-            var location = profile.Locations.FirstOrDefault()
+            var location = profile!.Locations.FirstOrDefault()
                            ?? dto.Locations.FirstOrDefault()
                            ?? Location.None;
 
@@ -40,9 +40,11 @@ internal static class ProfileInfoCollector
         SemanticModel model,
         ImmutableArray<Diagnostic>.Builder diagnostics)
     {
-        var dtoProps = dtoType.GetMembers()
+        var dtoProps = dtoType
+            .GetMembers()
             .OfType<IPropertySymbol>()
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .OrderBy(x => x.Name, StringComparer.Ordinal)
             .ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
 
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);

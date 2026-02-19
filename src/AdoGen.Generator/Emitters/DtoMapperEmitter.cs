@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -14,7 +15,9 @@ internal static class DtoMapperEmitter
         
         var props = dto.GetMembers()
             .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .Where(x => x.DeclaredAccessibility == Accessibility.Public)
+            .Where(x => !x.IsStatic)
+            .OrderBy(x => x.Name, StringComparer.Ordinal)
             .ToArray();
 
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);
