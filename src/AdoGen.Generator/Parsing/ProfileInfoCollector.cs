@@ -44,7 +44,12 @@ internal static class ProfileInfoCollector
             .GetMembers()
             .OfType<IPropertySymbol>()
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .OrderBy(x => x.Name, StringComparer.Ordinal)
+            .OrderBy(x =>
+            {
+                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
+                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
+            })
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
             .ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
 
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);

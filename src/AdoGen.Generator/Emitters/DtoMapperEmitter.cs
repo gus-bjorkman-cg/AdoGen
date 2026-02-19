@@ -17,7 +17,12 @@ internal static class DtoMapperEmitter
             .OfType<IPropertySymbol>()
             .Where(x => x.DeclaredAccessibility == Accessibility.Public)
             .Where(x => !x.IsStatic)
-            .OrderBy(x => x.Name, StringComparer.Ordinal)
+            .OrderBy(x =>
+            {
+                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
+                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
+            })
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
             .ToArray();
 
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);

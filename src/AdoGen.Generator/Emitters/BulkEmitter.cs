@@ -1,3 +1,4 @@
+using System;
 using AdoGen.Generator.Diagnostics;
 using Microsoft.CodeAnalysis;
 using System.Linq;
@@ -24,6 +25,12 @@ public static class BulkEmitter
         var dtoProps = dto.GetMembers()
             .OfType<IPropertySymbol>()
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .OrderBy(x =>
+            {
+                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
+                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
+            })
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
             .ToArray();
 
         var ns = dto.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dto.ContainingNamespace.ToDisplayString();

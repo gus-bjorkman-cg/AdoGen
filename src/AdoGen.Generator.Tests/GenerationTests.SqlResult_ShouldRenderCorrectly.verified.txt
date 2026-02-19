@@ -382,25 +382,25 @@ namespace AdoGen.Generator.Tests;
 public sealed partial record User : ISqlResult<global::AdoGen.Generator.Tests.User>
 {
     private static bool IsInitialized;
-    private static int EmailOrdinal;
     private static int IdOrdinal;
     private static int NameOrdinal;
+    private static int EmailOrdinal;
 
     public static global::AdoGen.Generator.Tests.User Map(SqlDataReader reader)
     {
         if (!IsInitialized)
         {
-            EmailOrdinal = reader.GetOrdinal("Email");
             IdOrdinal = reader.GetOrdinal("Id");
             NameOrdinal = reader.GetOrdinal("Name");
+            EmailOrdinal = reader.GetOrdinal("Email");
 
             IsInitialized = true;
         }
 
         return new global::AdoGen.Generator.Tests.User(
-            Email : reader.GetString(EmailOrdinal),
             Id : reader.GetGuid(IdOrdinal),
-            Name : reader.GetString(NameOrdinal)
+            Name : reader.GetString(NameOrdinal),
+            Email : reader.GetString(EmailOrdinal)
         );
     }
 }

@@ -47,7 +47,7 @@ internal static class ConfigureChainParser
             else break;
         }
         
-        foreach (var (methodName, args, node) in chainMethods.OrderBy(x => x.Name, StringComparer.Ordinal))
+        foreach (var (methodName, args, node) in chainMethods)
         {
             switch (methodName)
             {
