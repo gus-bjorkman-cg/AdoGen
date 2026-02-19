@@ -44,7 +44,7 @@ class Build : NukeBuild
     
     Project AbstractionsProject;
     Project GeneratorProject;
-    Project TestProject;
+    Project[] TestProjects = [];
 
     bool IsTagBuild;
     
@@ -56,7 +56,7 @@ class Build : NukeBuild
         ProjectModelTasks.Initialize();
         AbstractionsProject = Solution.AdoGen_Abstractions;
         GeneratorProject = Solution.AdoGen_Generator;
-        TestProject = Solution.AdoGen_Tests;
+        TestProjects = Solution.AllProjects.Where(x => x.Name.EndsWith("Tests")).ToArray();
         IsTagBuild = GitRepo?.Branch?.StartsWith(TagPath) == true;
     }
     
@@ -124,10 +124,16 @@ class Build : NukeBuild
     Target Test => x => x
         .Description("Runs all tests in the TestProject")
         .DependsOn(Compile)
-        .Executes(() => DotNetTest(x => 
-            x.SetConfiguration(Configuration)
-                .SetNoBuild(true)
-                .SetProjectFile(TestProject)));
+        .Executes(() =>
+        {
+            foreach (var testProject in TestProjects)
+            {
+                DotNetTest(x =>
+                    x.SetConfiguration(Configuration)
+                        .SetNoBuild(true)
+                        .SetProjectFile(testProject));    
+            }
+        });
     
     Target Pack => x => x
         .Description("Packs the Abstraction and generator projects")
