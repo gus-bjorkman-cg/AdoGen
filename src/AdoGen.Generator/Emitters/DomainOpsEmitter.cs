@@ -4,20 +4,17 @@ using Microsoft.CodeAnalysis;
 using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Parsing;
 using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
 internal static class DomainOpsEmitter
 {
-    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto)
+    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto, ProfileInfo info)
     {
         var (dto, kind, _, _) = discoveryDto;
 
         if (kind < SqlModelKind.Domain) return;
-
-        var info = ProfileInfoCollector.Resolve(spc, discoveryDto);
 
         EmitWithInfo(spc, dto, info);
     }

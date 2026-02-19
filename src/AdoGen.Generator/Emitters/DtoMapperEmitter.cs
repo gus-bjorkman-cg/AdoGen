@@ -1,8 +1,6 @@
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Pipelines;
 
@@ -10,22 +8,10 @@ namespace AdoGen.Generator.Emitters;
 
 internal static class DtoMapperEmitter
 {
-    private const string AbstractionsLib = "AdoGen.Abstractions";
-    private const string InterfaceSqlResult = $"{AbstractionsLib}.ISqlResult";
-
     public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto)
     {
-        var (dto, kind, _, _) = discoveryDto;
-
-        if (kind == SqlModelKind.None) return;
-
-        var isPartial = dto.DeclaringSyntaxReferences
-            .Select(r => r.GetSyntax())
-            .OfType<TypeDeclarationSyntax>()
-            .Any(t => t.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)));
-
-        if (!isPartial) return;
-
+        var (dto, _, _, _) = discoveryDto;
+        
         var props = dto.GetMembers()
             .OfType<IPropertySymbol>()
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)

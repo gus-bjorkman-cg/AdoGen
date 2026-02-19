@@ -15,19 +15,10 @@ internal static class ProfileInfoCollector
 {
     private const string RuleFor = nameof(RuleFor);
     
-    internal static ProfileInfo Resolve(
-        SourceProductionContext spc,
-        DiscoveryDto discoveryDto)
+    internal static ProfileInfo Resolve(DiscoveryDto discoveryDto, ImmutableArray<Diagnostic>.Builder diagnostics)
     {
-        var dto = discoveryDto.Dto;
-
-        var profile = discoveryDto.Profile;
-        var model = discoveryDto.ProfileSemanticModel;
-
-        if (profile is null || model is null)
-            return BuildDefaultProfileInfo(dto);
-
-        var collected = ProfileInfoCollector.Collect(profile, dto, model, spc);
+        var (dto, _, profile, model) = discoveryDto;
+        var collected = Collect(profile, dto, model, diagnostics);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
         {
@@ -35,51 +26,19 @@ internal static class ProfileInfoCollector
                            ?? dto.Locations.FirstOrDefault()
                            ?? Location.None;
 
-            spc.ReportDiagnostic(Diagnostic.Create(
+            diagnostics.Add(Diagnostic.Create(
                 SqlDiagnostics.MissingKey,
                 location, dto.Name));
         }
 
         return collected;
     }
-
-    private static ProfileInfo BuildDefaultProfileInfo(INamedTypeSymbol dto)
-    {
-        var props = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .ToArray();
-
-        var dict = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
-
-        foreach (var p in props)
-        {
-            dict[p.Name] = new ParamConfig
-            {
-                PropertyName = p.Name,
-                PropertyType = p.Type,
-                ParameterName = p.Name,
-                DbType = p.Type.MapDefaultSqlDbType()
-            };
-        }
-
-        var idName = props.FirstOrDefault(p => string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase))?.Name;
-        var keys = idName is null ? ImmutableArray<string>.Empty : [idName];
-
-        return new ProfileInfo(
-            Schema: "dbo",
-            Table: dto.Name.PluralizeSimple(),
-            Keys: keys,
-            IdentityKeys: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
-            ParamsByProperty: dict.ToImmutableDictionary(StringComparer.Ordinal)
-        );
-    }
     
     private static ProfileInfo Collect(
         INamedTypeSymbol profileSymbol,
         INamedTypeSymbol dtoType,
         SemanticModel model,
-        SourceProductionContext spc)
+        ImmutableArray<Diagnostic>.Builder diagnostics)
     {
         var dtoProps = dtoType.GetMembers()
             .OfType<IPropertySymbol>()
@@ -143,7 +102,7 @@ internal static class ProfileInfoCollector
 
                     if (isConfigureCall)
                     {
-                        ConfigureChainParser.ParseConfigureRootAndForwardChain(spc, model, dtoType, dtoProps, inv, configs);
+                        ConfigureChainParser.ParseConfigureRootAndForwardChain(model, dtoType, dtoProps, inv, configs, diagnostics);
                     }
                 }
             }

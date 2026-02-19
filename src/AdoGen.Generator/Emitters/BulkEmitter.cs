@@ -4,20 +4,17 @@ using System.Linq;
 using System.Text;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Parsing;
 using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
 public static class BulkEmitter
 {
-    internal static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto)
+    internal static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto, ProfileInfo info)
     {
         var (dto, kind, _, _) = discoveryDto;
         
         if (kind < SqlModelKind.Bulk) return;
-
-        var info = ProfileInfoCollector.Resolve(spc, discoveryDto);
 
         EmitWithInfo(spc, dto, info);
     }

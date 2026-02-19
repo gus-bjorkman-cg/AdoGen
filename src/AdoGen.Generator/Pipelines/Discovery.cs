@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Linq;
+using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -59,11 +60,11 @@ internal static class Discovery
                         typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlResultInterface)) ? SqlModelKind.Result :
                         SqlModelKind.None;
 
-                    if (kind == SqlModelKind.None)
-                        continue;
+                    if (kind == SqlModelKind.None) continue;
 
                     INamedTypeSymbol? profile = null;
                     SemanticModel? model = null;
+                    
                     for (var i = 0; i < profiles.Length; i++)
                     {
                         if (!SymbolEqualityComparer.Default.Equals(profiles[i].Dto, typeSymbol))
@@ -122,3 +123,8 @@ internal readonly record struct DiscoveryDto(
     SqlModelKind Kind,
     INamedTypeSymbol? Profile,
     SemanticModel? ProfileSemanticModel);
+    
+internal readonly record struct ValidatedDiscoveryDto(
+    DiscoveryDto Discovery,
+    ProfileInfo ProfileInfo,
+    ImmutableArray<Diagnostic> Diagnostics);

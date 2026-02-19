@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Data;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -12,12 +13,12 @@ namespace AdoGen.Generator.Parsing;
 internal static class ConfigureChainParser
 {
     public static void ParseConfigureRootAndForwardChain(
-        SourceProductionContext spc,
         SemanticModel model,
         INamedTypeSymbol dtoType,
         IReadOnlyDictionary<string, IPropertySymbol> dtoProps,
         InvocationExpressionSyntax configureInvocation,
-        Dictionary<string, ParamConfig> configs)
+        Dictionary<string, ParamConfig> configs,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder)
     {
         var lambda = (LambdaExpressionSyntax)configureInvocation.ArgumentList.Arguments[0].Expression;
         var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
@@ -52,35 +53,35 @@ internal static class ConfigureChainParser
                     if (args.Count == 1 && model.TryGetConstEnumArg<SqlDbType>(args[0].Expression, CancellationToken.None, out var dbt))
                         cfg.DbType = dbt;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Size":
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var size))
                         cfg.Size = size;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Precision":
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var prec))
                         cfg.Precision = prec;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Scale":
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var sc))
                         cfg.Scale = sc;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Name":
                     if (args.Count == 1 && model.TryGetConstString(args[0].Expression, CancellationToken.None, out var pname) && !string.IsNullOrWhiteSpace(pname))
                         cfg.ParameterName = pname!;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "NVarChar":
@@ -90,7 +91,7 @@ internal static class ConfigureChainParser
                         cfg.Size = nsize;
                     }
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "VarChar":
@@ -100,7 +101,7 @@ internal static class ConfigureChainParser
                         cfg.Size = vsize;
                     }
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "NChar":
@@ -110,7 +111,7 @@ internal static class ConfigureChainParser
                         cfg.Size = ncsize;
                     }
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Char":
@@ -120,7 +121,7 @@ internal static class ConfigureChainParser
                         cfg.Size = csize;
                     }
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "VarBinary":
@@ -130,26 +131,26 @@ internal static class ConfigureChainParser
                         cfg.Size = bsize;
                     }
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
                 
                 case "Nullable":
                     if (args.Count == 0) cfg.IsNullable = true;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "NotNull":
                     if (args.Count == 0) cfg.IsNullable = false;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "DefaultValue":
                     if (args.Count == 1 && model.TryGetConstString(args[0].Expression, CancellationToken.None, out var expr) && !string.IsNullOrWhiteSpace(expr))
                         cfg.DefaultSqlExpression = expr!;
                     else
-                        spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 default:
