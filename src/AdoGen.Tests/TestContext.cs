@@ -1,8 +1,6 @@
-﻿using Microsoft.Data.SqlClient;
-using Testcontainers.MsSql;
-using AdoGen.Abstractions;
+﻿using Testcontainers.MsSql;
 using AdoGen.Sample.Features.Orders;
-using User = AdoGen.Sample.Features.Users.User;
+using AdoGen.Sample.Features.Users;
 
 namespace AdoGen.Tests;
 

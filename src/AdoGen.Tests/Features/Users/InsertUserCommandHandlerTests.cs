@@ -1,4 +1,3 @@
-using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
 
 namespace AdoGen.Tests.Features.Users;

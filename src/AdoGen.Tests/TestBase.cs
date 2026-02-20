@@ -1,9 +1,7 @@
-using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Orders;
 using AdoGen.Sample.Features.Users;
 using Bogus;
 using Bogus.Extensions;
-using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests;
 

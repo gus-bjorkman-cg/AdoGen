@@ -1,6 +1,4 @@
-using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
-using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 

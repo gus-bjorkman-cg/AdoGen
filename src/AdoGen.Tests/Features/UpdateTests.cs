@@ -1,6 +1,3 @@
-using AdoGen.Abstractions;
-using Microsoft.Data.SqlClient;
-
 namespace AdoGen.Tests.Features;
 
 public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)

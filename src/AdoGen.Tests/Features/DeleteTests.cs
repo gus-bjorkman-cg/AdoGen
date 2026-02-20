@@ -1,6 +1,3 @@
-using AdoGen.Abstractions;
-using Microsoft.Data.SqlClient;
-
 namespace AdoGen.Tests.Features;
 
 public sealed class DeleteTests(TestContext testContext) : TestBase(testContext)
