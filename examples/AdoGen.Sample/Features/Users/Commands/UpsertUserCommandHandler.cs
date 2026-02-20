@@ -1,4 +1,4 @@
-namespace AdoGen.Sample.Features.Users;
+namespace AdoGen.Sample.Features.Users.Commands;
 
 public sealed record UpsertUserCommand(User User);
 public sealed class UpsertUserCommandHandler(string connectionString)

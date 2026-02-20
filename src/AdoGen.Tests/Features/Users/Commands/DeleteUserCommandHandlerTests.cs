@@ -1,6 +1,7 @@
 using AdoGen.Sample.Features.Users;
+using AdoGen.Sample.Features.Users.Commands;
 
-namespace AdoGen.Tests.Features.Users;
+namespace AdoGen.Tests.Features.Users.Commands;
 
 public sealed class DeleteUserCommandHandlerTests(TestContext testContext) : TestBase(testContext)
 {

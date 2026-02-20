@@ -34,7 +34,7 @@ public sealed class InsertListTests(TestContext testContext) : TestBase(testCont
     public async Task Insert_ShouldRespectCommandTimeout()
     {
         // Arrange
-        await using var transaction = await LockUserTable();
+        await using var transaction = await LockTable("Users");
         
         // Act
         var act = async () =>

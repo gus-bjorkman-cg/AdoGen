@@ -30,10 +30,10 @@ public abstract class TestBase : IAsyncLifetime
             .Generate(20);
     }
 
-    protected async ValueTask<SqlTransaction> LockUserTable()
+    protected async ValueTask<SqlTransaction> LockTable(string tableName)
     {
         var transaction = Connection.BeginTransaction();
-        await using var cmd = new SqlCommand("SELECT * FROM Users WITH (TABLOCKX)", Connection, transaction);
+        await using var cmd = new SqlCommand($"SELECT * FROM {tableName} WITH (TABLOCKX)", Connection, transaction);
         await cmd.ExecuteNonQueryAsync(CancellationToken);
         
         return transaction;
@@ -42,6 +42,9 @@ public abstract class TestBase : IAsyncLifetime
     private const string GetUserSql = "SELECT TOP(1) * FROM Users WHERE Id = @Id"; 
     protected async ValueTask<User?> GetUser(Guid id) =>
         await Connection.QueryFirstOrDefaultAsync<User>(GetUserSql, UserSql.CreateParameterId(id), CancellationToken);
+
+    protected async ValueTask<List<User>> GetAllUsers() =>
+        await Connection.QueryAsync<User>("SELECT * FROM Users", CancellationToken);
 
     protected virtual ValueTask InitializeAsync() => ValueTask.CompletedTask;
     protected virtual ValueTask DisposeAsync() => ValueTask.CompletedTask;

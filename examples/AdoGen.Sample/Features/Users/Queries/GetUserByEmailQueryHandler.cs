@@ -1,4 +1,4 @@
-namespace AdoGen.Sample.Features.Users;
+namespace AdoGen.Sample.Features.Users.Queries;
 
 public sealed record GetUserByEmailQuery(string Email);
 

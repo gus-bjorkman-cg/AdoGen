@@ -32,7 +32,7 @@ public sealed class TruncateTests(TestContext testContext) : TestBase(testContex
     public async Task Truncate_ShouldRespectCommandTimeout()
     {
         // Arrange
-        await using var transaction = await LockUserTable();
+        await using var transaction = await LockTable("Users");
         
         // Act
         var act = async () =>
