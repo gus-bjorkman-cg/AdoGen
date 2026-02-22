@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using AdoGen.Generator.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -15,10 +16,13 @@ internal static class ProfileInfoCollector
 {
     private const string RuleFor = nameof(RuleFor);
     
-    internal static ProfileInfo Resolve(DiscoveryDto discoveryDto, ImmutableArray<Diagnostic>.Builder diagnostics)
+    internal static ProfileInfo Resolve(
+        DiscoveryDto discoveryDto, 
+        ImmutableArray<Diagnostic>.Builder diagnostics,
+        CancellationToken ct)
     {
         var (dto, _, profile, model) = discoveryDto;
-        var collected = Collect(profile!, dto, model!, diagnostics);
+        var collected = Collect(profile!, dto, model!, diagnostics, ct);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
         {
@@ -38,7 +42,8 @@ internal static class ProfileInfoCollector
         INamedTypeSymbol profileSymbol,
         INamedTypeSymbol dtoType,
         SemanticModel model,
-        ImmutableArray<Diagnostic>.Builder diagnostics)
+        ImmutableArray<Diagnostic>.Builder diagnostics,
+        CancellationToken ct)
     {
         var dtoProps = dtoType
             .GetMembers()
@@ -109,7 +114,14 @@ internal static class ProfileInfoCollector
 
                     if (isConfigureCall)
                     {
-                        ConfigureChainParser.ParseConfigureRootAndForwardChain(model, dtoType, dtoProps, inv, configs, diagnostics);
+                        ConfigureChainParser.ParseConfigureRootAndForwardChain(
+                            model, 
+                            dtoType, 
+                            dtoProps, 
+                            inv, 
+                            configs,
+                            diagnostics, 
+                            ct);
                     }
                 }
             }

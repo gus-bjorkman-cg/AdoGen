@@ -1,5 +1,6 @@
 ﻿using Testcontainers.MsSql;
 using AdoGen.Sample.Features.Orders;
+using AdoGen.Sample.Features.TestTypes;
 using AdoGen.Sample.Features.Users;
 
 namespace AdoGen.Tests;
@@ -23,6 +24,7 @@ public sealed class TestContext : IAsyncLifetime
         await command.ExecuteNonQueryAsync(CancellationToken);
         await connection.CreateTableAsync<User>(CancellationToken);
         await connection.CreateTableAsync<Order>(CancellationToken);
+        await connection.CreateTableAsync<TestType>(CancellationToken);
     }
 
     public async ValueTask DisposeAsync() => await _msSqlContainer.DisposeAsync();

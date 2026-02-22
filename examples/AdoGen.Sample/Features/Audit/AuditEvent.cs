@@ -2,6 +2,7 @@ using System.Data;
 
 namespace AdoGen.Sample.Features.Audit;
 
+// Created to test code with a different schema
 public sealed partial record AuditEvent(
     long EventId,
     DateTimeOffset CreatedAt,

@@ -100,15 +100,16 @@ internal static class DtoMapperEmitter
         string ordinalField,
         out bool needsEnumCastHelper)
     {
-        var (underlying, isNullable) = p.Type.UnwrapNullable();
+        var (underlying, isNullableValueType) = p.Type.UnwrapNullable();
+        
+        var isNullable = isNullableValueType || p.NullableAnnotation == NullableAnnotation.Annotated;
 
         if (underlying.TypeKind == TypeKind.Enum)
         {
-            needsEnumCastHelper = true; // you can do it inline; no helper needed
+            needsEnumCastHelper = true;
             var enumUnderlying = ((INamedTypeSymbol)underlying).EnumUnderlyingType!;
 
-            // Re-enter the same switch using the enum's underlying type
-            var (eu, _) = enumUnderlying.UnwrapNullable(); // not nullable in practice
+            var (eu, _) = enumUnderlying.UnwrapNullable();
             var coreGetterName = eu.SpecialType switch
             {
                 SpecialType.System_SByte => "GetSByte",
@@ -126,12 +127,11 @@ internal static class DtoMapperEmitter
             {
                 var read = $"reader.{coreGetterName}({ordinalField})";
                 var cast = $"({underlying.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat)}){read}";
-
                 return isNullable
                     ? $"reader.IsDBNull({ordinalField}) ? default : {cast}"
                     : cast;
             }
-            
+
             var enumKey = underlying.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat);
             var fv = $"reader.GetFieldValue<{enumKey}>({ordinalField})";
             return isNullable ? $"reader.IsDBNull({ordinalField}) ? default : {fv}" : fv;
@@ -156,10 +156,10 @@ internal static class DtoMapperEmitter
                 var key => $"GetFieldValue<{key}>"
             }
         };
-        
+
         getter = $"reader.{getter}({ordinalField})";
         needsEnumCastHelper = false;
-        
+
         return isNullable ? $"reader.IsDBNull({ordinalField}) ? default : {getter}" : getter;
     }
 }

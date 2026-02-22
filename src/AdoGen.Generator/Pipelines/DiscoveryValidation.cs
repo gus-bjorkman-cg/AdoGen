@@ -87,7 +87,7 @@ internal static class DiscoveryValidation
                 return vdto with { Diagnostics = diagnostics.ToImmutable() };
             }
 
-            var profile = ProfileInfoCollector.Resolve(dto, diagnostics);
+            var profile = ProfileInfoCollector.Resolve(dto, diagnostics, ct);
             
             if (propsNeedingConfig.Count == 0) return vdto with { ProfileInfo = profile };
             

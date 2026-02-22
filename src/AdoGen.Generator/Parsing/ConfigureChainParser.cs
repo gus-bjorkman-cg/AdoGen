@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Data;
-using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -20,7 +18,8 @@ internal static class ConfigureChainParser
         IReadOnlyDictionary<string, IPropertySymbol> dtoProps,
         InvocationExpressionSyntax configureInvocation,
         Dictionary<string, ParamConfig> configs,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder)
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder,
+        CancellationToken ct)
     {
         var lambda = (LambdaExpressionSyntax)configureInvocation.ArgumentList.Arguments[0].Expression;
         var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
@@ -52,42 +51,42 @@ internal static class ConfigureChainParser
             switch (methodName)
             {
                 case "Type":
-                    if (args.Count == 1 && model.TryGetConstEnumArg<SqlDbType>(args[0].Expression, CancellationToken.None, out var dbt))
+                    if (args.Count == 1 && model.TryGetConstEnumArg<SqlDbType>(args[0].Expression, ct, out var dbt))
                         cfg.DbType = dbt;
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Size":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var size))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var size))
                         cfg.Size = size;
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Precision":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var prec))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var prec))
                         cfg.Precision = prec;
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Scale":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var sc))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var sc))
                         cfg.Scale = sc;
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "Name":
-                    if (args.Count == 1 && model.TryGetConstString(args[0].Expression, CancellationToken.None, out var pname) && !string.IsNullOrWhiteSpace(pname))
+                    if (args.Count == 1 && model.TryGetConstString(args[0].Expression, ct, out var pname) && !string.IsNullOrWhiteSpace(pname))
                         cfg.ParameterName = pname!;
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "NVarChar":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var nsize))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var nsize))
                     {
                         cfg.DbType = SqlDbType.NVarChar;
                         cfg.Size = nsize;
@@ -97,7 +96,7 @@ internal static class ConfigureChainParser
                     break;
 
                 case "VarChar":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var vsize))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var vsize))
                     {
                         cfg.DbType = SqlDbType.VarChar;
                         cfg.Size = vsize;
@@ -107,7 +106,7 @@ internal static class ConfigureChainParser
                     break;
 
                 case "NChar":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var ncsize))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var ncsize))
                     {
                         cfg.DbType = SqlDbType.NChar;
                         cfg.Size = ncsize;
@@ -117,7 +116,7 @@ internal static class ConfigureChainParser
                     break;
 
                 case "Char":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var csize))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var csize))
                     {
                         cfg.DbType = SqlDbType.Char;
                         cfg.Size = csize;
@@ -127,7 +126,7 @@ internal static class ConfigureChainParser
                     break;
 
                 case "VarBinary":
-                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, CancellationToken.None, out var bsize))
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var bsize))
                     { 
                         cfg.DbType = SqlDbType.VarBinary;
                         cfg.Size = bsize;
@@ -149,12 +148,27 @@ internal static class ConfigureChainParser
                     break;
 
                 case "DefaultValue":
-                    if (args.Count == 1 && model.TryGetConstString(args[0].Expression, CancellationToken.None, out var expr) && !string.IsNullOrWhiteSpace(expr))
+                    if (args.Count == 1 && model.TryGetConstString(args[0].Expression, ct, out var expr) && !string.IsNullOrWhiteSpace(expr))
                         cfg.DefaultSqlExpression = expr!;
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
+                case "Decimal":
+                    if (args.Count == 2
+                        && model.TryGetConstInt(args[0].Expression, ct, out var precision)
+                        && model.TryGetConstInt(args[1].Expression, ct, out var scale))
+                    {
+                        cfg.DbType = SqlDbType.Decimal;
+                        cfg.Precision = precision;
+                        cfg.Scale = scale;
+                    }
+                    else
+                    {
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                    }
+                    break;
+                
                 default:
                     break;
             }

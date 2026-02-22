@@ -33,28 +33,51 @@ internal static class RoslynSymbolExtensions
                 ? (named.TypeArguments[0], true)
                 : (t, false);
 
-        public SqlDbType MapDefaultSqlDbType() => t.UnwrapNullable().Underlying.SpecialType switch
+        public SqlDbType MapDefaultSqlDbType()
         {
-            SpecialType.System_Boolean => SqlDbType.Bit,
-            SpecialType.System_Byte => SqlDbType.TinyInt,
-            SpecialType.System_Int16 => SqlDbType.SmallInt,
-            SpecialType.System_Int32 => SqlDbType.Int,
-            SpecialType.System_Int64 => SqlDbType.BigInt,
-            SpecialType.System_Single => SqlDbType.Real,
-            SpecialType.System_Double => SqlDbType.Float,
-            SpecialType.System_Decimal => SqlDbType.Decimal, // requires precision/scale
-            SpecialType.System_String => SqlDbType.NVarChar, // requires size
-            _ => t.ToDisplayString(GetterKeyFormat) switch
+            var (underlying, _) = t.UnwrapNullable();
+            
+            if (underlying.TypeKind == TypeKind.Enum && underlying is INamedTypeSymbol enumType)
             {
-                "global::System.Guid" => SqlDbType.UniqueIdentifier,
-                "global::System.DateTime" => SqlDbType.DateTime2,
-                "global::System.DateTimeOffset" => SqlDbType.DateTimeOffset,
-                "global::System.DateOnly" => SqlDbType.Date,
-                "global::System.TimeOnly" => SqlDbType.Time,
-                "global::System.Byte[]" => SqlDbType.VarBinary, // requires size
-                _ => SqlDbType.Variant
+                return enumType.EnumUnderlyingType?.SpecialType switch
+                {
+                    SpecialType.System_Byte => SqlDbType.TinyInt,
+                    SpecialType.System_SByte => SqlDbType.SmallInt,
+                    SpecialType.System_Int16 => SqlDbType.SmallInt,
+                    SpecialType.System_UInt16 => SqlDbType.Int,
+                    SpecialType.System_Int32 => SqlDbType.Int,
+                    SpecialType.System_UInt32 => SqlDbType.BigInt,
+                    SpecialType.System_Int64 => SqlDbType.BigInt,
+                    SpecialType.System_UInt64 => SqlDbType.Decimal,
+                    _ => SqlDbType.Variant
+                };
             }
-        };
+
+            return underlying.SpecialType switch
+            {
+                SpecialType.System_Boolean => SqlDbType.Bit,
+                SpecialType.System_Byte => SqlDbType.TinyInt,
+                SpecialType.System_Int16 => SqlDbType.SmallInt,
+                SpecialType.System_Int32 => SqlDbType.Int,
+                SpecialType.System_Int64 => SqlDbType.BigInt,
+                SpecialType.System_Single => SqlDbType.Real,
+                SpecialType.System_Double => SqlDbType.Float,
+                SpecialType.System_Decimal => SqlDbType.Decimal // requires precision/scale
+                ,
+                SpecialType.System_String => SqlDbType.NVarChar // requires size
+                ,
+                _ => underlying.ToDisplayString(GetterKeyFormat) switch
+                {
+                    "global::System.Guid" => SqlDbType.UniqueIdentifier,
+                    "global::System.DateTime" => SqlDbType.DateTime2,
+                    "global::System.DateTimeOffset" => SqlDbType.DateTimeOffset,
+                    "global::System.DateOnly" => SqlDbType.Date,
+                    "global::System.TimeOnly" => SqlDbType.Time,
+                    "global::System.Byte[]" => SqlDbType.VarBinary, // requires size
+                    _ => SqlDbType.Variant
+                }
+            };
+        }
     }
 
     extension(IPropertySymbol prop)

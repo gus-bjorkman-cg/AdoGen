@@ -294,7 +294,7 @@ public static class BulkEmitter
             {
                 var p = dtoProps[i];
                 var t = GetUnderlyingTypeSymbol(p.Type);
-                var typeName = t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                var typeName = t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat).TrimEnd('?');
                 sb.AppendLine($"            {i} => typeof({typeName}),");
             }
             return sb.ToString().TrimEnd();

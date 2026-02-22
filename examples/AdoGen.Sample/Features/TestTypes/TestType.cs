@@ -2,6 +2,7 @@ using System.Data;
 
 namespace AdoGen.Sample.Features.TestTypes;
 
+// Created to cover remaining types for test
 public enum Fruits
 {
     Apple,
@@ -74,7 +75,7 @@ public sealed partial record TestType(
     ShortEnum ShortEnum,
     IntEnum IntEnum,
     LongEnum LongEnum
-    ) : ISqlDomainModel;
+    ) : ISqlBulkModel;
 
 public sealed class TestTypeProfile : SqlProfile<TestType>
 {
@@ -91,10 +92,10 @@ public sealed class TestTypeProfile : SqlProfile<TestType>
         RuleFor(x => x.NullableChar).NChar(1).Nullable();
         RuleFor(x => x.NullableBytes).VarBinary(200).Nullable();
         RuleFor(x => x.Bytes).VarBinary(200);
-        RuleFor(x => x.Decimal).Type(SqlDbType.Decimal).Precision(2).Scale(2);
-        RuleFor(x => x.NullableDecimal).Decimal(1, 5).Nullable();
-        RuleFor(x => x.Bytes).Type(SqlDbType.VarBinary).Size(5);
+        RuleFor(x => x.Decimal).Decimal(4,2);
+        RuleFor(x => x.NullableDecimal).Decimal(6, 3).Nullable();
         RuleFor(x => x.CharString).Char(10);
         RuleFor(x => x.NCharString).NChar(15);
+        RuleFor(x => x.NullableDateTime).Type(SqlDbType.DateTime).Nullable();
     }
 }
