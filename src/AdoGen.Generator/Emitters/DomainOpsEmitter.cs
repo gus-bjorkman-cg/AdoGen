@@ -1,95 +1,22 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Parsing;
+using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
 internal static class DomainOpsEmitter
 {
-    public static void Emit(
-        SourceProductionContext spc,
-        (((INamedTypeSymbol dto, bool _, bool missingInterface) domain, ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)> profilesIndex) input, Compilation compilation) data)
+    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto, ProfileInfo info)
     {
-        var ((domain, profilesIndex), compilation) = data;
-        var (dto, _, missingInterface) = domain;
+        var (dto, kind, _, _) = discoveryDto;
 
-        if (missingInterface)
-        {
-            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingDomainInterface, Location.None));
-            return;
-        }
-
-        var isPartial = dto.DeclaringSyntaxReferences
-            .Select(r => r.GetSyntax())
-            .OfType<TypeDeclarationSyntax>()
-            .Any(t => t.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)));
-        if (!isPartial)
-        {
-            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.NotPartial, dto.Locations.FirstOrDefault() ?? Location.None, dto.ToDisplayString()));
-            return;
-        }
-
-        // Try to find SqlProfile<T> for this DTO from precomputed index
-        var profileEntry = profilesIndex.FirstOrDefault(p => SymbolEqualityComparer.Default.Equals(p.Dto, dto));
-        ProfileInfo info;
-        if (profileEntry.Profile is null)
-        {
-            // Build defaults (dbo, pluralized name, Id key if present, default type mappings)
-            info = BuildDefaultProfileInfo(dto);
-        }
-        else
-        {
-            var collected = ProfileInfoCollector.Collect(profileEntry.Profile, dto, profileEntry.Model, spc);
-
-            if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
-            {
-                spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingKey, profileEntry.Profile.Locations.FirstOrDefault() ?? dto.Locations.FirstOrDefault() ?? Location.None, dto.Name));
-            }
-            info = collected;
-        }
+        if (kind < SqlModelKind.Domain) return;
 
         EmitWithInfo(spc, dto, info);
-    }
-
-    private static ProfileInfo BuildDefaultProfileInfo(INamedTypeSymbol dto)
-    {
-        var props = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .ToArray();
-
-        var dict = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
-        
-        foreach (var p in props)
-        {
-            dict[p.Name] = new ParamConfig
-            {
-                PropertyName = p.Name,
-                PropertyType = p.Type,
-                ParameterName = "@" + p.Name,
-                DbType = p.Type.MapDefaultSqlDbType()
-            };
-        }
-
-        var idName = props.FirstOrDefault(p => string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase))?.Name;
-        var keys = idName is null ? ImmutableArray<string>.Empty : [idName];
-
-        return new ProfileInfo(
-            Schema: "dbo",
-            Table: dto.Name.PluralizeSimple(),
-            Keys: keys,
-            IdentityKeys: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
-            ParamsByProperty: dict.ToImmutableDictionary(StringComparer.Ordinal)
-        );
     }
 
     private static void EmitWithInfo(SourceProductionContext spc, INamedTypeSymbol dto, ProfileInfo info)
@@ -118,7 +45,7 @@ internal static class DomainOpsEmitter
 
             const string spaces = "            ";
             var comma = i == dtoProps.Length - 1 ? "" : ",";
-            var line = $"{spaces}[{p.Name}] {sqlType}{identity}{defaultClause} {nullability}{comma}";
+            var line = $"{spaces}[{cfg.ParameterName}] {sqlType}{identity}{defaultClause} {nullability}{comma}";
             sbColDefs.AppendLine(line);
         }
 
@@ -133,30 +60,78 @@ internal static class DomainOpsEmitter
             """;
 
         // INSERT (skip identity)
-        var insertCols = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"[{p.Name}]").ToArray();
-        var insertParams = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => "@" + p.Name).ToArray();
-        var insertSql = $"INSERT INTO [{info.Schema}].[{info.Table}] ({string.Join(", ", insertCols)}) VALUES ({string.Join(", ", insertParams)});";
+        var insertCols = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+
+        var insertParams = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => "@" + info.ParamsByProperty[p.Name].ParameterName)
+            .ToArray();
+
+        var insertSql =
+            $"INSERT INTO [{info.Schema}].[{info.Table}] ({string.Join(", ", insertCols)}) VALUES ({string.Join(", ", insertParams)});";
+
         var insertBatchSql = $"INSERT INTO [{info.Schema}].[{info.Table}] ({string.Join(", ", insertCols)}) VALUES";
 
         // UPDATE (non-key, non-identity)
-        var nonKeyNonIdentity = dtoProps.Where(p => !info.Keys.Contains(p.Name) && !info.IdentityKeys.Contains(p.Name)).ToArray();
-        var updateSet = string.Join(", ", nonKeyNonIdentity.Select(p => $"[{p.Name}] = @{p.Name}"));
-        var whereClause = string.Join(" AND ", info.Keys.Select(k => $"[{k}] = @{k}"));
+        var nonKeyNonIdentity = dtoProps
+            .Where(p => !info.Keys.Contains(p.Name) && !info.IdentityKeys.Contains(p.Name))
+            .ToArray();
+
+        var updateSet = string.Join(", ", nonKeyNonIdentity.Select(p =>
+        {
+            var col = info.ParamsByProperty[p.Name].ParameterName;
+            return $"[{col}] = @{col}";
+        }));
+
+        var whereClause = string.Join(" AND ", info.Keys.Select(k =>
+        {
+            var col = info.ParamsByProperty[k].ParameterName;
+            return $"[{col}] = @{col}";
+        }));
+
         var updateSql = $"UPDATE [{info.Schema}].[{info.Table}] SET {updateSet} WHERE {whereClause};";
         var deleteSql = $"DELETE FROM [{info.Schema}].[{info.Table}] WHERE {whereClause};";
 
         // UPSERT via MERGE
-        var matchKeys = info.Keys.Where(k => !info.IdentityKeys.Contains(k)).Select(k => $"T.[{k}] = S.[{k}]");
-        var allCols = dtoProps.Select(p => $"[{p.Name}]").ToArray();
-        var allParams = dtoProps.Select(p => "@" + p.Name).ToArray();
+        var matchKeys = info.Keys
+            .Where(k => !info.IdentityKeys.Contains(k))
+            .Select(k =>
+            {
+                var col = info.ParamsByProperty[k].ParameterName;
+                return $"T.[{col}] = S.[{col}]";
+            });
+
+        var allCols = dtoProps
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+
+        var allParams = dtoProps
+            .Select(p => "@" + info.ParamsByProperty[p.Name].ParameterName)
+            .ToArray();
+
         var usingColumns = string.Join(", ", allCols);
-        var usingValues  = string.Join(", ", allParams);
+        var usingValues = string.Join(", ", allParams);
         var onExpr = string.Join(" AND ", matchKeys);
-        var updateSetFromS = string.Join(", ", dtoProps.Where(p => !info.Keys.Contains(p.Name)).Select(p => $"T.[{p.Name}] = S.[{p.Name}]"));
+
+        var updateSetFromS = string.Join(", ", dtoProps
+            .Where(p => !info.Keys.Contains(p.Name))
+            .Select(p =>
+            {
+                var col = info.ParamsByProperty[p.Name].ParameterName;
+                return $"T.[{col}] = S.[{col}]";
+            }));
+
         var nonIdentityProp = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).ToArray();
         var nonIdentityPropCount = nonIdentityProp.Length;
 
-        var insertCols2 = allCols.Where(c => !info.IdentityKeys.Contains(c.Trim('[', ']'))).ToArray();
+        var insertCols2 = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+
         var insertValues2 = insertCols2.Select(c => $"S.{c}").ToArray();
 
         var upsertSql =

@@ -1,6 +1,3 @@
-using AdoGen.Abstractions;
-using Microsoft.Data.SqlClient;
-
 namespace AdoGen.Tests.Features;
 
 public sealed class DeleteTests(TestContext testContext) : TestBase(testContext)
@@ -33,7 +30,7 @@ public sealed class DeleteTests(TestContext testContext) : TestBase(testContext)
     public async Task Delete_ShouldRespectCommandTimeout()
     {
         // Arrange
-        await using var transaction = await LockUserTable();
+        await using var transaction = await LockTable("Users");
         
         // Act
         var act = async () =>

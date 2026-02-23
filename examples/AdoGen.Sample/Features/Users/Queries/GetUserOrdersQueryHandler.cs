@@ -1,6 +1,6 @@
 using AdoGen.Sample.Features.Orders;
 
-namespace AdoGen.Sample.Features.Users;
+namespace AdoGen.Sample.Features.Users.Queries;
 
 public sealed record GetUserOrdersResponse(User User, List<Order> Orders);
 public sealed record GetUserOrdersQuery

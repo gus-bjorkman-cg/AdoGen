@@ -91,13 +91,13 @@ public sealed class PropertyBuilder<TProp>
     public PropertyBuilder<TProp> Name(string parameterName) => this;
     
     /// <summary>
-    /// Shorthand config for setting db type as Decimal with its scale and precision.
+    /// Shorthand config for setting db type as Decimal with its precision and scale.
     /// </summary>
-    /// <param name="scale"></param>
     /// <param name="precision"></param>
+    /// <param name="scale"></param>
     /// <returns></returns>
-    public PropertyBuilder<TProp> Decimal(int scale, int precision) => 
-        Type(SqlDbType.Decimal).Size(scale).Precision(precision);
+    public PropertyBuilder<TProp> Decimal(int precision, int scale) => 
+        Type(SqlDbType.Decimal).Precision(precision).Scale(scale);
     
     /// <summary>
     /// Shorthand config for setting db type as NVarChar with its size.

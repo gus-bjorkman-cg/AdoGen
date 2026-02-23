@@ -1,6 +1,3 @@
-using AdoGen.Abstractions;
-using Microsoft.Data.SqlClient;
-
 namespace AdoGen.Tests.Features;
 
 public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
@@ -37,7 +34,7 @@ public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
     public async Task Update_ShouldRespectCommandTimeout()
     {
         // Arrange
-        await using var transaction = await LockUserTable();
+        await using var transaction = await LockTable("Users");
         
         // Act
         var act = async () =>

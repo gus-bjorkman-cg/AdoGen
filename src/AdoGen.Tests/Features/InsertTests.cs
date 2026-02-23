@@ -1,6 +1,4 @@
-using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
-using Microsoft.Data.SqlClient;
 
 namespace AdoGen.Tests.Features;
 
@@ -36,7 +34,7 @@ public sealed class InsertTests(TestContext testContext) : TestBase(testContext)
     public async Task Insert_ShouldRespectCommandTimeout()
     {
         // Arrange
-        await using var transaction = await LockUserTable();
+        await using var transaction = await LockTable("Users");
         
         // Act
         var act = async () =>

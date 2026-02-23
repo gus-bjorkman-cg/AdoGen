@@ -118,10 +118,6 @@
           "description": "NuGet API key (from GH secret or env NUGET_API_KEY)",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "PackageVersion": {
-          "type": "string",
-          "description": "Package version to produce. Default: 0.1.0.0"
-        },
         "Solution": {
           "type": "string",
           "description": "Path to a solution file that is automatically loaded"

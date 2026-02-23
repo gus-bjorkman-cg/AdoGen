@@ -1,7 +1,7 @@
-using AdoGen.Abstractions;
 using AdoGen.Sample.Features.Users;
+using AdoGen.Sample.Features.Users.Commands;
 
-namespace AdoGen.Tests.Features.Users;
+namespace AdoGen.Tests.Features.Users.Commands;
 
 public sealed class InsertUserCommandHandlerTests(TestContext testContext) : TestBase(testContext)
 {

@@ -1,88 +1,23 @@
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using AdoGen.Generator.Diagnostics;
 using Microsoft.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Parsing;
+using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
 public static class BulkEmitter
 {
-    public static void Emit(
-        SourceProductionContext spc,
-        (((INamedTypeSymbol dto, bool _, bool missingInterface) domain,
-            ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)> profilesIndex) input,
-            Compilation compilation) data)
+    internal static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto, ProfileInfo info)
     {
-        var ((domain, profilesIndex), compilation) = data;
-        var (dto, _, missingInterface) = domain;
-
-        if (missingInterface)
-        {
-            spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingBulkInterface, Location.None));
-            return;
-        }
+        var (dto, kind, _, _) = discoveryDto;
         
-        // Try to find SqlProfile<T> for this DTO from precomputed index
-        var profileEntry = profilesIndex.FirstOrDefault(p => SymbolEqualityComparer.Default.Equals(p.Dto, dto));
-        ProfileInfo info;
-
-        if (profileEntry.Profile is null)
-        {
-            info = BuildDefaultProfileInfo(dto);
-        }
-        else
-        {
-            var collected = ProfileInfoCollector.Collect(profileEntry.Profile, dto, profileEntry.Model, spc);
-
-            if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
-            {
-                spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingKey,
-                    profileEntry.Profile.Locations.FirstOrDefault() ?? dto.Locations.FirstOrDefault() ?? Location.None,
-                    dto.Name));
-            }
-
-            info = collected;
-        }
+        if (kind < SqlModelKind.Bulk) return;
 
         EmitWithInfo(spc, dto, info);
-    }
-
-    private static ProfileInfo BuildDefaultProfileInfo(INamedTypeSymbol dto)
-    {
-        var props = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .ToArray();
-
-        var dict = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
-
-        foreach (var p in props)
-        {
-            dict[p.Name] = new ParamConfig
-            {
-                PropertyName = p.Name,
-                PropertyType = p.Type,
-                ParameterName = "@" + p.Name,
-                DbType = p.Type.MapDefaultSqlDbType()
-            };
-        }
-
-        var idName = props.FirstOrDefault(p => string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase))?.Name;
-        var keys = idName is null ? ImmutableArray<string>.Empty : [idName];
-
-        return new ProfileInfo(
-            Schema: "dbo",
-            Table: dto.Name.PluralizeSimple(),
-            Keys: keys,
-            IdentityKeys: ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal),
-            ParamsByProperty: dict.ToImmutableDictionary(StringComparer.Ordinal)
-        );
     }
 
     private static void EmitWithInfo(SourceProductionContext spc, INamedTypeSymbol dto, ProfileInfo info)
@@ -90,6 +25,12 @@ public static class BulkEmitter
         var dtoProps = dto.GetMembers()
             .OfType<IPropertySymbol>()
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .OrderBy(x =>
+            {
+                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
+                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
+            })
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
             .ToArray();
 
         var ns = dto.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dto.ContainingNamespace.ToDisplayString();
@@ -113,14 +54,24 @@ public static class BulkEmitter
         var idxClause = $"        CREATE INDEX [IX_AdoGen_{info.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
 
         // INSERT columns: skip identity keys (same rule as DomainOpsEmitter)
-        var insertCols = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"[{p.Name}]").ToArray();
-        var insertSelect = dtoProps.Where(p => !info.IdentityKeys.Contains(p.Name)).Select(p => $"S.[{p.Name}]").ToArray();
+        var insertCols = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
+        
+        var insertSelect = dtoProps
+            .Where(p => !info.IdentityKeys.Contains(p.Name))
+            .Select(p => $"S.[{info.ParamsByProperty[p.Name].ParameterName}]")
+            .ToArray();
 
         // UPDATE SET: non-key, non-identity (same as DomainOpsEmitter)
         var nonKeyNonIdentity = dtoProps
             .Where(p => !info.Keys.Contains(p.Name) && !info.IdentityKeys.Contains(p.Name))
             .ToArray();
-        var updateSet = string.Join(",\n        ", nonKeyNonIdentity.Select(p => $"    T.[{p.Name}] = S.[{p.Name}]"));
+        
+        var updateSet = string.Join(",\n        ", nonKeyNonIdentity
+            .Select(x => info.ParamsByProperty[x.Name].ParameterName)
+            .Select(x => $"    T.[{x}] = S.[{x}]"));
 
         // CREATE TEMP TABLE (no identity clause here; it's just staging)
         var sbColDefs = new StringBuilder();
@@ -133,7 +84,7 @@ public static class BulkEmitter
             var nullability = isNullable ? "NULL" : "NOT NULL";
 
             const string spaces = "            ";
-            sbColDefs.AppendLine($"{spaces}[{p.Name}] {sqlType} {nullability},");
+            sbColDefs.AppendLine($"{spaces}[{cfg.ParameterName}] {sqlType} {nullability},");
         }
         sbColDefs.AppendLine("            [Operation] CHAR(1) NOT NULL");
 
@@ -324,7 +275,10 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             foreach (var p in dtoProps)
-                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{p.Name}\", \"{p.Name}\");");
+            {
+                var propName = info.ParamsByProperty[p.Name].ParameterName;
+                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{propName}\", \"{propName}\");");
+            }
             return sb.ToString().TrimEnd();
         }
 
@@ -332,7 +286,7 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             for (var i = 0; i < dtoProps.Length; i++)
-                sb.AppendLine($"            {i} => \"{dtoProps[i].Name}\",");
+                sb.AppendLine($"            {i} => \"{info.ParamsByProperty[dtoProps[i].Name].ParameterName}\",");
             return sb.ToString().TrimEnd();
         }
 
@@ -343,7 +297,7 @@ public static class BulkEmitter
             {
                 var p = dtoProps[i];
                 var t = GetUnderlyingTypeSymbol(p.Type);
-                var typeName = t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                var typeName = t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat).TrimEnd('?');
                 sb.AppendLine($"            {i} => typeof({typeName}),");
             }
             return sb.ToString().TrimEnd();
@@ -375,7 +329,7 @@ public static class BulkEmitter
             return type;
         }
 
-        static string GetValueExpression(IPropertySymbol p, bool isNullable)
+        string GetValueExpression(IPropertySymbol p, bool isNullable)
         {
             // Reference nullable: item.Prop ?? (object)DBNull.Value
             if (isNullable && p.Type.IsReferenceType)
@@ -396,7 +350,7 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             for (var i = 0; i < dtoProps.Length; i++)
-                sb.AppendLine($"            \"{dtoProps[i].Name}\" => {i},");
+                sb.AppendLine($"            \"{info.ParamsByProperty[dtoProps[i].Name].ParameterName}\" => {i},");
             sb.AppendLine($"            \"Operation\" => {dtoProps.Length},");
             return sb.ToString().TrimEnd();
         }

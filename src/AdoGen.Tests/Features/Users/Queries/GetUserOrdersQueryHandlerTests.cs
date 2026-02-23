@@ -1,6 +1,6 @@
-using AdoGen.Sample.Features.Users;
+using AdoGen.Sample.Features.Users.Queries;
 
-namespace AdoGen.Tests.Features.Users;
+namespace AdoGen.Tests.Features.Users.Queries;
 
 public sealed class GetUserOrdersQueryHandlerTests : TestBase
 {

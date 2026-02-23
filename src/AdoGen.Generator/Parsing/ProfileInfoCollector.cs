@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
+using AdoGen.Generator.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
+using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Parsing;
 
@@ -13,15 +16,45 @@ internal static class ProfileInfoCollector
 {
     private const string RuleFor = nameof(RuleFor);
     
-    public static ProfileInfo Collect(
+    internal static ProfileInfo Resolve(
+        DiscoveryDto discoveryDto, 
+        ImmutableArray<Diagnostic>.Builder diagnostics,
+        CancellationToken ct)
+    {
+        var (dto, _, profile, model) = discoveryDto;
+        var collected = Collect(profile!, dto, model!, diagnostics, ct);
+
+        if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
+        {
+            var location = profile!.Locations.FirstOrDefault()
+                           ?? dto.Locations.FirstOrDefault()
+                           ?? Location.None;
+
+            diagnostics.Add(Diagnostic.Create(
+                SqlDiagnostics.MissingKey,
+                location, dto.Name));
+        }
+
+        return collected;
+    }
+    
+    private static ProfileInfo Collect(
         INamedTypeSymbol profileSymbol,
         INamedTypeSymbol dtoType,
         SemanticModel model,
-        SourceProductionContext spc)
+        ImmutableArray<Diagnostic>.Builder diagnostics,
+        CancellationToken ct)
     {
-        var dtoProps = dtoType.GetMembers()
+        var dtoProps = dtoType
+            .GetMembers()
             .OfType<IPropertySymbol>()
             .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
+            .OrderBy(x =>
+            {
+                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
+                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
+            })
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
             .ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
 
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
@@ -81,7 +114,14 @@ internal static class ProfileInfoCollector
 
                     if (isConfigureCall)
                     {
-                        ConfigureChainParser.ParseConfigureRootAndForwardChain(spc, model, dtoType, dtoProps, inv, configs);
+                        ConfigureChainParser.ParseConfigureRootAndForwardChain(
+                            model, 
+                            dtoType, 
+                            dtoProps, 
+                            inv, 
+                            configs,
+                            diagnostics, 
+                            ct);
                     }
                 }
             }
@@ -106,7 +146,7 @@ internal static class ProfileInfoCollector
                 {
                     PropertyName = prop.Name,
                     PropertyType = prop.Type,
-                    ParameterName = "@" + prop.Name,
+                    ParameterName = prop.Name,
                     DbType = prop.Type.MapDefaultSqlDbType()   
                 };
             }
