@@ -6,22 +6,20 @@ built around source‑generated mappings and explicit parameter metadata.
 AdoGen focuses on **predictable performance**, **Native AOT compatibility**,  
 and **doing parameter binding correctly**—without magic, reflection, or runtime code generation.
 
-AdoGen outperforms others in multi insert & bulk operations.
----
-
 Project description
 -------------------
-Alfa release, only supporting .net 10 & Sql server.
+First release, only supporting .net 10 & Sql server.
 Configuration inspired by [`FluentValidation`](https://github.com/JeremySkinner/FluentValidation).
 Querying inspired by [`Dapper`](https://github.com/DapperLib/Dapper)
 
 Implementing ISqlResult triggers source generation for mapper helper classes.
 Implementing ISqlDomainModel triggers source generation of standard crud implementations.
+Implementing ISqlBulkModel triggers source generation of bulk implementations.
 Creating a SqlProfile triggers db parameter generation.
 
 Class or record must be partial to trigger source generation.
-SqlProfile must be imlpemented for ISqlDomainModel to work.
-ISqlDomainModel inherits from ISqlResult, so it can be used for query results as well.
+ISqlDomainModel inherits from ISqlResult, and ISqlBulkModel inherits from ISqlDomainModel, 
+so you can pick only the one that suits your usecase.
 
 Benchmarks
 -------------------
@@ -94,7 +92,7 @@ public sealed class UserProfile : SqlProfile<User>
     }
 }
 
-public sealed partial record Order(Guid Id, string ProductName, Guid UserId) : ISqlDomainModel;
+public sealed partial record Order(Guid Id, string ProductName, Guid UserId) : ISqlBulkModel;
 
 public sealed class OrderProfile : SqlProfile<Order>
 {
@@ -124,6 +122,22 @@ public sealed class Sample
         await connection.UpsertAsync(order, ct);
         await connection.DeleteAsync(order, ct);
     }
+    
+    public async ValueTask OrderBulkMethods(
+        Order[] ordersToAdd, 
+        Order[] ordersToUpdate, 
+        Order[] ordersToDelete, 
+        CancellationToken ct)
+    {
+        var bulk = new OrderBulk(ordersToAdd.Length + ordersToUpdate.Length + ordersToDelete.Length);
+        bulk.AddRange(ordersToAdd);
+        bulk.UpdateRange(ordersToUpdate);
+        bulk.RemoveRange(ordersToDelete);
+        
+        await using var transaction = connection.BeginTransaction();
+        await bulk.SaveChangesAsync(bulk, ct);
+        await transaction.CommitAsync(ct);
+    }
 }
 
 /* OUTPUT:
@@ -133,5 +147,6 @@ UserMapper.g.cs
 OrderSql.g.cs
 OrderMapper.g.cs
 OrderDomainOps.g.cs
+OrderBulk.g.cs
 */
 ```
