@@ -101,9 +101,10 @@ internal static class DtoMapperEmitter
         out bool needsEnumCastHelper)
     {
         var (underlying, isNullableValueType) = p.Type.UnwrapNullable();
-        
         var isNullable = isNullableValueType || p.NullableAnnotation == NullableAnnotation.Annotated;
-
+        var propertyTypeKey = p.Type.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat);
+        var dbNullValueExpr = isNullableValueType ? $"({propertyTypeKey})null" : "null";
+        
         if (underlying.TypeKind == TypeKind.Enum)
         {
             needsEnumCastHelper = true;
@@ -128,13 +129,24 @@ internal static class DtoMapperEmitter
                 var read = $"reader.{coreGetterName}({ordinalField})";
                 var cast = $"({underlying.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat)}){read}";
                 return isNullable
-                    ? $"reader.IsDBNull({ordinalField}) ? default : {cast}"
+                    ? $"reader.IsDBNull({ordinalField}) ? {dbNullValueExpr} : {cast}"
                     : cast;
             }
 
             var enumKey = underlying.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat);
             var fv = $"reader.GetFieldValue<{enumKey}>({ordinalField})";
-            return isNullable ? $"reader.IsDBNull({ordinalField}) ? default : {fv}" : fv;
+            return isNullable ? $"reader.IsDBNull({ordinalField}) ? {dbNullValueExpr} : {fv}" : fv;
+        }
+        
+        needsEnumCastHelper = false;
+        
+        if (underlying.SpecialType == SpecialType.System_Char)
+        {
+            var readChar = $"reader.GetString({ordinalField})[0]";
+            
+            return isNullable
+                ? $"reader.IsDBNull({ordinalField}) ? {dbNullValueExpr} : {readChar}"
+                : readChar;
         }
 
         var getter = underlying.SpecialType switch
@@ -158,8 +170,7 @@ internal static class DtoMapperEmitter
         };
 
         getter = $"reader.{getter}({ordinalField})";
-        needsEnumCastHelper = false;
 
-        return isNullable ? $"reader.IsDBNull({ordinalField}) ? default : {getter}" : getter;
+        return isNullable ? $"reader.IsDBNull({ordinalField}) ? {dbNullValueExpr} : {getter}" : getter;
     }
 }

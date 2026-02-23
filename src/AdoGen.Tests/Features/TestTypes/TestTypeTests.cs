@@ -6,6 +6,9 @@ namespace AdoGen.Tests.Features.TestTypes;
 
 public sealed class TestTypeTests(TestContext testContext) : TestBase(testContext)
 {
+    private static DateTime RoundToSqlServerDateTime(DateTime value) => 
+        new(value.Year, value.Month, value.Day, value.Hour, value.Minute, value.Second);
+
     private static readonly Faker<TestType> Faker = new Faker<TestType>()
         .StrictMode(true)
         .RuleFor(x => x.Int, _ => 0)
@@ -21,7 +24,7 @@ public sealed class TestTypeTests(TestContext testContext) : TestBase(testContex
         .RuleFor(x => x.Float, f => f.Random.Float())
         .RuleFor(x => x.NullableFloat, f => f.Random.Bool() ? f.Random.Float() : null)
         .RuleFor(x => x.DateTime, f => f.Date.Recent())
-        .RuleFor(x => x.NullableDateTime, f => f.Date.Recent())
+        .RuleFor(x => x.NullableDateTime, f => RoundToSqlServerDateTime(f.Date.Recent()))
         .RuleFor(x => x.Double, f => f.Random.Double())
         .RuleFor(x => x.NullableDouble, f => f.Random.Bool() ? f.Random.Double() : null)
         .RuleFor(x => x.Char, f => f.Random.Char('a', 'z'))
@@ -45,7 +48,7 @@ public sealed class TestTypeTests(TestContext testContext) : TestBase(testContex
         .WithDefaultConstructor();
 
     private List<TestType> _toInsert = [];
-    private List<TestType> _toUpdate = [];
+    private readonly List<TestType> _toUpdate = [];
     private List<TestType> _toDelete = [];
     
     protected override async ValueTask InitializeAsync()
@@ -63,7 +66,7 @@ public sealed class TestTypeTests(TestContext testContext) : TestBase(testContex
 
         for (var i = 0; i < toUpdate.Count; i++)
         {
-            _toUpdate.Add(testTypes[i + 30] with{ Int = toUpdate[i].Int, Decimal = toUpdate[i].Decimal });
+            _toUpdate.Add(testTypes[i + 30] with { Int = toUpdate[i].Int, Decimal = toUpdate[i].Decimal });
         }
         
         await Connection.InsertAsync(_toDelete.Concat(toUpdate).ToList(), CancellationToken);
