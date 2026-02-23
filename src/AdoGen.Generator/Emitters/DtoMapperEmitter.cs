@@ -3,13 +3,14 @@ using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using AdoGen.Generator.Extensions;
+using AdoGen.Generator.Models;
 using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Emitters;
 
 internal static class DtoMapperEmitter
 {
-    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto)
+    public static void Emit(SourceProductionContext spc, DiscoveryDto discoveryDto, ProfileInfo profileInfo)
     {
         var (dto, _, _, _) = discoveryDto;
         
@@ -39,16 +40,16 @@ internal static class DtoMapperEmitter
         for (var i = 0; i < props.Length; i++)
         {
             var p = props[i];
-            var ordinalField = $"{p.Name}Ordinal";
+            var cfg = profileInfo.ParamsByProperty[p.Name];
+            var ordinalField = $"{cfg.ParameterName}Ordinal";
             var isLast = i == props.Length - 1;
-            
             var getterExpr = EmitReaderGet(p, ordinalField, out bool needsEnumCastForThis);
 
             if (needsEnumCastForThis) needsEnumCastHelper = true;
             
             ordinals.AppendLine($"    private static int {ordinalField};");
-            init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{p.Name}\");");
-            read.AppendLine($"            {p.Name} {sep} {getterExpr}{(isLast ? "" : ",")}");
+            init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{cfg.ParameterName}\");");
+            read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr}{(isLast ? "" : ",")}");
         }
 
         read.Append(setUsingConstructor ? "        )" : "        }");

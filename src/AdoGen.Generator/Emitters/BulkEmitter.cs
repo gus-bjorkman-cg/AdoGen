@@ -275,7 +275,10 @@ public static class BulkEmitter
         {
             var sb = new StringBuilder();
             foreach (var p in dtoProps)
-                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{p.Name}\", \"{info.ParamsByProperty[p.Name].ParameterName}\");");
+            {
+                var propName = info.ParamsByProperty[p.Name].ParameterName;
+                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{propName}\", \"{propName}\");");
+            }
             return sb.ToString().TrimEnd();
         }
 

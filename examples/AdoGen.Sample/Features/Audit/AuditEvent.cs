@@ -18,6 +18,6 @@ public sealed class AuditEventProfile : SqlProfile<AuditEvent>
         Identity(x => x.EventId);
         Key(x => x.EventId);
         RuleFor(x => x.EventType).Name("Type").NVarChar(50);
-        RuleFor(x => x.JsonPayload).Type(SqlDbType.VarBinary).Size(int.MaxValue);
+        RuleFor(x => x.JsonPayload).Type(SqlDbType.VarBinary).Size(8000);
     }
 }

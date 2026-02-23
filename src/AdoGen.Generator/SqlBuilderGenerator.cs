@@ -23,7 +23,7 @@ public sealed class SqlBuilderGenerator : IIncrementalGenerator
 
                 var dto = validatedDto.Discovery;
 
-                DtoMapperEmitter.Emit(spc, dto);
+                DtoMapperEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
                 SqlParameterHelpersEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
                 DomainOpsEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
                 BulkEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
