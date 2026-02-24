@@ -53,7 +53,7 @@ public class GenerationTests
 
         foreach (var r in GetTrustedPlatformAssemblyReferences()) refs.Add(r);
 
-        refs.Add(FromAssembly(typeof(Abstractions.ISqlBulkModel).Assembly));
+        refs.Add(FromAssembly(typeof(SqlServer.ISqlBulkModel).Assembly));
         refs.Add(FromAssembly(typeof(SqlBulkCopy).Assembly));
 
         return [..refs];
@@ -73,7 +73,7 @@ public class GenerationTests
     private const string Source =
         """
         using System;
-        using AdoGen.Abstractions;
+        using AdoGen.SqlServer;
         
         namespace AdoGen.Generator.Tests;
         

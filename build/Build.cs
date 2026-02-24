@@ -192,8 +192,8 @@ class Build : NukeBuild
         .Executes(() =>
         {
             var generator = OutputDirectory.GlobFiles("AdoGen.Generator*.nupkg").Single();
-            var abstractions = OutputDirectory.GlobFiles("AdoGen.Abstractions*.nupkg").Single();
-            var abstractionsSym = OutputDirectory.GlobFiles("AdoGen.Abstractions*.snupkg").Single();
+            var abstractions = OutputDirectory.GlobFiles("AdoGen.SqlServer*.nupkg").Single();
+            var abstractionsSym = OutputDirectory.GlobFiles("AdoGen.SqlServer*.snupkg").Single();
             
             DotNetNuGetPush(s => s
                 .SetTargetPath(generator)

@@ -2,7 +2,7 @@ using System;
 using System.Data;
 using System.Linq.Expressions;
 
-namespace AdoGen.Abstractions;
+namespace AdoGen.SqlServer;
 
 /// <summary>
 /// The generator inspects the constructor body and reads calls to RuleFor(...).

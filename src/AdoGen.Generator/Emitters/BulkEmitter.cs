@@ -111,7 +111,7 @@ public static class BulkEmitter
             using System.Threading;
             using System.Threading.Tasks;
             using Microsoft.Data.SqlClient;
-            using AdoGen.Abstractions;
+            using AdoGen.SqlServer;
 
             namespace {{{ns}}};
 

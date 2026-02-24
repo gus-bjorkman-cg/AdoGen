@@ -1,4 +1,4 @@
-namespace AdoGen.Abstractions;
+namespace AdoGen.SqlServer;
 
 /// <summary>
 /// Represents the supported bulk operation types that is supported by this extension.

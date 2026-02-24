@@ -34,7 +34,7 @@ internal static class SqlParameterHelpersEmitter
             using System.Runtime.CompilerServices;
             using Microsoft.Data.SqlClient;
 
-            namespace AdoGen.Abstractions;
+            namespace AdoGen.SqlServer;
 
             /// <summary>
             /// Helper methods for creating typed SQL parameters for {{dto.Name}}.

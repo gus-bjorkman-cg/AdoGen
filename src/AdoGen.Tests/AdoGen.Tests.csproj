@@ -30,7 +30,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\examples\AdoGen.Sample\AdoGen.Sample.csproj" />
-        <ProjectReference Include="..\AdoGen.Abstractions\AdoGen.Abstractions.csproj" />
+        <ProjectReference Include="..\AdoGen.SqlServer\AdoGen.SqlServer.csproj" />
         <ProjectReference Include="..\AdoGen.Generator\AdoGen.Generator.csproj"
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"/>

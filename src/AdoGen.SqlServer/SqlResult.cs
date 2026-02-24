@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-namespace AdoGen.Abstractions;
+namespace AdoGen.SqlServer;
 
 /// <summary>
 /// Interface used to generate ado gen mapper and sql helper class.

@@ -8,7 +8,7 @@ namespace AdoGen.Generator.Pipelines;
 
 internal static class Discovery
 {
-    private const string AbstractionsLib = "AdoGen.Abstractions";
+    private const string AbstractionsLib = "AdoGen.SqlServer";
     private const string SqlResultInterface = $"{AbstractionsLib}.ISqlResult";
     private const string SqlDomainInterface = $"{AbstractionsLib}.ISqlDomainModel";
     private const string SqlBulkInterface = $"{AbstractionsLib}.ISqlBulkModel";

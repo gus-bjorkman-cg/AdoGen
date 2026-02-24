@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-namespace AdoGen.Abstractions;
+namespace AdoGen.SqlServer;
 
 /// <summary>
 /// Represents a batch of bulk operations (insert, update, delete) to be applied to a SQL

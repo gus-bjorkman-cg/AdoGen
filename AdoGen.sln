@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Sample", "examples/AdoGen.Sample/AdoGen.Sample.csproj", "{E8582590-15FE-552D-428F-D27EFD09BAFF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Abstractions", "src/AdoGen.Abstractions/AdoGen.Abstractions.csproj", "{C81988E5-FA8D-D2A3-9C1A-B194867B576D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.SqlServer", "src\AdoGen.SqlServer\AdoGen.SqlServer.csproj", "{C81988E5-FA8D-D2A3-9C1A-B194867B576D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Benchmarks", "src/AdoGen.Benchmarks/AdoGen.Benchmarks.csproj", "{7CE86B51-0216-9B49-9D8F-8CF8021986C7}"
 EndProject
@@ -13,6 +13,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Builder", "build\Builder.csproj", "{9007F185-D2E2-419B-A4C5-0BE330684E80}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Generator.Tests", "src\AdoGen.Generator.Tests\AdoGen.Generator.Tests.csproj", "{9D01FE9B-2C1F-473E-B39F-E5C85E416776}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.PostgreSql", "src\AdoGen.PostgreSql\AdoGen.PostgreSql.csproj", "{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -46,5 +48,9 @@ Global
 		{9D01FE9B-2C1F-473E-B39F-E5C85E416776}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9D01FE9B-2C1F-473E-B39F-E5C85E416776}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9D01FE9B-2C1F-473E-B39F-E5C85E416776}.Release|Any CPU.Build.0 = Release|Any CPU
+		{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

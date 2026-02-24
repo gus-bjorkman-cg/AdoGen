@@ -1,7 +1,7 @@
 using System;
 using System.Data;
 
-namespace AdoGen.Abstractions;
+namespace AdoGen.SqlServer;
 
 /// <summary>
 /// Minimal base reader for SqlBulkCopy. Derived types implement core metadata + value access.

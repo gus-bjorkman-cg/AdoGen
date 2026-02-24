@@ -1,5 +1,5 @@
 using Microsoft.Data.SqlClient;
-using AdoGen.Abstractions;
+using AdoGen.SqlServer;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
 using Bogus;

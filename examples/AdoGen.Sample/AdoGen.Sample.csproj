@@ -12,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\AdoGen.Abstractions\AdoGen.Abstractions.csproj" />
+      <ProjectReference Include="..\..\src\AdoGen.SqlServer\AdoGen.SqlServer.csproj" />
       <ProjectReference Include="..\..\src\AdoGen.Generator\AdoGen.Generator.csproj" 
                         OutputItemType="Analyzer"
                         ReferenceOutputAssembly="false"/>

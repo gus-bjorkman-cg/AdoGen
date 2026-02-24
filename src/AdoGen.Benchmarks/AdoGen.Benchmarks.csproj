@@ -17,6 +17,6 @@
     
     <ItemGroup>
         <ProjectReference Include="..\..\examples\AdoGen.Sample\AdoGen.Sample.csproj"/>
-        <ProjectReference Include="..\AdoGen.Abstractions\AdoGen.Abstractions.csproj" />
+        <ProjectReference Include="..\AdoGen.SqlServer\AdoGen.SqlServer.csproj" />
     </ItemGroup>
 </Project>
