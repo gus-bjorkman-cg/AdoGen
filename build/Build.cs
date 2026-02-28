@@ -42,7 +42,8 @@ class Build : NukeBuild
     static AbsolutePath SourceDirectory => RootDirectory / "src";
     static AbsolutePath Changelog => RootDirectory / "Changelog.md";
     
-    Project AbstractionsProject;
+    Project SqlServerProject;
+    Project PostgreSqlProject;
     Project GeneratorProject;
     Project[] TestProjects = [];
 
@@ -54,7 +55,8 @@ class Build : NukeBuild
     {
         base.OnBuildInitialized();
         ProjectModelTasks.Initialize();
-        AbstractionsProject = Solution.AdoGen_Abstractions;
+        SqlServerProject = Solution.AdoGen_SqlServer;
+        PostgreSqlProject = Solution.AdoGen_PostgreSql;
         GeneratorProject = Solution.AdoGen_Generator;
         TestProjects = Solution.AllProjects.Where(x => x.Name.EndsWith("Tests")).ToArray();
         IsTagBuild = GitRepo?.Branch?.StartsWith(TagPath) == true;
@@ -136,7 +138,7 @@ class Build : NukeBuild
         });
     
     Target Pack => x => x
-        .Description("Packs the Abstraction and generator projects")
+        .Description("Packs the provider and generator projects")
         .DependsOn(Test)
         .Executes(() =>
         {
@@ -144,22 +146,27 @@ class Build : NukeBuild
             var numericVersion = version.Split('-', 2)[0] + ".0";
             var notes = ExtractReleaseNotes(version);
             
-            DotNetPack(s => s
-                .SetProject(AbstractionsProject)
-                .SetConfiguration(Configuration)
-                .SetOutputDirectory(OutputDirectory)
-                .SetNoBuild(true)
-                .EnableNoLogo()
-                .EnableNoRestore()
-                .EnableContinuousIntegrationBuild()
-                .SetProperty("Version", version)
-                .SetProperty("PackageVersion", version)
-                .SetProperty("InformationalVersion", version)
-                .SetProperty("AssemblyVersion", numericVersion)
-                .SetProperty("FileVersion", numericVersion)
-                .SetProperty("IncludeSymbols", "true")
-                .SetProperty("SymbolPackageFormat", "snupkg")
-                .SetProperty("PackageReleaseNotes", notes));
+            var providerProjects = new[] { SqlServerProject, PostgreSqlProject };
+
+            foreach (var project in providerProjects)
+            {
+                DotNetPack(s => s
+                    .SetProject(project)
+                    .SetConfiguration(Configuration)
+                    .SetOutputDirectory(OutputDirectory)
+                    .SetNoBuild(true)
+                    .EnableNoLogo()
+                    .EnableNoRestore()
+                    .EnableContinuousIntegrationBuild()
+                    .SetProperty("Version", version)
+                    .SetProperty("PackageVersion", version)
+                    .SetProperty("InformationalVersion", version)
+                    .SetProperty("AssemblyVersion", numericVersion)
+                    .SetProperty("FileVersion", numericVersion)
+                    .SetProperty("IncludeSymbols", "true")
+                    .SetProperty("SymbolPackageFormat", "snupkg")
+                    .SetProperty("PackageReleaseNotes", notes));
+            }
 
             DotNetPack(s => s
                 .SetProject(GeneratorProject)
@@ -191,26 +198,15 @@ class Build : NukeBuild
         .Requires(() => !string.IsNullOrWhiteSpace(NuGetApiKey))
         .Executes(() =>
         {
-            var generator = OutputDirectory.GlobFiles("AdoGen.Generator*.nupkg").Single();
-            var abstractions = OutputDirectory.GlobFiles("AdoGen.SqlServer*.nupkg").Single();
-            var abstractionsSym = OutputDirectory.GlobFiles("AdoGen.SqlServer*.snupkg").Single();
-            
-            DotNetNuGetPush(s => s
-                .SetTargetPath(generator)
-                .SetSource(NugetSource)
-                .SetApiKey(NuGetApiKey)
-                .EnableSkipDuplicate());
+            var packages = OutputDirectory.GlobFiles("*.nupkg", "*.snupkg");
 
-            DotNetNuGetPush(s => s
-                .SetTargetPath(abstractions)
-                .SetSource(NugetSource)
-                .SetApiKey(NuGetApiKey)
-                .EnableSkipDuplicate());
-
-            DotNetNuGetPush(s => s
-                .SetTargetPath(abstractionsSym)
-                .SetSource(NugetSource)
-                .SetApiKey(NuGetApiKey)
-                .EnableSkipDuplicate());
+            foreach (var package in packages)
+            {
+                DotNetNuGetPush(s => s
+                    .SetTargetPath(package)
+                    .SetSource(NugetSource)
+                    .SetApiKey(NuGetApiKey)
+                    .EnableSkipDuplicate());
+            }
         });
 }
