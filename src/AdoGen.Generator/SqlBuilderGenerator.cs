@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using AdoGen.Generator.Emitters;
 using AdoGen.Generator.Emitters.PostgreSql;
 using AdoGen.Generator.Emitters.SqlServer;
+using AdoGen.Generator.Models;
 using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 

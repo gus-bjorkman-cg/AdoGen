@@ -170,24 +170,4 @@ internal static class Discovery
             .Select(static (p, _) => (Dto: (INamedTypeSymbol)p.Profile.BaseType!.TypeArguments[0], p.Profile, p.Model, p.Provider))
             .Collect();
 }
-
-internal enum SqlModelKind : byte
-{
-    None = 0,
-    Result = 1,
-    Domain = 2,
-    Bulk = 3
-}
-
-internal readonly record struct DiscoveryDto(
-    INamedTypeSymbol Dto,
-    SqlModelKind Kind,
-    INamedTypeSymbol? Profile,
-    SemanticModel? ProfileSemanticModel,
-    SqlProviderKind Provider);
-
-internal readonly record struct ValidatedDiscoveryDto(
-    DiscoveryDto Discovery,
-    ProfileInfo ProfileInfo,
-    ImmutableArray<Diagnostic> Diagnostics);
     

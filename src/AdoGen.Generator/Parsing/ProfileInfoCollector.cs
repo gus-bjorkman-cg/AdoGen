@@ -9,7 +9,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Parsing;
 
@@ -116,6 +115,7 @@ internal static class ProfileInfoCollector
                             dtoProps, 
                             inv, 
                             configs,
+                            provider,
                             diagnostics, 
                             ct);
                     }
