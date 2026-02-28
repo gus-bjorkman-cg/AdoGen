@@ -13,9 +13,9 @@ internal static class RoslynSymbolExtensions
     
     extension(ITypeSymbol t)
     {
-        public bool IsString() => t.SpecialType == SpecialType.System_String;
-        public bool IsDecimal() => t.SpecialType == SpecialType.System_Decimal;
-        public bool IsByteArray() => t is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte };
+        public bool IsString => t.SpecialType == SpecialType.System_String;
+        public bool IsDecimal => t.SpecialType == SpecialType.System_Decimal;
+        public bool IsByteArray => t is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte };
         public string GetGetterKey() => t.ToDisplayString(GetterKeyFormat);
         
         public bool IsGuidType()

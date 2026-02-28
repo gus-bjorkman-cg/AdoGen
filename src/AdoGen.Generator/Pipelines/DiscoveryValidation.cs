@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Data;
 using System.Linq;
 using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
 using AdoGen.Generator.Parsing;
+using AdoGen.Generator.Pipelines.PostgreSql;
+using AdoGen.Generator.Pipelines.SqlServer;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -15,6 +16,16 @@ namespace AdoGen.Generator.Pipelines;
 
 internal static class DiscoveryValidation
 {
+    private static readonly List<IParamConfigValidator> ParamConfigValidators =
+    [
+        StringValidatorSqlServer.Instance,
+        DecimalValidatorSqlServer.Instance,
+        BinaryValidatorSqlServer.Instance,
+        StringValidatorNpgsql.Instance,
+        DecimalValidatorNpgsql.Instance,
+        BinaryValidatorNpgsql.Instance
+    ];
+    
     internal static IncrementalValuesProvider<ValidatedDiscoveryDto> ValidateDtos(IncrementalValuesProvider<DiscoveryDto> dtos)
     {
         var initial = dtos.Select(static (dto, ct) =>
@@ -65,14 +76,15 @@ internal static class DiscoveryValidation
                 })
                 .ThenBy(x => x.Name, StringComparer.Ordinal)
                 .ToImmutableArray();
+            
+            var propsNeedingConfig = new Dictionary<IPropertySymbol, PropertyTypeKind>(props.Length, SymbolEqualityComparer.Default);
 
-            var propsNeedingConfig = new List<IPropertySymbol>(props.Length);
             for (var i = 0; i < props.Length; i++)
             {
                 var p = props[i];
-                var t = p.Type;
-
-                if (t.IsString() || t.IsDecimal() || t.IsByteArray()) propsNeedingConfig.Add(p);
+                if (p.Type.IsString) propsNeedingConfig.Add(p, PropertyTypeKind.String);
+                else if (p.Type.IsDecimal) propsNeedingConfig.Add(p, PropertyTypeKind.Decimal);
+                else if (p.Type.IsByteArray) propsNeedingConfig.Add(p, PropertyTypeKind.ByteArray);
             }
             
             var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
@@ -91,99 +103,15 @@ internal static class DiscoveryValidation
             
             if (propsNeedingConfig.Count == 0) return vdto with { ProfileInfo = profile };
             
-            foreach (var p in propsNeedingConfig)
+            foreach (var kvp in propsNeedingConfig)
             {
-                if (!profile.ParamsByProperty.TryGetValue(p.Name, out var cfg))
-                {
-                    diagnostics.Add(Diagnostic.Create(
-                        SqlDiagnostics.MissingRequiredParameterConfig,
-                        dto.Profile.Locations.FirstOrDefault()
-                            ?? dto.Dto.Locations.FirstOrDefault()
-                            ?? Location.None,
-                        dto.Dto.Name,
-                        p.Name));
-                    continue;
-                }
+                var p = kvp.Key;
+                var typeKind = kvp.Value;
+                profile.ParamsByProperty.TryGetValue(p.Name, out var cfg);
 
-                if (p.Type.IsString())
-                {
-                    if (dto.Provider == SqlProviderKind.SqlServer)
-                    {
-                        // SQL Server: string must be configured with declared kind (varchar/nvarchar/etc) + size
-                        if (cfg.DbType is null || cfg.Size is null)
-                        {
-                            diagnostics.Add(Diagnostic.Create(
-                                SqlDiagnostics.StringMissing,
-                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                                dto.Dto.Name,
-                                p.Name));
-                        }
-                    }
-                    else
-                    {
-                        // PostgreSQL: require explicit Type + Size unless Text is chosen
-                        if (cfg.DbType is null || (cfg.DbType.Value.EnumMember == "Varchar" && cfg.Size is null))
-                        {
-                            diagnostics.Add(Diagnostic.Create(
-                                SqlDiagnostics.StringMissing,
-                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                                dto.Dto.Name,
-                                p.Name));
-                        }
-                    }
-                }
-
-                if (p.Type.IsDecimal())
-                {
-                    if (dto.Provider == SqlProviderKind.SqlServer)
-                    {
-                        if (cfg.DbType?.EnumMember != "Decimal" || cfg.Precision is null || cfg.Scale is null)
-                        {
-                            diagnostics.Add(Diagnostic.Create(
-                                SqlDiagnostics.DecimalMissing,
-                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                                dto.Dto.Name,
-                                p.Name));
-                        }
-                    }
-                    else
-                    {
-                        if (cfg.DbType?.EnumMember != "Numeric" || cfg.Precision is null || cfg.Scale is null)
-                        {
-                            diagnostics.Add(Diagnostic.Create(
-                                SqlDiagnostics.DecimalMissing,
-                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                                dto.Dto.Name,
-                                p.Name));
-                        }
-                    }
-                }
-
-                if (p.Type.IsByteArray())
-                {
-                    if (dto.Provider == SqlProviderKind.SqlServer)
-                    {
-                        if (cfg.DbType?.EnumMember != "VarBinary" || cfg.Size is null)
-                        {
-                            diagnostics.Add(Diagnostic.Create(
-                                SqlDiagnostics.BinaryMissing,
-                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                                dto.Dto.Name,
-                                p.Name));
-                        }
-                    }
-                    else
-                    {
-                        if (cfg.DbType?.EnumMember != "Bytea")
-                        {
-                            diagnostics.Add(Diagnostic.Create(
-                                SqlDiagnostics.BinaryMissing,
-                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                                dto.Dto.Name,
-                                p.Name));
-                        }
-                    }
-                }
+                ParamConfigValidators
+                    .FirstOrDefault(x => x.IsMatch(dto.Provider, typeKind))
+                    ?.Validate(dto, p, cfg, diagnostics);
             }
 
             return vdto with { ProfileInfo = profile, Diagnostics = diagnostics.ToImmutable() };
