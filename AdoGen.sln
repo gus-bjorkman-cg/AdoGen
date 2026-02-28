@@ -8,13 +8,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Benchmarks", "src/Ad
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Generator", "src/AdoGen.Generator/AdoGen.Generator.csproj", "{4C1240BD-D727-712B-0D55-F95748DBA22E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Tests", "src/AdoGen.Tests/AdoGen.Tests.csproj", "{E7B8A342-8B72-68AA-37D8-BD22D85553C3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.SqlServer.Tests", "src\AdoGen.SqlServer.Tests\AdoGen.SqlServer.Tests.csproj", "{E7B8A342-8B72-68AA-37D8-BD22D85553C3}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Builder", "build\Builder.csproj", "{9007F185-D2E2-419B-A4C5-0BE330684E80}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.Generator.Tests", "src\AdoGen.Generator.Tests\AdoGen.Generator.Tests.csproj", "{9D01FE9B-2C1F-473E-B39F-E5C85E416776}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.PostgreSql", "src\AdoGen.PostgreSql\AdoGen.PostgreSql.csproj", "{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoGen.PostgreSql.Tests", "src\AdoGen.PostgreSql.Tests\AdoGen.PostgreSql.Tests.csproj", "{A32B1E8E-3403-41CC-B4AF-541B33528ECE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -52,5 +54,9 @@ Global
 		{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{00BC389E-0EFD-45DB-86FC-1C64BDBDDFFC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A32B1E8E-3403-41CC-B4AF-541B33528ECE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A32B1E8E-3403-41CC-B4AF-541B33528ECE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A32B1E8E-3403-41CC-B4AF-541B33528ECE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A32B1E8E-3403-41CC-B4AF-541B33528ECE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

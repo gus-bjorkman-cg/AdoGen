@@ -9,10 +9,12 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+      <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\AdoGen.SqlServer\AdoGen.SqlServer.csproj" />
+      <ProjectReference Include="..\..\src\AdoGen.PostgreSql\AdoGen.PostgreSql.csproj" />
       <ProjectReference Include="..\..\src\AdoGen.Generator\AdoGen.Generator.csproj" 
                         OutputItemType="Analyzer"
                         ReferenceOutputAssembly="false"/>

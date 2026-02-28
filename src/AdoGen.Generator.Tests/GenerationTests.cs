@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace AdoGen.Generator.Tests;
 
@@ -85,6 +86,69 @@ public class GenerationTests
             {
                 RuleFor(x => x.Name).VarChar(20);
                 RuleFor(x => x.Email).VarChar(50);
+            }
+        }
+        """;
+
+    [Fact]
+    public Task NpgsqlResult_ShouldRenderCorrectly()
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(PostgreSource, new CSharpParseOptions(LanguageVersion.Latest));
+        var compilation = CSharpCompilation.Create(
+            assemblyName: "Tests.PostgreSql",
+            syntaxTrees: [syntaxTree],
+            references: GetPostgreReferences(),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var generator = new SqlBuilderGenerator();
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var driverDiagnostics);
+        var runResult = driver.GetRunResult();
+        var allDiagnostics = driverDiagnostics.Concat(runResult.Diagnostics).ToArray();
+
+        if (allDiagnostics.Length > 0)
+        {
+            var formatted = string.Join(Environment.NewLine, allDiagnostics.Select(d => d.ToString()));
+            Assert.Fail("No sources were generated.\nDiagnostics:\n" + formatted);
+        }
+
+        var generated = runResult.Results
+            .SelectMany(r => r.GeneratedSources)
+            .Select(s => new { s.HintName, Source = s.SourceText.ToString() })
+            .OrderBy(x => x.HintName, StringComparer.Ordinal)
+            .ToArray();
+
+        return Verify(generated);
+    }
+
+    private static ImmutableArray<MetadataReference> GetPostgreReferences()
+    {
+        var refs = new List<MetadataReference>(capacity: 128);
+
+        foreach (var r in GetTrustedPlatformAssemblyReferences()) refs.Add(r);
+
+        refs.Add(FromAssembly(typeof(AdoGen.PostgreSql.INpgsqlBulkModel).Assembly));
+        refs.Add(FromAssembly(typeof(NpgsqlConnection).Assembly));
+
+        return [..refs];
+    }
+
+    private const string PostgreSource =
+        """
+        using System;
+        using AdoGen.PostgreSql;
+        using NpgsqlTypes;
+
+        namespace AdoGen.Generator.Tests;
+
+        public sealed partial record UserPg(Guid Id, string Name, string Email) : INpgsqlBulkModel;
+
+        public sealed class UserPgProfile : NpgsqlProfile<UserPg>
+        {
+            public UserPgProfile()
+            {
+                RuleFor(x => x.Name).Varchar(20);
+                RuleFor(x => x.Email).Varchar(50);
             }
         }
         """;

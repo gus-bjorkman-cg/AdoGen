@@ -28,6 +28,7 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 
     <ItemGroup>
@@ -37,6 +38,7 @@
     <ItemGroup>
       <ProjectReference Include="..\AdoGen.Generator\AdoGen.Generator.csproj" />
       <ProjectReference Include="..\AdoGen.SqlServer\AdoGen.SqlServer.csproj" />
+      <ProjectReference Include="..\AdoGen.PostgreSql\AdoGen.PostgreSql.csproj" />
     </ItemGroup>
 
 </Project>

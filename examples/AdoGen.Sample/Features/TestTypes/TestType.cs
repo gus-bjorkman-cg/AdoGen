@@ -75,7 +75,7 @@ public sealed partial record TestType(
     ShortEnum ShortEnum,
     IntEnum IntEnum,
     LongEnum LongEnum
-    ) : ISqlBulkModel;
+    ) : ISqlBulkModel, INpgsqlBulkModel;
 
 public sealed class TestTypeProfile : SqlProfile<TestType>
 {
@@ -97,5 +97,28 @@ public sealed class TestTypeProfile : SqlProfile<TestType>
         RuleFor(x => x.CharString).Char(10);
         RuleFor(x => x.NCharString).NChar(15);
         RuleFor(x => x.NullableDateTime).Type(SqlDbType.DateTime).Nullable();
+    }
+}
+
+public sealed class TestTypeNpgsqlProfile : NpgsqlProfile<TestType>
+{
+    public TestTypeNpgsqlProfile()
+    {
+        Key(x => x.Int);
+        Key(x => x.Decimal);
+
+        RuleFor(x => x.NullableStringVarchar).Varchar(100);
+        RuleFor(x => x.NullableStringNVarchar).Varchar(100);
+        RuleFor(x => x.StringVarcharRuledNull).Varchar(100).Nullable();
+        RuleFor(x => x.Char).Char(1);
+        RuleFor(x => x.NChar).Char(1);
+        RuleFor(x => x.NullableChar).Char(1).Nullable();
+        RuleFor(x => x.NullableBytes).Bytea().Nullable();
+        RuleFor(x => x.Bytes).Bytea();
+        RuleFor(x => x.Decimal).Decimal(4, 2);
+        RuleFor(x => x.NullableDecimal).Decimal(6, 3).Nullable();
+        RuleFor(x => x.CharString).Char(10);
+        RuleFor(x => x.NCharString).Char(15);
+        RuleFor(x => x.NullableDateTime).Type(NpgsqlDbType.Timestamp).Nullable();
     }
 }

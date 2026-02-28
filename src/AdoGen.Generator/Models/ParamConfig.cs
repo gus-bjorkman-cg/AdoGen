@@ -8,7 +8,7 @@ internal sealed class ParamConfig
     public required string PropertyName { get; set; }
     public required ITypeSymbol PropertyType { get; set; }
     public required string ParameterName { get; set; }
-    public SqlDbType? DbType { get; set; }
+    public DbTypeRef? DbType { get; set; }
     public int? Size { get; set; }
     public int? Precision { get; set; }
     public int? Scale { get; set; }

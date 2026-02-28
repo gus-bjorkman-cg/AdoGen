@@ -91,7 +91,7 @@ If a CancellationToken is not present in the method signature, it is a design bu
 Source generation is triggered only when:
 
 - The DTO is `partial`
-- The DTO implements `ISqlDomainModel` or `ISqlResult`
+- The DTO implements `ISqlDomainModel` or `ISqlResult` or `IBulkModel`
 
 ### Profiles
 

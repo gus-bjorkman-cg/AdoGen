@@ -11,8 +11,8 @@ namespace AdoGen.SqlServer;
 /// </summary>
 /// <typeparam name="TModel"></typeparam>
 /// <typeparam name="TKey"></typeparam>
-public interface ISingleIdModel<TModel, TKey>
-    where TModel : ISingleIdModel<TModel, TKey>
+public interface ISqlSingleIdModel<TModel, TKey>
+    where TModel : ISqlSingleIdModel<TModel, TKey>
 {
     /// <summary>
     /// Deletes the records with the given ids.
@@ -55,6 +55,6 @@ public static class SqlConnectionSingleIdExtensions
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
-        where TModel : ISingleIdModel<TModel, TKey>
+        where TModel : ISqlSingleIdModel<TModel, TKey>
         => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
 }

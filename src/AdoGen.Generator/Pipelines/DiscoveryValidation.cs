@@ -105,31 +105,84 @@ internal static class DiscoveryValidation
                     continue;
                 }
 
-                if (p.Type.IsString() && (cfg.DbType is null || cfg.Size is null))
+                if (p.Type.IsString())
                 {
-                    diagnostics.Add(Diagnostic.Create(
-                        SqlDiagnostics.StringMissing,
-                        dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                        dto.Dto.Name,
-                        p.Name));
+                    if (dto.Provider == SqlProviderKind.SqlServer)
+                    {
+                        // SQL Server: string must be configured with declared kind (varchar/nvarchar/etc) + size
+                        if (cfg.DbType is null || cfg.Size is null)
+                        {
+                            diagnostics.Add(Diagnostic.Create(
+                                SqlDiagnostics.StringMissing,
+                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
+                                dto.Dto.Name,
+                                p.Name));
+                        }
+                    }
+                    else
+                    {
+                        // PostgreSQL: require explicit Type + Size unless Text is chosen
+                        if (cfg.DbType is null || (cfg.DbType.Value.EnumMember == "Varchar" && cfg.Size is null))
+                        {
+                            diagnostics.Add(Diagnostic.Create(
+                                SqlDiagnostics.StringMissing,
+                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
+                                dto.Dto.Name,
+                                p.Name));
+                        }
+                    }
                 }
 
-                if (p.Type.IsDecimal() && (cfg.DbType != SqlDbType.Decimal || cfg.Precision is null || cfg.Scale is null))
+                if (p.Type.IsDecimal())
                 {
-                    diagnostics.Add(Diagnostic.Create(
-                        SqlDiagnostics.DecimalMissing,
-                        dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                        dto.Dto.Name,
-                        p.Name));
+                    if (dto.Provider == SqlProviderKind.SqlServer)
+                    {
+                        if (cfg.DbType?.EnumMember != "Decimal" || cfg.Precision is null || cfg.Scale is null)
+                        {
+                            diagnostics.Add(Diagnostic.Create(
+                                SqlDiagnostics.DecimalMissing,
+                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
+                                dto.Dto.Name,
+                                p.Name));
+                        }
+                    }
+                    else
+                    {
+                        if (cfg.DbType?.EnumMember != "Numeric" || cfg.Precision is null || cfg.Scale is null)
+                        {
+                            diagnostics.Add(Diagnostic.Create(
+                                SqlDiagnostics.DecimalMissing,
+                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
+                                dto.Dto.Name,
+                                p.Name));
+                        }
+                    }
                 }
 
-                if (p.Type.IsByteArray() && (cfg.DbType is null || cfg.Size is null))
+                if (p.Type.IsByteArray())
                 {
-                    diagnostics.Add(Diagnostic.Create(
-                        SqlDiagnostics.BinaryMissing,
-                        dto.Profile.Locations.FirstOrDefault() ?? Location.None,
-                        dto.Dto.Name,
-                        p.Name));
+                    if (dto.Provider == SqlProviderKind.SqlServer)
+                    {
+                        if (cfg.DbType?.EnumMember != "VarBinary" || cfg.Size is null)
+                        {
+                            diagnostics.Add(Diagnostic.Create(
+                                SqlDiagnostics.BinaryMissing,
+                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
+                                dto.Dto.Name,
+                                p.Name));
+                        }
+                    }
+                    else
+                    {
+                        if (cfg.DbType?.EnumMember != "Bytea")
+                        {
+                            diagnostics.Add(Diagnostic.Create(
+                                SqlDiagnostics.BinaryMissing,
+                                dto.Profile.Locations.FirstOrDefault() ?? Location.None,
+                                dto.Dto.Name,
+                                p.Name));
+                        }
+                    }
                 }
             }
 

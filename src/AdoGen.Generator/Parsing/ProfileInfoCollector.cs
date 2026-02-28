@@ -21,8 +21,8 @@ internal static class ProfileInfoCollector
         ImmutableArray<Diagnostic>.Builder diagnostics,
         CancellationToken ct)
     {
-        var (dto, _, profile, model) = discoveryDto;
-        var collected = Collect(profile!, dto, model!, diagnostics, ct);
+        var (dto, _, profile, model, provider) = discoveryDto;
+        var collected = Collect(profile!, dto, model!, diagnostics, provider, ct);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
         {
@@ -43,6 +43,7 @@ internal static class ProfileInfoCollector
         INamedTypeSymbol dtoType,
         SemanticModel model,
         ImmutableArray<Diagnostic>.Builder diagnostics,
+        SqlProviderKind provider,
         CancellationToken ct)
     {
         var dtoProps = dtoType
@@ -128,7 +129,10 @@ internal static class ProfileInfoCollector
         }
 
         // Defaults
-        schema ??= "dbo";
+        if (schema is null)
+        {
+            schema = profileSymbol.BaseType?.ContainingNamespace?.ToDisplayString() == "AdoGen.PostgreSql" ? "public" : "dbo";
+        }
         table ??= dtoType.Name.PluralizeSimple();
 
         if (keys.Count == 0)
@@ -147,13 +151,17 @@ internal static class ProfileInfoCollector
                     PropertyName = prop.Name,
                     PropertyType = prop.Type,
                     ParameterName = prop.Name,
-                    DbType = prop.Type.MapDefaultSqlDbType()   
+                    DbType = provider == SqlProviderKind.PostgreSql
+                        ? prop.Type.MapDefaultNpgsqlDbType()
+                        : prop.Type.MapDefaultSqlDbType()
                 };
             }
             else if (configs[prop.Name].DbType is null)
             {
                 var config = configs[prop.Name];
-                config.DbType = config.PropertyType.MapDefaultSqlDbType();
+                config.DbType = provider == SqlProviderKind.PostgreSql
+                    ? config.PropertyType.MapDefaultNpgsqlDbType()
+                    : config.PropertyType.MapDefaultSqlDbType();
             }
         }
 

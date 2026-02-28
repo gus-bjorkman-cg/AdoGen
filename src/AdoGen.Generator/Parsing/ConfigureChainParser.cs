@@ -23,8 +23,18 @@ internal static class ConfigureChainParser
     {
         var lambda = (LambdaExpressionSyntax)configureInvocation.ArgumentList.Arguments[0].Expression;
         var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
-        
+
         if (propName is null || !dtoProps.TryGetValue(propName, out var propSymbol)) return;
+
+        // determine provider based on containing profile base type namespace
+        var provider = SqlProviderKind.SqlServer;
+        if (configureInvocation.FirstAncestorOrSelf<ClassDeclarationSyntax>() is { } cls)
+        {
+            var profileSymbol = model.GetDeclaredSymbol(cls, ct) as INamedTypeSymbol;
+            var bt = profileSymbol?.BaseType;
+            var ns = bt?.ContainingNamespace?.ToDisplayString();
+            if (ns == "AdoGen.PostgreSql") provider = SqlProviderKind.PostgreSql;
+        }
 
         var cfg = new ParamConfig
         {
@@ -35,7 +45,7 @@ internal static class ConfigureChainParser
 
         var chainMethods = new List<ChainMethod>();
         var current = configureInvocation.Parent;
-        
+
         while (current is MemberAccessExpressionSyntax nextMae)
         {
             if (nextMae.Parent is InvocationExpressionSyntax nextCall)
@@ -45,14 +55,29 @@ internal static class ConfigureChainParser
             }
             else break;
         }
-        
+
         foreach (var (methodName, args, node) in chainMethods)
         {
             switch (methodName)
             {
                 case "Type":
-                    if (args.Count == 1 && model.TryGetConstEnumArg<SqlDbType>(args[0].Expression, ct, out var dbt))
-                        cfg.DbType = dbt;
+                    if (args.Count == 1)
+                    {
+                        if (provider == SqlProviderKind.SqlServer)
+                        {
+                            if (model.TryGetConstEnumArg<SqlDbType>(args[0].Expression, ct, out var sqlDbt))
+                                cfg.DbType = DbTypeRef.SqlServer(sqlDbt.ToString());
+                            else
+                                diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        }
+                        else
+                        {
+                            if (model.TryGetConstEnumMember(args[0].Expression, ct, out var enumMember))
+                                cfg.DbType = DbTypeRef.PostgreSql(enumMember);
+                            else
+                                diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                        }
+                    }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
@@ -85,66 +110,120 @@ internal static class ConfigureChainParser
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "NVarChar":
+                // SQL Server shorthands
+                case "NVarChar" when provider == SqlProviderKind.SqlServer:
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var nsize))
                     {
-                        cfg.DbType = SqlDbType.NVarChar;
+                        cfg.DbType = DbTypeRef.SqlServer(SqlDbType.NVarChar.ToString());
                         cfg.Size = nsize;
                     }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "VarChar":
+                case "VarChar" when provider == SqlProviderKind.SqlServer:
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var vsize))
                     {
-                        cfg.DbType = SqlDbType.VarChar;
+                        cfg.DbType = DbTypeRef.SqlServer(SqlDbType.VarChar.ToString());
                         cfg.Size = vsize;
                     }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "NChar":
+                case "NChar" when provider == SqlProviderKind.SqlServer:
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var ncsize))
                     {
-                        cfg.DbType = SqlDbType.NChar;
+                        cfg.DbType = DbTypeRef.SqlServer(SqlDbType.NChar.ToString());
                         cfg.Size = ncsize;
                     }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "Char":
+                case "Char" when provider == SqlProviderKind.SqlServer:
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var csize))
                     {
-                        cfg.DbType = SqlDbType.Char;
+                        cfg.DbType = DbTypeRef.SqlServer(SqlDbType.Char.ToString());
                         cfg.Size = csize;
                     }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "VarBinary":
+                case "VarBinary" when provider == SqlProviderKind.SqlServer:
                     if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var bsize))
-                    { 
-                        cfg.DbType = SqlDbType.VarBinary;
+                    {
+                        cfg.DbType = DbTypeRef.SqlServer(SqlDbType.VarBinary.ToString());
                         cfg.Size = bsize;
                     }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
-                
-                case "Nullable":
-                    if (args.Count == 0) cfg.IsNullable = true;
+
+                case "Decimal" when provider == SqlProviderKind.SqlServer:
+                    if (args.Count == 2
+                        && model.TryGetConstInt(args[0].Expression, ct, out var precision)
+                        && model.TryGetConstInt(args[1].Expression, ct, out var scale))
+                    {
+                        cfg.DbType = DbTypeRef.SqlServer(SqlDbType.Decimal.ToString());
+                        cfg.Precision = precision;
+                        cfg.Scale = scale;
+                    }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "NotNull":
-                    if (args.Count == 0) cfg.IsNullable = false;
+                // PostgreSQL shorthands
+                case "Varchar" when provider == SqlProviderKind.PostgreSql:
+                    if (args.Count == 1 && model.TryGetConstInt(args[0].Expression, ct, out var psize))
+                    {
+                        cfg.DbType = DbTypeRef.PostgreSql("Varchar");
+                        cfg.Size = psize;
+                    }
                     else
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                    break;
+
+                case "Text" when provider == SqlProviderKind.PostgreSql:
+                    if (args.Count == 0)
+                    {
+                        cfg.DbType = DbTypeRef.PostgreSql("Text");
+                    }
+                    else
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                    break;
+
+                case "Bytea" when provider == SqlProviderKind.PostgreSql:
+                    if (args.Count == 0)
+                    {
+                        cfg.DbType = DbTypeRef.PostgreSql("Bytea");
+                    }
+                    else
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                    break;
+
+                case "Decimal" when provider == SqlProviderKind.PostgreSql:
+                    if (args.Count == 2
+                        && model.TryGetConstInt(args[0].Expression, ct, out var pprecision)
+                        && model.TryGetConstInt(args[1].Expression, ct, out var pscale))
+                    {
+                        cfg.DbType = DbTypeRef.PostgreSql("Numeric");
+                        cfg.Precision = pprecision;
+                        cfg.Scale = pscale;
+                    }
+                    else
+                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                    break;
+
+                case "Nullable":
+                    if (args.Count == 0) cfg.IsNullable = true;
+                    else diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
+                    break;
+
+                case "NotNull":
+                    if (args.Count == 0) cfg.IsNullable = false;
+                    else diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
                 case "DefaultValue":
@@ -154,21 +233,6 @@ internal static class ConfigureChainParser
                         diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
                     break;
 
-                case "Decimal":
-                    if (args.Count == 2
-                        && model.TryGetConstInt(args[0].Expression, ct, out var precision)
-                        && model.TryGetConstInt(args[1].Expression, ct, out var scale))
-                    {
-                        cfg.DbType = SqlDbType.Decimal;
-                        cfg.Precision = precision;
-                        cfg.Scale = scale;
-                    }
-                    else
-                    {
-                        diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, node.GetLocation(), dtoType.Name, propName));
-                    }
-                    break;
-                
                 default:
                     break;
             }
