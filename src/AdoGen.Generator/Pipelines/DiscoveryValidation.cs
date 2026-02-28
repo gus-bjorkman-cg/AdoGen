@@ -64,7 +64,7 @@ internal static class DiscoveryValidation
                     return loc is null ? int.MaxValue : loc.SourceSpan.Start;
                 })
                 .ThenBy(x => x.Name, StringComparer.Ordinal)
-                .ToArray();
+                .ToImmutableArray();
 
             var propsNeedingConfig = new List<IPropertySymbol>(props.Length);
             for (var i = 0; i < props.Length; i++)
@@ -87,7 +87,7 @@ internal static class DiscoveryValidation
                 return vdto with { Diagnostics = diagnostics.ToImmutable() };
             }
 
-            var profile = ProfileInfoCollector.Resolve(dto, diagnostics, ct);
+            var profile = ProfileInfoCollector.Resolve(dto, diagnostics, props, ct);
             
             if (propsNeedingConfig.Count == 0) return vdto with { ProfileInfo = profile };
             

@@ -1,4 +1,3 @@
-using System.Data;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Models;
@@ -14,4 +13,5 @@ internal sealed class ParamConfig
     public int? Scale { get; set; }
     public bool? IsNullable { get; set; }
     public string? DefaultSqlExpression { get; set; }
+    public string SqlTypeLiteral { get; set; } = "";
 }

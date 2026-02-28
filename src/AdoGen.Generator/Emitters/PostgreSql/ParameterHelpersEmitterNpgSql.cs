@@ -19,8 +19,7 @@ internal sealed class ParameterHelpersEmitterNpgSql : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        
-                var constBuilder = new StringBuilder();
+        var constBuilder = new StringBuilder();
         var methodBuilder = new StringBuilder();
 
         var paramConfigs = profileInfo.ParamsByProperty.Select(x => x.Value).OrderBy(x => x.PropertyName);

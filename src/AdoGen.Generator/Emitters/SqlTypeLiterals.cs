@@ -4,21 +4,21 @@ using AdoGen.Generator.Models;
 
 namespace AdoGen.Generator.Emitters;
 
-internal static class SqlTypeLiterals
+internal interface ISqlTypeLiterals
 {
-    public static string ToSqlTypeLiteral(ParamConfig cfg)
-    {
-        if (cfg.DbType is null) throw new InvalidOperationException("Missing DbType");
+    bool IsMatch(ParamConfig cfg);
+    string Get(ParamConfig cfg);
+}
 
-        return cfg.DbType.Value.Provider == SqlProviderKind.PostgreSql
-            ? ToPostgreTypeLiteral(cfg)
-            : ToSqlServerTypeLiteral(cfg);
-    }
+internal sealed class SqlTypeLiteralsSqlServer : ISqlTypeLiterals
+{
+    private SqlTypeLiteralsSqlServer() {}
+    public static SqlTypeLiteralsSqlServer Instance { get; } = new();
+    
+    public bool IsMatch(ParamConfig cfg) => cfg.DbType?.Provider is SqlProviderKind.SqlServer;
 
-    private static string ToSqlServerTypeLiteral(ParamConfig cfg)
-    {
-        var dbt = (SqlDbType)Enum.Parse(typeof(SqlDbType), cfg.DbType!.Value.EnumMember);
-        return dbt switch
+    public string Get(ParamConfig cfg) =>
+        (SqlDbType)Enum.Parse(typeof(SqlDbType), cfg.DbType!.Value.EnumMember) switch
         {
             SqlDbType.NVarChar => cfg.Size is int s && s > 0 ? $"NVARCHAR({s})" : "NVARCHAR(MAX)",
             SqlDbType.VarChar => cfg.Size is int s2 && s2 > 0 ? $"VARCHAR({s2})" : "VARCHAR(MAX)",
@@ -26,14 +26,19 @@ internal static class SqlTypeLiterals
             SqlDbType.Char => cfg.Size is int s4 && s4 > 0 ? $"CHAR({s4})" : "CHAR(1)",
             SqlDbType.VarBinary => cfg.Size is int s5 && s5 > 0 ? $"VARBINARY({s5})" : "VARBINARY(MAX)",
             SqlDbType.Decimal => $"DECIMAL({(cfg.Precision ?? 18)},{(cfg.Scale ?? 2)})",
-            _ => dbt.ToString().ToUpperInvariant()
+            _ => cfg.DbType!.Value.EnumMember.ToUpperInvariant()
         };
-    }
+}
 
-    private static string ToPostgreTypeLiteral(ParamConfig cfg)
-    {
-        // Use NpgsqlDbType enum member names, but map to SQL type literals.
-        return cfg.DbType!.Value.EnumMember switch
+internal sealed class SqlTypeLiteralsPostgreSql : ISqlTypeLiterals
+{
+    private SqlTypeLiteralsPostgreSql() {}
+    public static SqlTypeLiteralsPostgreSql Instance { get; } = new();
+    
+    public bool IsMatch(ParamConfig cfg) => cfg.DbType?.Provider is SqlProviderKind.PostgreSql;
+
+    public string Get(ParamConfig cfg) =>
+        cfg.DbType!.Value.EnumMember switch
         {
             "Varchar" => cfg.Size is int s && s > 0 ? $"VARCHAR({s})" : "VARCHAR",
             "Text" => "TEXT",
@@ -52,8 +57,6 @@ internal static class SqlTypeLiterals
             "Date" => "DATE",
             "Time" => "TIME",
             "Varbit" => cfg.Size is int s3 && s3 > 0 ? $"VARBIT({s3})" : "VARBIT",
-            // Fallback: use lower-case enum member as sql type name (best-effort).
             var x => x.ToLowerInvariant()
         };
-    }
 }

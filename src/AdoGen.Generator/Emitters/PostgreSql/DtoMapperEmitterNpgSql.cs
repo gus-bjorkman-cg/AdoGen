@@ -20,18 +20,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        
-        var props = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(x => x.DeclaredAccessibility == Accessibility.Public)
-            .Where(x => !x.IsStatic)
-            .OrderBy(x =>
-            {
-                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
-                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
-            })
-            .ThenBy(x => x.Name, StringComparer.Ordinal)
-            .ToArray();
+        var dtoProps = profileInfo.DtoProperties;
 
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);
 
@@ -45,12 +34,12 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
         if (setUsingConstructor) read.Append('(').AppendLine();
         else read.AppendLine("{");
 
-        for (var i = 0; i < props.Length; i++)
+        for (var i = 0; i < dtoProps.Length; i++)
         {
-            var p = props[i];
+            var p = dtoProps[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
             var ordinalField = $"{fieldPrefix}{cfg.ParameterName}Ordinal";
-            var isLast = i == props.Length - 1;
+            var isLast = i == dtoProps.Length - 1;
             var getterExpr = EmitReaderGet(p, ordinalField, out bool needsEnumCastForThis);
 
             if (needsEnumCastForThis) needsEnumCastHelper = true;
@@ -64,7 +53,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
 
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
-        var ns = dto.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dto.ContainingNamespace.ToDisplayString();
+        var ns = profileInfo.Namespace;
         
         var isInitField = "Pg_IsInitialized";
 

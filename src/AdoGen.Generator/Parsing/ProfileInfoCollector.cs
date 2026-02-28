@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using AdoGen.Generator.Diagnostics;
+using AdoGen.Generator.Emitters;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Extensions;
@@ -15,14 +16,17 @@ namespace AdoGen.Generator.Parsing;
 internal static class ProfileInfoCollector
 {
     private const string RuleFor = nameof(RuleFor);
+    private static readonly List<ISqlTypeLiterals> SqlTypeLiterals = 
+        [ SqlTypeLiteralsSqlServer.Instance, SqlTypeLiteralsPostgreSql.Instance ];
     
     internal static ProfileInfo Resolve(
         DiscoveryDto discoveryDto, 
         ImmutableArray<Diagnostic>.Builder diagnostics,
+        ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
         var (dto, _, profile, model, provider) = discoveryDto;
-        var collected = Collect(profile!, dto, model!, diagnostics, provider, ct);
+        var collected = Collect(profile!, dto, model!, diagnostics, provider, props, ct);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
         {
@@ -44,19 +48,10 @@ internal static class ProfileInfoCollector
         SemanticModel model,
         ImmutableArray<Diagnostic>.Builder diagnostics,
         SqlProviderKind provider,
+        ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var dtoProps = dtoType
-            .GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .OrderBy(x =>
-            {
-                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
-                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
-            })
-            .ThenBy(x => x.Name, StringComparer.Ordinal)
-            .ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
+        var dtoProps = props.ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
 
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
         string? schema = null;
@@ -164,13 +159,21 @@ internal static class ProfileInfoCollector
                     : config.PropertyType.MapDefaultSqlDbType();
             }
         }
+        
+        foreach (var cfg in configs.Values)
+            if (cfg.SqlTypeLiteral is "") 
+                cfg.SqlTypeLiteral = SqlTypeLiterals.First(x => x.IsMatch(cfg)).Get(cfg);
+        
+        var ns = dtoType.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dtoType.ContainingNamespace.ToDisplayString();
 
         return new ProfileInfo(
             Schema: schema,
             Table: table,
             Keys: [.. keys],
             IdentityKeys: identityKeys.ToImmutableHashSet(StringComparer.Ordinal),
-            ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal)
+            DtoProperties: props,
+            ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal),
+            Namespace: ns
         );
     }
 }

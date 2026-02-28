@@ -21,21 +21,9 @@ internal sealed class BulkEmitterNpgSql : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        
-        var dtoProps = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .OrderBy(x =>
-            {
-                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
-                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
-            })
-            .ThenBy(x => x.Name, StringComparer.Ordinal)
-            .ToArray();
+        var dtoProps = profileInfo.DtoProperties;
 
-        var ns = dto.ContainingNamespace.IsGlobalNamespace
-            ? "GlobalNamespace"
-            : dto.ContainingNamespace.ToDisplayString();
+        var ns = profileInfo.Namespace;
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         var tempTableName = $"adoGen_{dto.Name.ToLowerInvariant()}_tmp";
@@ -77,7 +65,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
         {
             var p = dtoProps[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
-            var sqlType = SqlTypeLiterals.ToSqlTypeLiteral(cfg);
+            var sqlType = cfg.SqlTypeLiteral;
             var isNullable = p.IsNullableProperty(cfg);
             var nullability = isNullable ? "NULL" : "NOT NULL";
             sbColDefs.AppendLine($"    \"{cfg.ParameterName}\" {sqlType} {nullability},");
@@ -147,7 +135,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                                  var op = Operations[i].Value;
 
                                  await importer.StartRowAsync(ct).ConfigureAwait(false);
-                     {{{EmitImporterWrites(dtoProps)}}}
+                     {{{EmitImporterWrites()}}}
                                  importer.Write(op);
                              }
 
@@ -214,22 +202,22 @@ internal sealed class BulkEmitterNpgSql : IEmitter
 
             return sb.ToString().TrimEnd();
         }
-    }
-
-    private static string EmitImporterWrites(IPropertySymbol[] dtoProps)
-    {
-        var sb = new StringBuilder();
-        for (var i = 0; i < dtoProps.Length; i++)
+        
+        string EmitImporterWrites()
         {
-            var p = dtoProps[i];
-            var accessor = ResolveNpgsqlBulkWriteAccessor(p);
-            sb.AppendLine(
-                $"            importer.Write({accessor});");
+            var sb = new StringBuilder();
+            for (var i = 0; i < dtoProps.Length; i++)
+            {
+                var p = dtoProps[i];
+                var accessor = ResolveNpgsqlBulkWriteAccessor(p);
+                sb.AppendLine(
+                    $"            importer.Write({accessor});");
+            }
+
+            return sb.ToString().TrimEnd();
         }
-
-        return sb.ToString().TrimEnd();
     }
-
+    
     /// <summary>
     /// Returns the accessor expression for a property in a COPY BINARY write.
     /// Enum values must be cast to their underlying type because Npgsql COPY BINARY

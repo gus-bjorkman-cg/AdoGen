@@ -21,21 +21,9 @@ internal sealed class BulkEmitterSqlServer : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        
-        var dtoProps = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .OrderBy(x =>
-            {
-                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
-                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
-            })
-            .ThenBy(x => x.Name, StringComparer.Ordinal)
-            .ToArray();
+        var dtoProps = profileInfo.DtoProperties;
 
-        var ns = dto.ContainingNamespace.IsGlobalNamespace
-            ? "GlobalNamespace"
-            : dto.ContainingNamespace.ToDisplayString();
+        var ns = profileInfo.Namespace;
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         // --- Bulk metadata ---
@@ -83,7 +71,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
         {
             var p = dtoProps[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
-            var sqlType = SqlTypeLiterals.ToSqlTypeLiteral(cfg);
+            var sqlType = cfg.SqlTypeLiteral;
             var isNullable = p.IsNullableProperty(cfg);
             var nullability = isNullable ? "NULL" : "NOT NULL";
 

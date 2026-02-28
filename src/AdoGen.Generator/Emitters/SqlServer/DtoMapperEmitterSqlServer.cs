@@ -20,19 +20,6 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        
-       var props = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(x => x.DeclaredAccessibility == Accessibility.Public)
-            .Where(x => !x.IsStatic)
-            .OrderBy(x =>
-            {
-                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
-                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
-            })
-            .ThenBy(x => x.Name, StringComparer.Ordinal)
-            .ToArray();
-
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);
 
         var ordinals = new StringBuilder();
@@ -44,12 +31,12 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         if (setUsingConstructor) read.Append('(').AppendLine();
         else read.AppendLine("{");
 
-        for (var i = 0; i < props.Length; i++)
+        for (var i = 0; i < profileInfo.DtoProperties.Length; i++)
         {
-            var p = props[i];
+            var p = profileInfo.DtoProperties[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
             var ordinalField = $"{cfg.ParameterName}Ordinal";
-            var isLast = i == props.Length - 1;
+            var isLast = i == profileInfo.DtoProperties.Length - 1;
             var getterExpr = EmitReaderGet(p, ordinalField, out bool needsEnumCastForThis);
 
             if (needsEnumCastForThis) needsEnumCastHelper = true;
@@ -63,7 +50,7 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
 
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
-        var ns = dto.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dto.ContainingNamespace.ToDisplayString();
+        var ns = profileInfo.Namespace;
         var castHelper = needsEnumCastHelper ? EnumHelper : "";
         var isInitField = "IsInitialized";
 

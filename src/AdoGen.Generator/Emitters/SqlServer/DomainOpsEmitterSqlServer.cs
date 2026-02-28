@@ -19,13 +19,9 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        
-        var dtoProps = dto.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .ToArray();
+        var dtoProps = profileInfo.DtoProperties;
 
-        var ns = dto.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dto.ContainingNamespace.ToDisplayString();
+        var ns = profileInfo.Namespace;
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
 
@@ -35,7 +31,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         {
             var p = dtoProps[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
-            var sqlType = SqlTypeLiterals.ToSqlTypeLiteral(cfg);
+            var sqlType = cfg.SqlTypeLiteral;
             var isNullable = p.IsNullableProperty(cfg);
             var nullability = isNullable ? "NULL" : "NOT NULL";
             var identity = profileInfo.IdentityKeys.Contains(p.Name) ? " IDENTITY(1,1)" : "";
