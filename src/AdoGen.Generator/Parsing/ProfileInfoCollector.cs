@@ -15,8 +15,11 @@ namespace AdoGen.Generator.Parsing;
 internal static class ProfileInfoCollector
 {
     private const string RuleFor = nameof(RuleFor);
-    private static readonly List<ISqlTypeLiterals> SqlTypeLiterals = 
-        [ SqlTypeLiteralsSqlServer.Instance, SqlTypeLiteralsPostgreSql.Instance ];
+
+    private static readonly List<ISqlTypeLiterals> SqlTypeLiterals =
+    [
+        SqlTypeLiteralsSqlServer.Instance, SqlTypeLiteralsPostgreSql.Instance
+    ];
     
     internal static ProfileInfo Resolve(
         DiscoveryDto discoveryDto, 
@@ -50,12 +53,13 @@ internal static class ProfileInfoCollector
         ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var dtoProps = props.ToImmutableDictionary(p => p.Name, p => p, StringComparer.Ordinal);
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
-        string? schema = null;
-        string? table = null;
-        var keys = new List<string>();
         var identityKeys = new HashSet<string>(StringComparer.Ordinal);
+        var keys = new List<string>();
+        
+        var dtoProps = props.ToImmutableDictionary(p => p.Name, p => p, StringComparer.Ordinal);
+        var schema = provider.DefaultSchema();
+        var table = dtoType.Name.PluralizeSimple();
         var expressionSyntaxes = profileSymbol.GetProfileExpressions();
 
         foreach (var expressionSyntax in expressionSyntaxes)
@@ -82,10 +86,17 @@ internal static class ProfileInfoCollector
                         kal[0].Expression is LambdaExpressionSyntax lambda)
                     {
                         var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
-                        if (propName is { } pn && dtoProps.ContainsKey(pn))
+                        if (propName != null && dtoProps.ContainsKey(propName))
                         {
-                            if (id.Identifier.Text == "Key" && !keys.Contains(pn, StringComparer.Ordinal)) keys.Add(pn);
-                            if (id.Identifier.Text == "Identity") identityKeys.Add(pn);
+                            switch (id.Identifier.Text)
+                            {
+                                case "Key" when !keys.Contains(propName, StringComparer.Ordinal):
+                                    keys.Add(propName);
+                                    break;
+                                case "Identity":
+                                    identityKeys.Add(propName);
+                                    break;
+                            }
                         }
                     }
                     break;
@@ -102,11 +113,7 @@ internal static class ProfileInfoCollector
                     break;
             }
         }
-
-        // Defaults
-        schema ??= provider == SqlProviderKind.PostgreSql ? "public" : "dbo";
-        table ??= dtoType.Name.PluralizeSimple();
-
+        
         if (keys.Count == 0)
         {
             var idProp = dtoProps.Keys.FirstOrDefault(n => string.Equals(n, "Id", StringComparison.OrdinalIgnoreCase));
@@ -123,17 +130,13 @@ internal static class ProfileInfoCollector
                     PropertyName = prop.Name,
                     PropertyType = prop.Type,
                     ParameterName = prop.Name,
-                    DbType = provider == SqlProviderKind.PostgreSql
-                        ? prop.Type.MapDefaultNpgsqlDbType()
-                        : prop.Type.MapDefaultSqlDbType()
+                    DbType = prop.MapDefaultDbType(provider)
                 };
             }
             else if (configs[prop.Name].DbType is null)
             {
                 var config = configs[prop.Name];
-                config.DbType = provider == SqlProviderKind.PostgreSql
-                    ? config.PropertyType.MapDefaultNpgsqlDbType()
-                    : config.PropertyType.MapDefaultSqlDbType();
+                config.DbType = prop.MapDefaultDbType(provider);
             }
         }
         
@@ -141,8 +144,6 @@ internal static class ProfileInfoCollector
             if (cfg.SqlTypeLiteral is "") 
                 cfg.SqlTypeLiteral = SqlTypeLiterals.First(x => x.IsMatch(cfg)).Get(cfg);
         
-        var ns = dtoType.ContainingNamespace.IsGlobalNamespace ? "GlobalNamespace" : dtoType.ContainingNamespace.ToDisplayString();
-
         return new ProfileInfo(
             Schema: schema,
             Table: table,
@@ -150,23 +151,47 @@ internal static class ProfileInfoCollector
             IdentityKeys: identityKeys.ToImmutableHashSet(StringComparer.Ordinal),
             DtoProperties: props,
             ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal),
-            Namespace: ns
+            Namespace: dtoType.GetNamespace()
         );
     }
     
-    private static ImmutableArray<InvocationExpressionSyntax> GetProfileExpressions(this INamedTypeSymbol profileSymbol) =>
-        profileSymbol.DeclaringSyntaxReferences
-            .Select(r => r.GetSyntax())
-            .OfType<ClassDeclarationSyntax>()
-            .SelectMany(x => x.Members.OfType<ConstructorDeclarationSyntax>())
-            .SelectMany(x =>
-            {
-                var nodes = new List<SyntaxNode>();
-                if (x.Body is { } body) nodes.AddRange(body.DescendantNodes());
-                if (x.ExpressionBody is { } exprBody) nodes.AddRange(exprBody.DescendantNodes());
-                return nodes;
-            })
-            .OfType<InvocationExpressionSyntax>()
-            .Where(x => x.Expression is IdentifierNameSyntax)
-            .ToImmutableArray();
+    private static string DefaultSchema(this SqlProviderKind provider) =>
+        provider switch
+        {
+            SqlProviderKind.SqlServer => "dbo",
+            SqlProviderKind.PostgreSql => "public",
+            _ => throw new NotSupportedException($"Unsupported provider: {provider}")
+        };
+    
+    private static DbTypeRef MapDefaultDbType(this IPropertySymbol propertySymbol, SqlProviderKind provider) =>
+        provider switch
+        {
+            SqlProviderKind.SqlServer => propertySymbol.Type.MapDefaultSqlDbType(),
+            SqlProviderKind.PostgreSql => propertySymbol.Type.MapDefaultNpgsqlDbType(),
+            _ => throw new NotSupportedException($"Unsupported provider: {provider}")
+        };
+    
+    extension(INamedTypeSymbol profileSymbol)
+    {
+        private ImmutableArray<InvocationExpressionSyntax> GetProfileExpressions() =>
+            profileSymbol.DeclaringSyntaxReferences
+                .Select(x => x.GetSyntax())
+                .OfType<ClassDeclarationSyntax>()
+                .SelectMany(x => x.Members.OfType<ConstructorDeclarationSyntax>())
+                .SelectMany(x =>
+                {
+                    var nodes = new List<SyntaxNode>();
+                    if (x.Body is { } body) nodes.AddRange(body.DescendantNodes());
+                    if (x.ExpressionBody is { } exprBody) nodes.AddRange(exprBody.DescendantNodes());
+                    return nodes;
+                })
+                .OfType<InvocationExpressionSyntax>()
+                .Where(x => x.Expression is IdentifierNameSyntax)
+                .ToImmutableArray();
+
+        private string GetNamespace() =>
+            profileSymbol.ContainingNamespace.IsGlobalNamespace
+                ? "GlobalNamespace"
+                : profileSymbol.ContainingNamespace.ToDisplayString();
+    }
 }
