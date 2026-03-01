@@ -51,7 +51,6 @@ internal static class ProfileInfoCollector
         CancellationToken ct)
     {
         var dtoProps = props.ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
-
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
         string? schema = null;
         string? table = null;
@@ -124,10 +123,7 @@ internal static class ProfileInfoCollector
         }
 
         // Defaults
-        if (schema is null)
-        {
-            schema = profileSymbol.BaseType?.ContainingNamespace?.ToDisplayString() == "AdoGen.PostgreSql" ? "public" : "dbo";
-        }
+        schema ??= provider == SqlProviderKind.PostgreSql ? "public" : "dbo";
         table ??= dtoType.Name.PluralizeSimple();
 
         if (keys.Count == 0)

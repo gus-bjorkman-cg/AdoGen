@@ -9,15 +9,20 @@ namespace AdoGen.Generator.Parsing;
 
 internal sealed class SizeChainHandler : IChainMethodHandler
 {
+    private const string MethodName = "Size";
     private SizeChainHandler() { }
     public static SizeChainHandler Instance { get; } = new();
 
-    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == "Size";
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
-        SemanticModel model, INamedTypeSymbol dtoType, string propertyName,
-        ChainMethod chain, ParamConfig cfg,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, CancellationToken ct)
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
     {
         if (chain.Args.Count == 1 && model.TryGetConstInt(chain.Args[0].Expression, ct, out var size))
             cfg.Size = size;
@@ -28,15 +33,20 @@ internal sealed class SizeChainHandler : IChainMethodHandler
 
 internal sealed class PrecisionChainHandler : IChainMethodHandler
 {
+    private const string MethodName = "Precision";
     private PrecisionChainHandler() { }
     public static PrecisionChainHandler Instance { get; } = new();
 
-    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == "Precision";
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
-        SemanticModel model, INamedTypeSymbol dtoType, string propertyName,
-        ChainMethod chain, ParamConfig cfg,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, CancellationToken ct)
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
     {
         if (chain.Args.Count == 1 && model.TryGetConstInt(chain.Args[0].Expression, ct, out var prec))
             cfg.Precision = prec;
@@ -47,15 +57,20 @@ internal sealed class PrecisionChainHandler : IChainMethodHandler
 
 internal sealed class ScaleChainHandler : IChainMethodHandler
 {
+    private const string MethodName = "Scale";
     private ScaleChainHandler() { }
     public static ScaleChainHandler Instance { get; } = new();
 
-    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == "Scale";
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
-        SemanticModel model, INamedTypeSymbol dtoType, string propertyName,
-        ChainMethod chain, ParamConfig cfg,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, CancellationToken ct)
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
     {
         if (chain.Args.Count == 1 && model.TryGetConstInt(chain.Args[0].Expression, ct, out var sc))
             cfg.Scale = sc;
@@ -66,15 +81,20 @@ internal sealed class ScaleChainHandler : IChainMethodHandler
 
 internal sealed class NameChainHandler : IChainMethodHandler
 {
+    private const string MethodName = "Name";
     private NameChainHandler() { }
     public static NameChainHandler Instance { get; } = new();
 
-    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == "Name";
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
-        SemanticModel model, INamedTypeSymbol dtoType, string propertyName,
-        ChainMethod chain, ParamConfig cfg,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, CancellationToken ct)
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
     {
         if (chain.Args.Count == 1 && model.TryGetConstString(chain.Args[0].Expression, ct, out var pname) && !string.IsNullOrWhiteSpace(pname))
             cfg.ParameterName = pname!;
@@ -85,15 +105,20 @@ internal sealed class NameChainHandler : IChainMethodHandler
 
 internal sealed class NullableChainHandler : IChainMethodHandler
 {
+    private const string MethodName = "Nullable";
     private NullableChainHandler() { }
     public static NullableChainHandler Instance { get; } = new();
 
-    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == "Nullable";
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
-        SemanticModel model, INamedTypeSymbol dtoType, string propertyName,
-        ChainMethod chain, ParamConfig cfg,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, CancellationToken ct)
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
     {
         if (chain.Args.Count == 0) cfg.IsNullable = true;
         else diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
@@ -102,15 +127,20 @@ internal sealed class NullableChainHandler : IChainMethodHandler
 
 internal sealed class NotNullChainHandler : IChainMethodHandler
 {
+    private const string MethodName = "NotNull";
     private NotNullChainHandler() { }
     public static NotNullChainHandler Instance { get; } = new();
 
-    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == "NotNull";
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
-        SemanticModel model, INamedTypeSymbol dtoType, string propertyName,
-        ChainMethod chain, ParamConfig cfg,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, CancellationToken ct)
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
     {
         if (chain.Args.Count == 0) cfg.IsNullable = false;
         else diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
@@ -119,15 +149,20 @@ internal sealed class NotNullChainHandler : IChainMethodHandler
 
 internal sealed class DefaultValueChainHandler : IChainMethodHandler
 {
+    private const string MethodName = "DefaultValue";
     private DefaultValueChainHandler() { }
     public static DefaultValueChainHandler Instance { get; } = new();
 
-    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == "DefaultValue";
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
-        SemanticModel model, INamedTypeSymbol dtoType, string propertyName,
-        ChainMethod chain, ParamConfig cfg,
-        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, CancellationToken ct)
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
     {
         if (chain.Args.Count == 1 && model.TryGetConstString(chain.Args[0].Expression, ct, out var expr) && !string.IsNullOrWhiteSpace(expr))
             cfg.DefaultSqlExpression = expr!;

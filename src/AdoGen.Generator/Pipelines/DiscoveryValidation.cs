@@ -31,15 +31,9 @@ internal static class DiscoveryValidation
         var initial = dtos.Select(static (dto, ct) =>
         {
             ct.ThrowIfCancellationRequested();
-
             var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
-            var isPartial = dto.Dto.DeclaringSyntaxReferences
-                .Select(r => r.GetSyntax(ct))
-                .OfType<TypeDeclarationSyntax>()
-                .Any(t => t.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)));
-
-            if (!isPartial)
+            if (!dto.Dto.IsPartial)
             {
                 diagnostics.Add(Diagnostic.Create(
                     SqlDiagnostics.NotPartial,
@@ -61,45 +55,24 @@ internal static class DiscoveryValidation
         return initial.Select(static (vdto, ct) =>
         {
             ct.ThrowIfCancellationRequested();
-
             if (vdto.Diagnostics.Length > 0) return vdto;
 
             var dto = vdto.Discovery;
-
-            var props = dto.Dto.GetMembers()
-                .OfType<IPropertySymbol>()
-                .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-                .OrderBy(x =>
-                {
-                    var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
-                    return loc is null ? int.MaxValue : loc.SourceSpan.Start;
-                })
-                .ThenBy(x => x.Name, StringComparer.Ordinal)
-                .ToImmutableArray();
+            var dtoProperties = dto.Dto.GetOrderedProperties();
             
-            var propsNeedingConfig = new Dictionary<IPropertySymbol, PropertyTypeKind>(props.Length, SymbolEqualityComparer.Default);
+            var propsNeedingConfig = new Dictionary<IPropertySymbol, PropertyTypeKind>(dtoProperties.Length, SymbolEqualityComparer.Default);
 
-            for (var i = 0; i < props.Length; i++)
+            for (var i = 0; i < dtoProperties.Length; i++)
             {
-                var p = props[i];
-                if (p.Type.IsString) propsNeedingConfig.Add(p, PropertyTypeKind.String);
-                else if (p.Type.IsDecimal) propsNeedingConfig.Add(p, PropertyTypeKind.Decimal);
-                else if (p.Type.IsByteArray) propsNeedingConfig.Add(p, PropertyTypeKind.ByteArray);
+                var property = dtoProperties[i];
+                
+                if (property.Type.IsString) propsNeedingConfig.Add(property, PropertyTypeKind.String);
+                else if (property.Type.IsDecimal) propsNeedingConfig.Add(property, PropertyTypeKind.Decimal);
+                else if (property.Type.IsByteArray) propsNeedingConfig.Add(property, PropertyTypeKind.ByteArray);
             }
             
             var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
-            
-            if (dto.Profile is null || dto.ProfileSemanticModel is null)
-            {
-                diagnostics.Add(Diagnostic.Create(
-                    SqlDiagnostics.MissingProfile,
-                    dto.Dto.Locations.FirstOrDefault() ?? Location.None,
-                    dto.Dto.Name));
-
-                return vdto with { Diagnostics = diagnostics.ToImmutable() };
-            }
-
-            var profile = ProfileInfoCollector.Resolve(dto, diagnostics, props, ct);
+            var profile = ProfileInfoCollector.Resolve(dto, diagnostics, dtoProperties, ct);
             
             if (propsNeedingConfig.Count == 0) return vdto with { ProfileInfo = profile };
             
@@ -116,5 +89,27 @@ internal static class DiscoveryValidation
 
             return vdto with { ProfileInfo = profile, Diagnostics = diagnostics.ToImmutable() };
         });
+    }
+    
+    extension(INamedTypeSymbol type)
+    {
+        private bool IsPartial =>
+            type.DeclaringSyntaxReferences
+                .Select(x => x.GetSyntax())
+                .OfType<TypeDeclarationSyntax>()
+                .Any(x => x.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)));
+
+        private ImmutableArray<IPropertySymbol> GetOrderedProperties() =>
+            type.GetMembers()
+                .OfType<IPropertySymbol>()
+                .Where(x => x.DeclaredAccessibility == Accessibility.Public)
+                .Where(x => !x.IsStatic)
+                .OrderBy(x =>
+                {
+                    var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
+                    return loc is null ? int.MaxValue : loc.SourceSpan.Start;
+                })
+                .ThenBy(x => x.Name, StringComparer.Ordinal)
+                .ToImmutableArray();
     }
 }

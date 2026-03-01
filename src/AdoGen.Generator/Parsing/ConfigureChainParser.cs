@@ -77,11 +77,10 @@ internal static class ConfigureChainParser
         {
             for (var i = 0; i < Handlers.Count; i++)
             {
-                if (Handlers[i].IsMatch(provider, chain.Name))
-                {
-                    Handlers[i].Handle(model, dtoType, propName, chain, cfg, diagnosticsBuilder, ct);
-                    break;
-                }
+                if (!Handlers[i].IsMatch(provider, chain.Name)) continue;
+                
+                Handlers[i].Handle(model, dtoType, propName, chain, cfg, diagnosticsBuilder, ct);
+                break;
             }
         }
 
