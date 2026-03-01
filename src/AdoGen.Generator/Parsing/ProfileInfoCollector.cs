@@ -50,75 +50,56 @@ internal static class ProfileInfoCollector
         ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var dtoProps = props.ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
+        var dtoProps = props.ToImmutableDictionary(p => p.Name, p => p, StringComparer.Ordinal);
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
         string? schema = null;
         string? table = null;
         var keys = new List<string>();
         var identityKeys = new HashSet<string>(StringComparer.Ordinal);
-        
-        foreach (var syntaxRef in profileSymbol.DeclaringSyntaxReferences)
+        var expressionSyntaxes = profileSymbol.GetProfileExpressions();
+
+        foreach (var expressionSyntax in expressionSyntaxes)
         {
-            if (syntaxRef.GetSyntax() is not ClassDeclarationSyntax cls) continue;
+            if (expressionSyntax.Expression is not IdentifierNameSyntax id) continue;
 
-            foreach (var ctor in cls.Members.OfType<ConstructorDeclarationSyntax>())
+            switch (id.Identifier.Text)
             {
-                IEnumerable<SyntaxNode> nodes = [];
-                if (ctor.Body is { } body) nodes = nodes.Concat(body.DescendantNodes());
-                if (ctor.ExpressionBody is { } exprBody) nodes = nodes.Concat(exprBody.DescendantNodes());
+                case "Table":
+                    if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } al &&
+                        model.TryGetConstString(al[0].Expression, default, out var tn) && !string.IsNullOrWhiteSpace(tn))
+                        table = tn!;
+                    break;
 
-                foreach (var inv in nodes.OfType<InvocationExpressionSyntax>())
-                {
-                    if (inv.Expression is IdentifierNameSyntax id)
+                case "Schema":
+                    if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } asl &&
+                        model.TryGetConstString(asl[0].Expression, default, out var sc) && !string.IsNullOrWhiteSpace(sc))
+                        schema = sc!;
+                    break;
+
+                case "Key":
+                case "Identity":
+                    if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } kal &&
+                        kal[0].Expression is LambdaExpressionSyntax lambda)
                     {
-                        switch (id.Identifier.Text)
+                        var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
+                        if (propName is { } pn && dtoProps.ContainsKey(pn))
                         {
-                            case "Table":
-                                if (inv.ArgumentList.Arguments is { Count: 1 } al &&
-                                    model.TryGetConstString(al[0].Expression, default, out var tn) && !string.IsNullOrWhiteSpace(tn))
-                                    table = tn!;
-                                break;
-
-                            case "Schema":
-                                if (inv.ArgumentList.Arguments is { Count: 1 } asl &&
-                                    model.TryGetConstString(asl[0].Expression, default, out var sc) && !string.IsNullOrWhiteSpace(sc))
-                                    schema = sc!;
-                                break;
-
-                            case "Key":
-                            case "Identity":
-                                if (inv.ArgumentList.Arguments is { Count: 1 } kal &&
-                                    kal[0].Expression is LambdaExpressionSyntax lambda)
-                                {
-                                    var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
-                                    if (propName is { } pn && dtoProps.ContainsKey(pn))
-                                    {
-                                        if (id.Identifier.Text == "Key" && !keys.Contains(pn, StringComparer.Ordinal)) keys.Add(pn);
-                                        if (id.Identifier.Text == "Identity") identityKeys.Add(pn);
-                                    }
-                                }
-                                break;
+                            if (id.Identifier.Text == "Key" && !keys.Contains(pn, StringComparer.Ordinal)) keys.Add(pn);
+                            if (id.Identifier.Text == "Identity") identityKeys.Add(pn);
                         }
                     }
-
-                    // Property chains starting with RuleFor(...)
-                    var isConfigureCall =
-                        (inv.Expression is IdentifierNameSyntax cid && cid.Identifier.Text == RuleFor) ||
-                        (inv.Expression is MemberAccessExpressionSyntax mae && mae.Name.Identifier.Text == RuleFor);
-
-                    if (isConfigureCall)
-                    {
-                        ConfigureChainParser.ParseConfigureRootAndForwardChain(
-                            model, 
-                            dtoType, 
-                            dtoProps, 
-                            inv, 
-                            configs,
-                            provider,
-                            diagnostics, 
-                            ct);
-                    }
-                }
+                    break;
+                case RuleFor:
+                    ConfigureChainParser.ParseConfigureRootAndForwardChain(
+                        model, 
+                        dtoType, 
+                        dtoProps, 
+                        expressionSyntax, 
+                        configs,
+                        provider,
+                        diagnostics, 
+                        ct);
+                    break;
             }
         }
 
@@ -172,4 +153,20 @@ internal static class ProfileInfoCollector
             Namespace: ns
         );
     }
+    
+    private static ImmutableArray<InvocationExpressionSyntax> GetProfileExpressions(this INamedTypeSymbol profileSymbol) =>
+        profileSymbol.DeclaringSyntaxReferences
+            .Select(r => r.GetSyntax())
+            .OfType<ClassDeclarationSyntax>()
+            .SelectMany(x => x.Members.OfType<ConstructorDeclarationSyntax>())
+            .SelectMany(x =>
+            {
+                var nodes = new List<SyntaxNode>();
+                if (x.Body is { } body) nodes.AddRange(body.DescendantNodes());
+                if (x.ExpressionBody is { } exprBody) nodes.AddRange(exprBody.DescendantNodes());
+                return nodes;
+            })
+            .OfType<InvocationExpressionSyntax>()
+            .Where(x => x.Expression is IdentifierNameSyntax)
+            .ToImmutableArray();
 }

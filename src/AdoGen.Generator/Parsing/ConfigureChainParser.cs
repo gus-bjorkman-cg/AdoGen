@@ -65,12 +65,12 @@ internal static class ConfigureChainParser
 
         while (current is MemberAccessExpressionSyntax nextMae)
         {
-            if (nextMae.Parent is InvocationExpressionSyntax nextCall)
-            {
-                chainMethods.Add(new ChainMethod(nextMae.Name.Identifier.Text, nextCall.ArgumentList.Arguments, nextCall));
-                current = nextCall.Parent;
-            }
-            else break;
+            if (nextMae.Parent is not InvocationExpressionSyntax nextCall) break;
+            
+            chainMethods.Add(new ChainMethod(nextMae.Name.Identifier.Text, nextCall.ArgumentList.Arguments,
+                nextCall));
+            
+            current = nextCall.Parent;
         }
 
         foreach (var chain in chainMethods)
