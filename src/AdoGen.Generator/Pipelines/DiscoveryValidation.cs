@@ -95,21 +95,21 @@ internal static class DiscoveryValidation
     {
         private bool IsPartial =>
             type.DeclaringSyntaxReferences
-                .Select(x => x.GetSyntax())
+                .Select(static x => x.GetSyntax())
                 .OfType<TypeDeclarationSyntax>()
-                .Any(x => x.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)));
+                .Any(static x => x.Modifiers.Any(static m => m.IsKind(SyntaxKind.PartialKeyword)));
 
         private ImmutableArray<IPropertySymbol> GetOrderedProperties() =>
             type.GetMembers()
                 .OfType<IPropertySymbol>()
-                .Where(x => x.DeclaredAccessibility == Accessibility.Public)
-                .Where(x => !x.IsStatic)
-                .OrderBy(x =>
+                .Where(static x => x.DeclaredAccessibility == Accessibility.Public)
+                .Where(static x => !x.IsStatic)
+                .OrderBy(static x =>
                 {
-                    var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
+                    var loc = x.Locations.FirstOrDefault(static l => l.IsInSource);
                     return loc is null ? int.MaxValue : loc.SourceSpan.Start;
                 })
-                .ThenBy(x => x.Name, StringComparer.Ordinal)
+                .ThenBy(static x => x.Name, StringComparer.Ordinal)
                 .ToImmutableArray();
     }
 }

@@ -57,7 +57,7 @@ internal static class ProfileInfoCollector
         var identityKeys = new HashSet<string>(StringComparer.Ordinal);
         var keys = new List<string>();
         
-        var dtoProps = props.ToImmutableDictionary(p => p.Name, p => p, StringComparer.Ordinal);
+        var dtoProps = props.ToImmutableDictionary(static p => p.Name, p => p, StringComparer.Ordinal);
         var schema = provider.DefaultSchema();
         var table = dtoType.Name.PluralizeSimple();
         var expressionSyntaxes = profileSymbol.GetProfileExpressions();
@@ -116,7 +116,7 @@ internal static class ProfileInfoCollector
         
         if (keys.Count == 0)
         {
-            var idProp = dtoProps.Keys.FirstOrDefault(n => string.Equals(n, "Id", StringComparison.OrdinalIgnoreCase));
+            var idProp = dtoProps.Keys.FirstOrDefault(static n => string.Equals(n, "Id", StringComparison.OrdinalIgnoreCase));
             if (idProp is not null) keys.Add(idProp);
         }
 
@@ -175,10 +175,10 @@ internal static class ProfileInfoCollector
     {
         private ImmutableArray<InvocationExpressionSyntax> GetProfileExpressions() =>
             profileSymbol.DeclaringSyntaxReferences
-                .Select(x => x.GetSyntax())
+                .Select(static x => x.GetSyntax())
                 .OfType<ClassDeclarationSyntax>()
-                .SelectMany(x => x.Members.OfType<ConstructorDeclarationSyntax>())
-                .SelectMany(x =>
+                .SelectMany(static x => x.Members.OfType<ConstructorDeclarationSyntax>())
+                .SelectMany(static x =>
                 {
                     var nodes = new List<SyntaxNode>();
                     if (x.Body is { } body) nodes.AddRange(body.DescendantNodes());
@@ -186,7 +186,7 @@ internal static class ProfileInfoCollector
                     return nodes;
                 })
                 .OfType<InvocationExpressionSyntax>()
-                .Where(x => x.Expression is IdentifierNameSyntax)
+                .Where(static x => x.Expression is IdentifierNameSyntax)
                 .ToImmutableArray();
 
         private string GetNamespace() =>
