@@ -3,7 +3,6 @@ using System.Text;
 using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.PostgreSql;
@@ -21,6 +20,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
         var dtoProps = profileInfo.DtoProperties;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         var ns = profileInfo.Namespace;
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -120,7 +120,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
             deleteBatchSrc =
                 $@"
-public sealed partial {typeKeyword} {dto.Name} : INpgsqlSingleIdModel<{dtoTypeName}, {keyType}>
+{accessibility} sealed partial {typeKeyword} {dto.Name} : INpgsqlSingleIdModel<{dtoTypeName}, {keyType}>
 {{
     private const string Pg_SqlDeleteBatchTemplate = ""{EscapeStringLiteral($@"DELETE FROM ""{profileInfo.Schema}"".""{profileInfo.Table}"" WHERE ""{keyName}"" IN (")}"";
 
@@ -164,7 +164,7 @@ using AdoGen.PostgreSql;
 
 namespace {ns};
 {deleteBatchSrc}
-public sealed partial {typeKeyword} {dto.Name} : INpgsqlDomainModel<{dtoTypeName}>
+{accessibility} sealed partial {typeKeyword} {dto.Name} : INpgsqlDomainModel<{dtoTypeName}>
 {{
     private const string Pg_SqlCreateTable = @""{EscapeVerbatim(createTableSql)}"";
     private const string Pg_SqlInsert = ""{EscapeStringLiteral(insertSql)}"";

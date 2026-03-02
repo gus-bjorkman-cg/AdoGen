@@ -75,4 +75,18 @@ internal static class SqlDiagnostics
         "Type '{0}' has no non-identity key to match on for MERGE. RuleFor Key(...) not also marked Identity(...).",
         category: "Reliability",
         DiagnosticSeverity.Warning, true);
+    
+    public static readonly DiagnosticDescriptor StaticNotAllowed = new(
+        id: "AG010",
+        title: "Static types not supported",
+        messageFormat: "Type '{0}' is static. Static types are not supported for SQL source generation.",
+        category: "Design",
+        DiagnosticSeverity.Error, true);
+    
+    public static readonly DiagnosticDescriptor InvalidAccessibility = new(
+        id: "AG011",
+        title: "Invalid type visibility",
+        messageFormat: "Type '{0}' has invalid visibility. Only public and internal types are supported for SQL source generation.",
+        category: "Design",
+        DiagnosticSeverity.Error, true);
 }

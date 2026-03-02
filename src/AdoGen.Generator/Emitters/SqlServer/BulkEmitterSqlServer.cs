@@ -1,10 +1,8 @@
-using System;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.SqlServer;
@@ -22,6 +20,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
         var dtoProps = profileInfo.DtoProperties;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         var ns = profileInfo.Namespace;
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -108,9 +107,9 @@ internal sealed class BulkEmitterSqlServer : IEmitter
 
                      namespace {{{ns}}};
 
-                     public sealed partial {{{typeKeyword}}} {{{dto.Name}}} : ISqlBulkModel<{{{dtoTypeName}}}>;
+                     {{{accessibility}}} sealed partial {{{typeKeyword}}} {{{dto.Name}}} : ISqlBulkModel<{{{dtoTypeName}}}>;
 
-                     public sealed class {{{bulkTypeName}}} : BulkBatchSql<{{{dtoTypeName}}}>
+                     {{{accessibility}}} sealed class {{{bulkTypeName}}} : BulkBatchSql<{{{dtoTypeName}}}>
                      {
                          private const string _tempTableName = "{{{tempTableName}}}";
 

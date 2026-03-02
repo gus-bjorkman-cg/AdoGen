@@ -2,7 +2,6 @@ using System.Linq;
 using System.Text;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.SqlServer;
@@ -20,6 +19,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
         var dtoProps = profileInfo.DtoProperties;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         var ns = profileInfo.Namespace;
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -149,7 +149,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             deleteSrc =
                 $$""""
                   
-                  public sealed partial {{typeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{dtoTypeName}}, {{keyType}}>
+                  {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{dtoTypeName}}, {{keyType}}>
                   {
                       private const string SqlDeleteBatchTemplate = "{{deleteBatchSql}}";
                   
@@ -197,7 +197,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
             namespace {{ns}};
             {{deleteSrc}}
-            public sealed partial {{typeKeyword}} {{dto.Name}} : ISqlDomainModel<{{dtoTypeName}}>
+            {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : ISqlDomainModel<{{dtoTypeName}}>
             {
                 private const string SqlCreateTable = 
                     """

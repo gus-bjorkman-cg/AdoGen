@@ -1,9 +1,7 @@
-using System;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.SqlServer;
@@ -20,6 +18,7 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);
 
         var ordinals = new StringBuilder();
@@ -62,7 +61,7 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
 
             namespace {{ns}};
 
-            public sealed partial {{typeKeyword}} {{dto.Name}} : ISqlResult<{{dtoTypeName}}>
+            {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : ISqlResult<{{dtoTypeName}}>
             {
                 private static bool {{isInitField}};
             {{ordinals}}

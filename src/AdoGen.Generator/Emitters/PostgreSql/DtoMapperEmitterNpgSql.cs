@@ -1,9 +1,7 @@
-using System;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.PostgreSql;
@@ -20,6 +18,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         var dtoProps = profileInfo.DtoProperties;
 
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);
@@ -66,7 +65,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
 
               namespace {{ns}};
 
-              public sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlResult<{{dtoTypeName}}>
+              {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlResult<{{dtoTypeName}}>
               {
                   private static bool {{isInitField}};
               {{ordinals}}

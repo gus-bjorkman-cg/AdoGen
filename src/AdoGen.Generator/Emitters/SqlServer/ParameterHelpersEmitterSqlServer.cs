@@ -1,7 +1,6 @@
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.SqlServer;
@@ -18,6 +17,7 @@ internal sealed class ParameterHelpersEmitterSqlServer : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         
         var constBuilder = new StringBuilder();
         var methodBuilder = new StringBuilder();
@@ -46,7 +46,7 @@ internal sealed class ParameterHelpersEmitterSqlServer : IEmitter
             /// <summary>
             /// Helper methods for creating typed SQL parameters for {{dto.Name}}.
             /// </summary>
-            public static class {{dto.Name}}Sql
+            {{accessibility}} static class {{dto.Name}}Sql
             {
             {{constBuilder}}
             {{methods}}

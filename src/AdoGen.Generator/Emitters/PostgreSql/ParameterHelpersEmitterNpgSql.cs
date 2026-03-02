@@ -2,7 +2,6 @@ using System.Linq;
 using System.Text;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.PostgreSql;
@@ -19,6 +18,7 @@ internal sealed class ParameterHelpersEmitterNpgSql : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         var constBuilder = new StringBuilder();
         var methodBuilder = new StringBuilder();
 
@@ -46,7 +46,7 @@ internal sealed class ParameterHelpersEmitterNpgSql : IEmitter
             /// <summary>
             /// Helper methods for creating typed PostgreSQL parameters for {{dto.Name}}.
             /// </summary>
-            public static class {{dto.Name}}Npgsql
+            {{accessibility}} static class {{dto.Name}}Npgsql
             {
             {{constBuilder}}
             {{methods}}

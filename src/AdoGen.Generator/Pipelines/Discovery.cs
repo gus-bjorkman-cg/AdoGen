@@ -10,18 +10,18 @@ namespace AdoGen.Generator.Pipelines;
 internal static class Discovery
 {
     private const string SqlServerLib = "AdoGen.SqlServer";
-    private const string PostgreSqlLib = "AdoGen.PostgreSql";
+    private const string NpgsqlSqlLib = "AdoGen.PostgreSql";
 
     private const string SqlServerResultInterface = $"{SqlServerLib}.ISqlResult";
     private const string SqlServerDomainInterface = $"{SqlServerLib}.ISqlDomainModel";
     private const string SqlServerBulkInterface = $"{SqlServerLib}.ISqlBulkModel";
     private const string SqlServerProfile = "SqlProfile";
 
-    private const string PostgreResultInterface = $"{PostgreSqlLib}.INpgsqlResult";
-    private const string PostgreDomainInterface = $"{PostgreSqlLib}.INpgsqlDomainModel";
-    private const string PostgreBulkInterface = $"{PostgreSqlLib}.INpgsqlBulkModel";
-    private const string PostgreProfile = "NpgsqlProfile";
-
+    private const string NpgsqlResultInterface = $"{NpgsqlSqlLib}.INpgsqlResult";
+    private const string NpgsqlDomainInterface = $"{NpgsqlSqlLib}.INpgsqlDomainModel";
+    private const string NpgsqlBulkInterface = $"{NpgsqlSqlLib}.INpgsqlBulkModel";
+    private const string NpgsqlProfile = "NpgsqlProfile";
+    
     public static IncrementalValuesProvider<DiscoveryDto> DiscoverDtos(
         IncrementalGeneratorInitializationContext context)
         => FilterTypes(
@@ -29,7 +29,7 @@ internal static class Discovery
             CreateDtoCandidates(context),
             BuildProfilesIndex(context));
 
-    private static IncrementalValuesProvider<INamedTypeSymbol> CreateDtoCandidates(
+    private static IncrementalValueProvider<ImmutableArray<INamedTypeSymbol>> CreateDtoCandidates(
         IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax,
@@ -37,16 +37,14 @@ internal static class Discovery
                     ctx.SemanticModel.GetDeclaredSymbol((TypeDeclarationSyntax)ctx.Node, ct) as INamedTypeSymbol)
             .Where(static x => x is not null)
             .Select(static (x, _) => x!)
-            .Where(static x => x.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal)
-            .Where(static x => !x.IsStatic)
-            .WithComparer(SymbolEqualityComparer.Default);
+            .WithComparer(SymbolEqualityComparer.Default)
+            .Collect();
 
     private static IncrementalValuesProvider<DiscoveryDto> FilterTypes(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<INamedTypeSymbol> candidates,
+        IncrementalValueProvider<ImmutableArray<INamedTypeSymbol>> candidates,
         IncrementalValueProvider<ImmutableArray<DiscoveryModel>> profilesIndex) =>
         candidates
-            .Collect()
             .Combine(profilesIndex)
             .Combine(context.CompilationProvider)
             .SelectMany(static (input, ct) =>
@@ -59,7 +57,7 @@ internal static class Discovery
 
                 foreach (var type in distinctTypes)
                 {
-                    var typeProfiles = profiles.Where(y => SymbolEqualityComparer.Default.Equals(y.Dto, type));
+                    var typeProfiles = profiles.Where(y => SymbolEqualityComparer.Default.Equals(y.Dto, type)).ToImmutableArray();
                     var typeDiscoveries = type.AllInterfaces
                         .Select(i => adoGenInterfaces.FirstOrDefault(x => SymbolEqualityComparer.Default.Equals(i, x.Interface)))
                         .Where(static x => x.Interface is not null)
@@ -70,11 +68,16 @@ internal static class Discovery
                             Provider = x.Key, Kind = x.Select(y => y.Kind).FirstOrDefault(),
                             Interface = x.Select(y => y.Interface).FirstOrDefault()
                         })
-                        .Where(x => typeProfiles.Any(y => y.Provider == x.Provider))
                         .Select(x =>
                         {
-                            var profile = typeProfiles.First(y => y.Provider == x.Provider);
-                            return new DiscoveryDto(type, x.Kind, profile.Profile, profile.Model, x.Provider);
+                            var discoveryModel = DiscoveryModel.Empty;
+                            foreach (var typeProfile in typeProfiles.Where(typeProfile => typeProfile.Provider == x.Provider))
+                            {
+                                discoveryModel = typeProfile;
+                                break;
+                            }
+                            
+                            return new DiscoveryDto(type, x.Kind, discoveryModel.Profile, discoveryModel.Model, x.Provider);
                         });
 
                     builder.AddRange(typeDiscoveries);
@@ -100,7 +103,7 @@ internal static class Discovery
                     var provider = baseType.Name switch
                     {
                         SqlServerProfile => SqlProviderKind.SqlServer,
-                        PostgreProfile => SqlProviderKind.PostgreSql,
+                        NpgsqlProfile => SqlProviderKind.PostgreSql,
                         _ => SqlProviderKind.None
                     };
 
@@ -130,9 +133,9 @@ internal static class Discovery
         (SqlServerResultInterface, SqlModelKind.Result, SqlProviderKind.SqlServer),
         (SqlServerDomainInterface, SqlModelKind.Domain, SqlProviderKind.SqlServer),
         (SqlServerBulkInterface, SqlModelKind.Bulk, SqlProviderKind.SqlServer),
-        (PostgreResultInterface, SqlModelKind.Result, SqlProviderKind.PostgreSql),
-        (PostgreDomainInterface, SqlModelKind.Domain, SqlProviderKind.PostgreSql),
-        (PostgreBulkInterface, SqlModelKind.Bulk, SqlProviderKind.PostgreSql)
+        (NpgsqlResultInterface, SqlModelKind.Result, SqlProviderKind.PostgreSql),
+        (NpgsqlDomainInterface, SqlModelKind.Domain, SqlProviderKind.PostgreSql),
+        (NpgsqlBulkInterface, SqlModelKind.Bulk, SqlProviderKind.PostgreSql)
     ];
 
     private readonly record struct AdoGenInterfaceInfo(
@@ -147,5 +150,8 @@ internal static class Discovery
         INamedTypeSymbol Dto,
         INamedTypeSymbol Profile,
         SemanticModel Model,
-        SqlProviderKind Provider);
+        SqlProviderKind Provider)
+    {
+        public static DiscoveryModel Empty => new(null!, null!, null!, SqlProviderKind.None);
+    }
 }

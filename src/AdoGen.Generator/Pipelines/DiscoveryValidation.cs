@@ -41,6 +41,22 @@ internal static class DiscoveryValidation
                     dto.Dto.Name));
             }
 
+            if (dto.Dto.IsStatic)
+            {
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.StaticNotAllowed,
+                    dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name));
+            }
+
+            if (dto.Dto.DeclaredAccessibility is not (Accessibility.Public or Accessibility.Internal))
+            {
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.InvalidAccessibility,
+                    dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name));
+            }
+
             if (dto.Profile is null || dto.ProfileSemanticModel is null)
             {
                 diagnostics.Add(Diagnostic.Create(

@@ -1,10 +1,8 @@
-using System;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Emitters.PostgreSql;
@@ -21,6 +19,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         var dtoProps = profileInfo.DtoProperties;
 
         var ns = profileInfo.Namespace;
@@ -101,9 +100,9 @@ internal sealed class BulkEmitterNpgSql : IEmitter
 
                      namespace {{{ns}}};
 
-                     public sealed partial {{{typeKeyword}}} {{{dto.Name}}} : INpgsqlBulkModel<{{{dtoTypeName}}}>;
+                     {{{accessibility}}} sealed partial {{{typeKeyword}}} {{{dto.Name}}} : INpgsqlBulkModel<{{{dtoTypeName}}}>;
 
-                     public sealed class {{{bulkTypeName}}} : BulkBatchNpg<{{{dtoTypeName}}}>
+                     {{{accessibility}}} sealed class {{{bulkTypeName}}} : BulkBatchNpg<{{{dtoTypeName}}}>
                      {
                          private const string _tempTableName = "{{{tempTableName}}}";
 
