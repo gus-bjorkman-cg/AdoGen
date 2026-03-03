@@ -77,53 +77,54 @@ public sealed class UserPgNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.Tes
 {
     private const string _tempTableName = "adoGen_userpg_tmp";
 
-    private const string _sqlCreateTempTable = @"CREATE TEMP TABLE IF NOT EXISTS ""adoGen_userpg_tmp""(
-    ""Id"" UUID NOT NULL,
-    ""Name"" VARCHAR(20) NOT NULL,
-    ""Email"" VARCHAR(50) NOT NULL,
-    ""operation"" CHAR(1) NOT NULL);";
+    private const string _sqlCreateTempTable = 
+    """
+    CREATE TEMP TABLE IF NOT EXISTS "adoGen_userpg_tmp"(
+        "Id" UUID NOT NULL,
+        "Name" VARCHAR(20) NOT NULL,
+        "Email" VARCHAR(50) NOT NULL,
+        "operation" CHAR(1) NOT NULL);
+    """;
+    
+    private const string _sqlApply = 
+    """
+    CREATE INDEX IF NOT EXISTS "ix_adoGen_userpg_tmp_op_keys" ON "adoGen_userpg_tmp" ("operation", "Id");
 
-    private const string _sqlApply = @"WITH updated AS (
-    UPDATE ""public"".""UserPgs"" AS T
-    SET
-            ""Name"" = S.""Name"",
-            ""Email"" = S.""Email""
-    FROM ""adoGen_userpg_tmp"" AS S
-    WHERE S.""operation"" = 'U' AND S.""Id"" = T.""Id""
-    RETURNING 1
-)
-, inserted AS (
-    INSERT INTO ""public"".""UserPgs"" (""Id"", ""Name"", ""Email"")
-    SELECT S.""Id"", S.""Name"", S.""Email""
-    FROM ""adoGen_userpg_tmp"" AS S
-    WHERE S.""operation"" = 'I'
-    RETURNING 1
-)
-, deleted AS (
-    DELETE FROM ""public"".""UserPgs"" AS T
-    USING ""adoGen_userpg_tmp"" AS S
-    WHERE S.""operation"" = 'D' AND S.""Id"" = T.""Id""
-    RETURNING 1
-)
-SELECT
-    (SELECT COUNT(*) FROM inserted) AS Inserted,
-    (SELECT COUNT(*) FROM updated) AS Updated,
-    (SELECT COUNT(*) FROM deleted) AS Deleted;";
+    WITH updated AS (
+        UPDATE "public"."UserPgs" AS T
+            SET "Name" = S."Name",
+                "Email" = S."Email"
+        FROM "adoGen_userpg_tmp" AS S
+        WHERE S."operation" = 'U' AND S."Id" = T."Id"
+        RETURNING 1),
+    inserted AS (
+        INSERT INTO "public"."UserPgs" ("Id", "Name", "Email")
+            SELECT S."Id", S."Name", S."Email"
+            FROM "adoGen_userpg_tmp" AS S
+            WHERE S."operation" = 'I'
+        RETURNING 1),
+    deleted AS (
+        DELETE FROM "public"."UserPgs" AS T
+        USING "adoGen_userpg_tmp" AS S
+        WHERE S."operation" = 'D' AND S."Id" = T."Id"
+        RETURNING 1)
+    SELECT
+        (SELECT COUNT(*) FROM inserted) AS Inserted,
+        (SELECT COUNT(*) FROM updated) AS Updated,
+        (SELECT COUNT(*) FROM deleted) AS Deleted;
+    """;
 
-    private const string _copyCommand = "COPY \"adoGen_userpg_tmp\" (\"Id\", \"Name\", \"Email\", \"operation\") FROM STDIN (FORMAT BINARY)";
+    private const string _copyCommand = """COPY "adoGen_userpg_tmp" ("Id", "Name", "Email", "operation") FROM STDIN (FORMAT BINARY)""";
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
-    protected override string SqlApplyWithIndex => _sqlApply;
-    protected override string SqlApplyNoIndex => _sqlApply;
+    protected override string SqlApply => _sqlApply;
     protected override int FieldCount => 4;
 
     public UserPgNpgsqlBulk(int capacity = 0) : base(capacity) { }
 
     protected override async ValueTask WriteItemsToServerAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken ct)
     {
-        // COPY BINARY is the fast path in PostgreSQL.
-        // Note: BeginBinaryImport is sync in Npgsql; we still honor CancellationToken during row loop via Write...Async.
         await using var importer = connection.BeginBinaryImport(_copyCommand);
 
         for (var i = 0; i < Items.Count; i++)
