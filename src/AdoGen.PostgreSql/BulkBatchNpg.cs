@@ -26,11 +26,6 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     public List<BulkOp> Operations { get; }
 
     /// <summary>
-    /// The threshold for the number of rows in the batch to decide whether to use the index-based apply SQL.
-    /// </summary>
-    public int IndexThresholdRows { get; set; } = 500;
-
-    /// <summary>
     /// The batch size for the COPY write operation.
     /// </summary>
     public int BulkCopyBatchSize { get; set; } = 5000;
@@ -72,13 +67,7 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     /// The SQL command to apply the batch of operations using an index on the temp table.
     /// Set by generated code.
     /// </summary>
-    protected abstract string SqlApplyWithIndex { get; }
-
-    /// <summary>
-    /// The SQL command to apply the batch of operations without using an index on the temp table.
-    /// Set by generated code.
-    /// </summary>
-    protected abstract string SqlApplyNoIndex { get; }
+    protected abstract string SqlApply { get; }
 
     /// <summary>
     /// The number of fields written per row.
@@ -201,9 +190,8 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
         }
 
         await WriteItemsToServerAsync(connection, transaction, ct).ConfigureAwait(false);
-
-        var sql = Items.Count >= IndexThresholdRows ? SqlApplyWithIndex : SqlApplyNoIndex;
-        await using var cmd = connection.CreateCommand(sql, CommandType.Text, transaction, commandTimeout);
+        
+        await using var cmd = connection.CreateCommand(SqlApply, CommandType.Text, transaction, commandTimeout);
         await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
         if (!await resultReader.ReadAsync(ct).ConfigureAwait(false)) return BulkApplyResult.Empty;

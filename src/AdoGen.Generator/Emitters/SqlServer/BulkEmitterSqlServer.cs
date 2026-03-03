@@ -89,8 +89,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
         // APPLY SQL variants
         var schemaTable = $"[{profileInfo.Schema}].[{profileInfo.Table}]";
 
-        var applyNoIndex = BuildApplySql(withIndex: false);
-        var applyWithIndex = BuildApplySql(withIndex: true);
+        var applySql = BuildApplySql();
         var typeKeyword = dto.IsRecord ? "record" : "class";
 
         // Generated file
@@ -119,20 +118,14 @@ internal sealed class BulkEmitterSqlServer : IEmitter
                        {{{tempTableSql}}}
                        """;
 
-                   private const string _sqlApply_NoIndex =
+                   private const string _sqlApply =
                        """
-                       {{{applyNoIndex}}}
-                       """;
-
-                   private const string _sqlApply_WithIndex =
-                       """
-                       {{{applyWithIndex}}}
+                       {{{applySql}}}
                        """;
 
                    protected override string SqlCreateTempTable => _sqlCreateTempTable;
                    protected override string TempTableName => _tempTableName;
-                   protected override string SqlApplyWithIndex => _sqlApply_WithIndex;
-                   protected override string SqlApplyNoIndex => _sqlApply_NoIndex;
+                   protected override string SqlApply => _sqlApply;
                    protected override int FieldCount => {{{dtoProps.Length + 1}}};
 
                    /// <summary>
@@ -207,18 +200,13 @@ internal sealed class BulkEmitterSqlServer : IEmitter
         spc.AddSource($"{dto.Name}Bulk.Sql.g.cs", src);
         return;
 
-        string BuildApplySql(bool withIndex)
+        string BuildApplySql()
         {
             var sb = new StringBuilder();
 
             sb.AppendLine("BEGIN TRY");
             sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;");
-
-            if (withIndex)
-            {
-                sb.AppendLine(idxClause);
-            }
-
+            sb.AppendLine(idxClause);
             sb.AppendLine();
 
             if (nonKeyNonIdentity.Length > 0)

@@ -26,12 +26,6 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     public List<BulkOp> Operations { get; }
     
     /// <summary>
-    /// The threshold for the number of rows in the batch to decide whether to create an index on the
-    /// temp table for the apply operation.
-    /// </summary>
-    public int IndexThresholdRows { get; set; } = 500;
-    
-    /// <summary>
     /// The batch size for the SqlBulkCopy operation.
     /// Adjust this based on the size of your data and the performance characteristics of your database.
     /// </summary>
@@ -72,13 +66,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     /// The SQL command to apply the batch of operations to the target table using an index on the temp table.
     /// Set by the generated code in build time.
     /// </summary>
-    protected abstract string SqlApplyWithIndex { get; }
-    
-    /// <summary>
-    /// The SQL command to apply the batch of operations to the target table without using an index on the temp table.
-    /// Set by the generated code in build time. 
-    /// </summary>
-    protected abstract string SqlApplyNoIndex { get;  }
+    protected abstract string SqlApply { get; }
     
     /// <summary>
     /// The number of fields in the temp table for the bulk copy operation. Set by the generated code in build time.
@@ -221,8 +209,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
             await WriteItemsToServerAsync(bulk, ct).ConfigureAwait(false);
         }
 
-        var sql = Items.Count >= IndexThresholdRows ? SqlApplyWithIndex : SqlApplyNoIndex;
-        await using var cmd = connection.CreateCommand(sql, CommandType.Text, transaction, commandTimeout);
+        await using var cmd = connection.CreateCommand(SqlApply, CommandType.Text, transaction, commandTimeout);
         await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
         if (!await resultReader.ReadAsync(ct).ConfigureAwait(false)) return BulkApplyResult.Empty;
