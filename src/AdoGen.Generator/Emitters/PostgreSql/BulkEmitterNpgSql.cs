@@ -70,9 +70,12 @@ internal sealed class BulkEmitterNpgSql : IEmitter
             sbColDefs.AppendLine($"    \"{cfg.ParameterName}\" {sqlType} {nullability},");
         }
 
-        sbColDefs.Append("    \"operation\" CHAR(1) NOT NULL");
+        sbColDefs.Append("""    "operation" CHAR(1) NOT NULL""");
 
-        var tempTableSqlRaw = $"CREATE TEMP TABLE IF NOT EXISTS \"{tempTableName}\"(\n{sbColDefs});";
+        var tempTableSqlRaw = $"""
+                               CREATE TEMP TABLE IF NOT EXISTS "{tempTableName}"(
+                               {sbColDefs});
+                               """;
         // Escape for verbatim string: double all quotes
         var tempTableSqlEscaped = tempTableSqlRaw.Replace("\"", "\"\"");
 
@@ -158,7 +161,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 sb.AppendLine("    SET");
                 sb.AppendLine("        " + updateSet);
                 sb.AppendLine($"    FROM {tempTableRef} AS S");
-                sb.AppendLine($"    WHERE S.\"operation\" = 'U' AND {joinOn}");
+                sb.AppendLine($"""    WHERE S."operation" = 'U' AND {joinOn}""");
                 sb.AppendLine("    RETURNING 1");
             }
             else

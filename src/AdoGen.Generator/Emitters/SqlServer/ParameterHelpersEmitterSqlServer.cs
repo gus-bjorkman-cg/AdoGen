@@ -79,7 +79,8 @@ internal sealed class ParameterHelpersEmitterSqlServer : IEmitter
 
         var optionalParams = optional.ToString().TrimEnd();
 
-        return $$"""
+        return 
+            $$"""
                 /// <summary>
                 /// Creates a SqlParameter with the configured db type and size/precision/scale.
                 /// </summary>

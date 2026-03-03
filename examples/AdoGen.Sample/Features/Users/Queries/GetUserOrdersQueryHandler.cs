@@ -2,14 +2,14 @@ using AdoGen.Sample.Features.Orders;
 
 namespace AdoGen.Sample.Features.Users.Queries;
 
-internal sealed record GetUserOrdersResponse(User User, List<Order> Orders);
+public sealed record GetUserOrdersResponse(User User, List<Order> Orders);
 public sealed record GetUserOrdersQuery
 {
     private GetUserOrdersQuery(){}
     public static GetUserOrdersQuery Instance { get; } = new();
 }
 
-internal sealed class GetUserOrdersQueryHandler(string connectionString)
+public sealed class GetUserOrdersQueryHandler(string connectionString)
 {
     public async ValueTask<List<GetUserOrdersResponse>> SqlServer(GetUserOrdersQuery request, CancellationToken ct)
     {

@@ -82,22 +82,21 @@ internal static class ProfileInfoCollector
 
                 case "Key":
                 case "Identity":
-                    if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } kal &&
-                        kal[0].Expression is LambdaExpressionSyntax lambda)
+                    if (expressionSyntax.ArgumentList.Arguments.Count != 1) break;
+                    
+                    var lambda = (LambdaExpressionSyntax)expressionSyntax.ArgumentList.Arguments[0].Expression;
+                    var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
+
+                    if (propName is null || !dtoProps.ContainsKey(propName)) break;
+                    
+                    switch (id.Identifier.Text)
                     {
-                        var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
-                        if (propName != null && dtoProps.ContainsKey(propName))
-                        {
-                            switch (id.Identifier.Text)
-                            {
-                                case "Key" when !keys.Contains(propName, StringComparer.Ordinal):
-                                    keys.Add(propName);
-                                    break;
-                                case "Identity":
-                                    identityKeys.Add(propName);
-                                    break;
-                            }
-                        }
+                        case "Key":
+                            keys.Add(propName);
+                            break;
+                        case "Identity":
+                            identityKeys.Add(propName);
+                            break;
                     }
                     break;
                 case RuleFor:
@@ -147,8 +146,8 @@ internal static class ProfileInfoCollector
         return new ProfileInfo(
             Schema: schema,
             Table: table,
-            Keys: [.. keys],
-            IdentityKeys: identityKeys.ToImmutableHashSet(StringComparer.Ordinal),
+            Keys: keys.Distinct().ToImmutableArray(),
+            IdentityKeys: identityKeys.Distinct().ToImmutableHashSet(StringComparer.Ordinal),
             DtoProperties: props,
             ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal),
             Namespace: dtoType.GetNamespace()

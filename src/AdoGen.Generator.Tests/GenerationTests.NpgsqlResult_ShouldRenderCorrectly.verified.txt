@@ -162,7 +162,7 @@ namespace AdoGen.Generator.Tests;
 
 public sealed partial record UserPg : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.UserPg, global::System.Guid>
 {
-    private const string Pg_SqlDeleteBatchTemplate = "DELETE FROM \"public\".\"UserPgs\" WHERE \"Id\" IN (";
+    private const string Pg_SqlDeleteBatchTemplate = """DELETE FROM "public"."UserPgs" WHERE "Id" IN (""";
 
     public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<global::System.Guid> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -190,19 +190,22 @@ public sealed partial record UserPg : INpgsqlSingleIdModel<global::AdoGen.Genera
 
 public sealed partial record UserPg : INpgsqlDomainModel<global::AdoGen.Generator.Tests.UserPg>
 {
-    private const string Pg_SqlCreateTable = @"CREATE TABLE IF NOT EXISTS ""public"".""UserPgs""(
-            ""Id"" UUID DEFAULT gen_random_uuid() NOT NULL,
-            ""Name"" VARCHAR(20) NOT NULL,
-            ""Email"" VARCHAR(50) NOT NULL
-        ,CONSTRAINT ""PK_UserPgs"" PRIMARY KEY (""Id""));
-";
-    private const string Pg_SqlInsert = "INSERT INTO \"public\".\"UserPgs\" (\"Id\", \"Name\", \"Email\") VALUES (@Id, @Name, @Email);";
-    private const string Pg_SqlInsertBatchTemplate = "INSERT INTO \"public\".\"UserPgs\" (\"Id\", \"Name\", \"Email\") VALUES";
-    private const string Pg_SqlUpdate = "UPDATE \"public\".\"UserPgs\" SET \"Name\" = @Name, \"Email\" = @Email WHERE \"Id\" = @Id;";
-    private const string Pg_SqlDelete = "DELETE FROM \"public\".\"UserPgs\" WHERE \"Id\" = @Id;";
-    private const string Pg_SqlTruncate = "TRUNCATE TABLE \"public\".\"UserPgs\";";
-    private const string Pg_SqlUpsert = "INSERT INTO \"public\".\"UserPgs\" (\"Id\", \"Name\", \"Email\") VALUES (@Id, @Name, @Email) ON CONFLICT (\"Id\") DO UPDATE SET \"Name\" = EXCLUDED.\"Name\", \"Email\" = EXCLUDED.\"Email\";";
-
+    private const string Pg_SqlCreateTable = 
+    """
+    CREATE TABLE IF NOT EXISTS "public"."UserPgs"(
+        "Id" UUID DEFAULT gen_random_uuid() NOT NULL,
+        "Name" VARCHAR(20) NOT NULL,
+        "Email" VARCHAR(50) NOT NULL
+    ,CONSTRAINT "PK_UserPgs" PRIMARY KEY ("Id"));
+    """;
+    
+    private const string Pg_SqlInsert = """INSERT INTO "public"."UserPgs" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email);""";
+    private const string Pg_SqlInsertBatchTemplate = """INSERT INTO "public"."UserPgs" ("Id", "Name", "Email") VALUES""";
+    private const string Pg_SqlUpdate = """UPDATE "public"."UserPgs" SET "Name" = @Name, "Email" = @Email WHERE "Id" = @Id;""";
+    private const string Pg_SqlDelete = """DELETE FROM "public"."UserPgs" WHERE "Id" = @Id;""";
+    private const string Pg_SqlTruncate = """TRUNCATE TABLE "public"."UserPgs";""";
+    private const string Pg_SqlUpsert = """INSERT INTO "public"."UserPgs" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email) ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name" , "Email" = EXCLUDED."Email" ;""";
+    
     private const int Pg_NonIdentityPropertyCount = 3;
 
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
@@ -219,6 +222,7 @@ public sealed partial record UserPg : INpgsqlDomainModel<global::AdoGen.Generato
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterId(model.Id));
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterEmail(model.Email));
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -254,6 +258,7 @@ public sealed partial record UserPg : INpgsqlDomainModel<global::AdoGen.Generato
             paramIndex++; 
             cmd.Parameters.Add(UserPgNpgsql.CreateParameterEmail(model.Email, $"@p{paramIndex}"));
             paramIndex++; 
+        
         }
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -266,6 +271,7 @@ public sealed partial record UserPg : INpgsqlDomainModel<global::AdoGen.Generato
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterEmail(model.Email));
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterId(model.Id));
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -274,6 +280,7 @@ public sealed partial record UserPg : INpgsqlDomainModel<global::AdoGen.Generato
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterId(model.Id));
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -284,6 +291,7 @@ public sealed partial record UserPg : INpgsqlDomainModel<global::AdoGen.Generato
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterId(model.Id));
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserPgNpgsql.CreateParameterEmail(model.Email));
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -294,7 +302,6 @@ public sealed partial record UserPg : INpgsqlDomainModel<global::AdoGen.Generato
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 }
-
   },
   {
     HintName: UserPgMapper.Npgsql.g.cs,
