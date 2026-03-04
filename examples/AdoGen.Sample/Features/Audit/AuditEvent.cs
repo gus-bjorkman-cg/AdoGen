@@ -30,7 +30,7 @@ public sealed class AuditEventNpgsqlProfile : NpgsqlProfile<AuditEvent>
         Schema("log");
         Identity(x => x.EventId);
         Key(x => x.EventId);
-        RuleFor(x => x.EventType).Name("Type").Varchar(50);
+        RuleFor(x => x.EventType).Name("Type").VarChar(50);
         RuleFor(x => x.JsonPayload).Type(NpgsqlDbType.Bytea);
     }
 }

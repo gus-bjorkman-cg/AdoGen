@@ -8,12 +8,12 @@ namespace AdoGen.PostgreSql;
 /// <summary>
 /// Interface used to generate AdoGen mapper and SQL helper class for PostgreSQL.
 /// </summary>
-public interface INpgsqlResult;
+public interface INpgsqlMapper;
 
 /// <summary>
 /// Interface used by AdoGen to make mapping extensions work for PostgreSQL.
 /// </summary>
-public interface INpgsqlResult<out T> where T : INpgsqlResult<T>
+public interface INpgsqlMapper<out T> where T : INpgsqlMapper<T>
 {
     /// <summary>
     /// Maps the objects by using the source generated mapper.
@@ -24,7 +24,7 @@ public interface INpgsqlResult<out T> where T : INpgsqlResult<T>
 /// <summary>
 /// Interface used to generate AdoGen domain operations class for PostgreSQL.
 /// </summary>
-public interface INpgsqlDomainModel : INpgsqlResult;
+public interface INpgsqlDomainModel : INpgsqlMapper;
 
 /// <summary>
 /// Interface used by AdoGen to make domain operations class work for PostgreSQL.

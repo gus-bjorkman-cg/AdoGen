@@ -119,7 +119,7 @@ public static class SqlConnectionExtensions
             CommandType commandType = CommandType.Text, 
             SqlTransaction? transaction = null,
             int? commandTimeout = null) 
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             return await command.QueryAsync<T>(ct);
@@ -143,7 +143,7 @@ public static class SqlConnectionExtensions
             CommandType commandType = CommandType.Text, 
             SqlTransaction? transaction = null,
             int? commandTimeout = null) 
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
@@ -168,7 +168,7 @@ public static class SqlConnectionExtensions
             CommandType commandType = CommandType.Text, 
             SqlTransaction? transaction = null,
             int? commandTimeout = null) 
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             foreach (var parameter in parameters)
@@ -194,7 +194,7 @@ public static class SqlConnectionExtensions
             CommandType commandType = CommandType.Text, 
             SqlTransaction? transaction = null,
             int? commandTimeout = null)
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             return await command.QueryFirstOrDefaultAsync<T>(ct);
@@ -218,7 +218,7 @@ public static class SqlConnectionExtensions
             CommandType commandType = CommandType.Text, 
             SqlTransaction? transaction = null,
             int? commandTimeout = null) 
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
@@ -243,7 +243,7 @@ public static class SqlConnectionExtensions
             CommandType commandType = CommandType.Text, 
             SqlTransaction? transaction = null,
             int? commandTimeout = null) 
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             foreach (var parameter in parameters)

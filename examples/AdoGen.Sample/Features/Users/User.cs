@@ -14,7 +14,7 @@ public sealed class UserNpgsqlProfile : NpgsqlProfile<User>
 {
     public UserNpgsqlProfile()
     {
-        RuleFor(x => x.Name).Varchar(20);
-        RuleFor(x => x.Email).Varchar(50);
+        RuleFor(x => x.Name).VarChar(20);
+        RuleFor(x => x.Email).VarChar(50);
     }
 }

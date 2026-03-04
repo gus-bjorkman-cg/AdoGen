@@ -14,6 +14,6 @@ public sealed class OrderNpgsqlProfile : NpgsqlProfile<Order>
 {
     public OrderNpgsqlProfile()
     {
-        RuleFor(x => x.ProductName).Varchar(50);
+        RuleFor(x => x.ProductName).VarChar(50);
     }
 }

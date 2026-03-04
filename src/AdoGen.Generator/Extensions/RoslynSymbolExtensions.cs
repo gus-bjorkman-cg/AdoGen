@@ -16,17 +16,21 @@ internal static class RoslynSymbolExtensions
         public bool IsString => t.SpecialType == SpecialType.System_String;
         public bool IsDecimal => t.SpecialType == SpecialType.System_Decimal;
         public bool IsByteArray => t is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte };
-        public string GetGetterKey() => t.ToDisplayString(GetterKeyFormat);
-        
-        public bool IsGuidType()
-        {
-            // unwrap Nullable<T>
-            if (t is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nt)
-                t = nt.TypeArguments[0];
 
-            return t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System.Guid";
+        public bool IsGuidType
+        {
+            get
+            {
+                // unwrap Nullable<T>
+                if (t is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nt)
+                    t = nt.TypeArguments[0];
+
+                if (t.Name == "Guid") return true;
+                
+                return t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System.Guid";
+            }
         }
-        
+
         public (ITypeSymbol Underlying, bool IsNullable) UnwrapNullable() =>
             t is INamedTypeSymbol 
                 { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T, TypeArguments.Length: 1 } named
@@ -54,7 +58,7 @@ internal static class RoslynSymbolExtensions
 
                 return DbTypeRef.SqlServer(dbt.ToString());
             }
-
+            
             var mapped = underlying.SpecialType switch
             {
                 SpecialType.System_Boolean => SqlDbType.Bit,
@@ -68,7 +72,7 @@ internal static class RoslynSymbolExtensions
                 SpecialType.System_String => SqlDbType.NVarChar,
                 _ => underlying.ToDisplayString(GetterKeyFormat) switch
                 {
-                    "global::System.Guid" => SqlDbType.UniqueIdentifier,
+                    "global::System.Guid" or "Guid" => SqlDbType.UniqueIdentifier,
                     "global::System.DateTime" => SqlDbType.DateTime2,
                     "global::System.DateTimeOffset" => SqlDbType.DateTimeOffset,
                     "global::System.DateOnly" => SqlDbType.Date,
@@ -116,7 +120,7 @@ internal static class RoslynSymbolExtensions
                 SpecialType.System_Char => "Char",
                 _ => underlying.ToDisplayString(GetterKeyFormat) switch
                 {
-                    "global::System.Guid" => "Uuid",
+                    "global::System.Guid" or "Guid" => "Uuid",
                     "global::System.DateTime" => "Timestamp",
                     "global::System.DateTimeOffset" => "TimestampTz",
                     "global::System.DateOnly" => "Date",
@@ -156,7 +160,7 @@ internal static class RoslynSymbolExtensions
             if (!string.IsNullOrWhiteSpace(cfg.DefaultSqlExpression))
                 return cfg.DefaultSqlExpression;
 
-            if (string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase) && cfg.PropertyType.IsGuidType())
+            if (string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase) && cfg.PropertyType.IsGuidType)
                 return provider == SqlProviderKind.PostgreSql ? "DEFAULT gen_random_uuid()" : "DEFAULT NEWID()";
 
             return null;

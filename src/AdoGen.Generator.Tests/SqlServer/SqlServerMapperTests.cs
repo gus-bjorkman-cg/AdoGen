@@ -1,19 +1,19 @@
 namespace AdoGen.Generator.Tests.SqlServer;
 
-public class SqlServerDomainTests
+public class SqlServerMapperTests
 {
-    private static readonly AdoGenType GenType = AdoGenType.SqlDomainModel;
-
+    private static readonly AdoGenType GenType = AdoGenType.SqlMapper;
+    
     [Fact]
     public void Diagnostics_ShouldBeEmpty_WhenValid() => 
         GenType.RunUserGenerator.Diagnostics.Should().BeEmpty();
 
     [Fact]
-    public void MapperFile_ShouldBeGenerated() =>
-        GenType.GenerateUserFile(AdoGenType.SqlMapper).Should().NotBeEmpty();
+    public Task MapperFile_ShouldBeGenerated() => Verify(GenType.GenerateUserFile(GenType));
     
     [Fact]
-    public Task DomainFile_ShouldMatchSnapshot() => Verify(GenType.GenerateUserFile(GenType));
+    public void DomainFile_ShouldNotBeGenerated() =>
+        GenType.GenerateUserFile(AdoGenType.SqlDomainModel).Should().BeEmpty();
     
     [Fact]
     public void BulkFile_ShouldNotBeGenerated() =>

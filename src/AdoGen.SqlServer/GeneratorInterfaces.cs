@@ -8,12 +8,12 @@ namespace AdoGen.SqlServer;
 /// <summary>
 /// Interface used to generate ado gen mapper and sql helper class.
 /// </summary>
-public interface ISqlResult;
+public interface ISqlMapper;
 
 /// <summary>
 /// Interface used by ado gen to make mapping extension to work.
 /// </summary>
-public interface ISqlResult<out T> where T : ISqlResult<T>
+public interface ISqlMapper<out T> where T : ISqlMapper<T>
 {
     /// <summary>
     /// Maps the objects by using the source generated mapper.
@@ -26,7 +26,7 @@ public interface ISqlResult<out T> where T : ISqlResult<T>
 /// <summary>
 /// Interface used to generate ado gen domain operations class.
 /// </summary>
-public interface ISqlDomainModel : ISqlResult;
+public interface ISqlDomainModel : ISqlMapper;
 
 /// <summary>
 /// Interface used by ado gen to make domain operations class to work.

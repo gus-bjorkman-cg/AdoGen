@@ -1,8 +1,8 @@
-namespace AdoGen.Generator.Tests.SqlServer;
+namespace AdoGen.Generator.Tests.PostgreSql;
 
-public class SqlServerBulkTests
+public class NpgsqlBulkTests
 {
-    private static readonly AdoGenType GenType = AdoGenType.SqlBulkModel;
+    private static readonly AdoGenType GenType = AdoGenType.NpgsqlBulkModel;
     
     [Fact]
     public void Diagnostics_ShouldBeEmpty_WhenValid() => 
@@ -10,12 +10,12 @@ public class SqlServerBulkTests
 
     [Fact]
     public void MapperFile_ShouldBeGenerated() =>
-        GenType.GenerateUserFile(AdoGenType.SqlMapper).Should().NotBeEmpty();
+        GenType.GenerateUserFile(AdoGenType.NpgsqlMapper).Should().NotBeEmpty();
     
     [Fact]
     public void DomainFile_ShouldBeGenerated()
     {
-        GenType.GenerateUserFile(AdoGenType.SqlDomainModel).Should().NotBeEmpty();
+        GenType.GenerateUserFile(AdoGenType.NpgsqlDomainModel).Should().NotBeEmpty();
     }
 
     [Fact]

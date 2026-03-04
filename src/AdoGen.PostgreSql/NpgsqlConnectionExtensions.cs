@@ -79,7 +79,7 @@ public static class NpgsqlConnectionExtensions
             CommandType commandType = CommandType.Text,
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             return await command.QueryAsync<T>(ct);
@@ -95,7 +95,7 @@ public static class NpgsqlConnectionExtensions
             CommandType commandType = CommandType.Text,
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
@@ -112,7 +112,7 @@ public static class NpgsqlConnectionExtensions
             CommandType commandType = CommandType.Text,
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
@@ -128,7 +128,7 @@ public static class NpgsqlConnectionExtensions
             CommandType commandType = CommandType.Text,
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             return await command.QueryFirstOrDefaultAsync<T>(ct);
@@ -144,7 +144,7 @@ public static class NpgsqlConnectionExtensions
             CommandType commandType = CommandType.Text,
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
@@ -161,7 +161,7 @@ public static class NpgsqlConnectionExtensions
             CommandType commandType = CommandType.Text,
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             foreach (var parameter in parameters) command.Parameters.Add(parameter);

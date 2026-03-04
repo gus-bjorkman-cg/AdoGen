@@ -12,12 +12,12 @@ internal static class Discovery
     private const string SqlServerLib = "AdoGen.SqlServer";
     private const string NpgsqlSqlLib = "AdoGen.PostgreSql";
 
-    private const string SqlServerResultInterface = $"{SqlServerLib}.ISqlResult";
+    private const string SqlServerMapperInterface = $"{SqlServerLib}.ISqlMapper";
     private const string SqlServerDomainInterface = $"{SqlServerLib}.ISqlDomainModel";
     private const string SqlServerBulkInterface = $"{SqlServerLib}.ISqlBulkModel";
     private const string SqlServerProfile = "SqlProfile";
 
-    private const string NpgsqlResultInterface = $"{NpgsqlSqlLib}.INpgsqlResult";
+    private const string NpgsqlMapperInterface = $"{NpgsqlSqlLib}.INpgsqlMapper";
     private const string NpgsqlDomainInterface = $"{NpgsqlSqlLib}.INpgsqlDomainModel";
     private const string NpgsqlBulkInterface = $"{NpgsqlSqlLib}.INpgsqlBulkModel";
     private const string NpgsqlProfile = "NpgsqlProfile";
@@ -130,10 +130,10 @@ internal static class Discovery
     
     private static readonly List<(string @interface, SqlModelKind kind, SqlProviderKind provider)> AdoGenInterfaces =
     [
-        (SqlServerResultInterface, SqlModelKind.Result, SqlProviderKind.SqlServer),
+        (SqlServerMapperInterface, SqlModelKind.Mapper, SqlProviderKind.SqlServer),
         (SqlServerDomainInterface, SqlModelKind.Domain, SqlProviderKind.SqlServer),
         (SqlServerBulkInterface, SqlModelKind.Bulk, SqlProviderKind.SqlServer),
-        (NpgsqlResultInterface, SqlModelKind.Result, SqlProviderKind.PostgreSql),
+        (NpgsqlMapperInterface, SqlModelKind.Mapper, SqlProviderKind.PostgreSql),
         (NpgsqlDomainInterface, SqlModelKind.Domain, SqlProviderKind.PostgreSql),
         (NpgsqlBulkInterface, SqlModelKind.Bulk, SqlProviderKind.PostgreSql)
     ];

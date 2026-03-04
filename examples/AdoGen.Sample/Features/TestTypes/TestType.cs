@@ -107,9 +107,9 @@ public sealed class TestTypeNpgsqlProfile : NpgsqlProfile<TestType>
         Key(x => x.Int);
         Key(x => x.Decimal);
 
-        RuleFor(x => x.NullableStringVarchar).Varchar(100);
-        RuleFor(x => x.NullableStringNVarchar).Varchar(100);
-        RuleFor(x => x.StringVarcharRuledNull).Varchar(100).Nullable();
+        RuleFor(x => x.NullableStringVarchar).VarChar(100);
+        RuleFor(x => x.NullableStringNVarchar).VarChar(100);
+        RuleFor(x => x.StringVarcharRuledNull).VarChar(100).Nullable();
         RuleFor(x => x.Char).Char(1);
         RuleFor(x => x.NChar).Char(1);
         RuleFor(x => x.NullableChar).Char(1).Nullable();

@@ -12,7 +12,7 @@ The generator is responsible for:
 
 - Discovering eligible DTOs
     - `partial` types
-    - Implementing `ISqlDomainModel` or `ISqlResult`
+    - Implementing `ISqlDomainModel` or `ISqlMapper`
 - Validating mapping configuration expressed via `SqlProfile<T>`
 - Failing **at generation time** for invalid or incomplete configuration
 - Emitting fully static runtime code with no reflection or dynamic behavior

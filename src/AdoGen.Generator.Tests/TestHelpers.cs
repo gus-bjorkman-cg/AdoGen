@@ -15,13 +15,13 @@ internal static class TestHelpers
     private static PortableExecutableReference GetReference(this Assembly assembly) =>
         MetadataReference.CreateFromFile(assembly.Location);
     
-    public static RunResult RunGenerator(this string source, ProviderKind provider)
+    public static RunResult RunGenerator(this string source, AdoGenType genType)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest));
         var compilation = CSharpCompilation.Create(
-            assemblyName: $"Tests{provider.ToString()}",
+            assemblyName: $"Tests{genType.ToString()}",
             syntaxTrees: [syntaxTree],
-            references: GetReferences(provider),
+            references: GetReferences(genType),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         
         var driver = Driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var driverDiagnostics);
@@ -38,33 +38,13 @@ internal static class TestHelpers
             .Select(x => x.SourceText.ToString())
             .FirstOrDefault() ?? "";
 
-    public static string GetFileName(this string dtoName, FileKind fileKind, ProviderKind provider)
+    private static ImmutableArray<MetadataReference> GetReferences(AdoGenType genType)
     {
-        var suffix = fileKind switch
-        {
-            FileKind.Parameters => "",
-            FileKind.Mapper => "Mapper",
-            FileKind.Domain => "DomainOps",
-            FileKind.Bulk => "Bulk",
-            _ => throw new ArgumentOutOfRangeException(nameof(fileKind), fileKind, null)
-        };
+        if (genType.Provider.Name == DbProvider.SqlServer) return SqlServerReferences!.Value;
+        if (genType.Provider.Name == DbProvider.PostgreSql) return NpgsqlReferences!.Value;
         
-        var providerSuffix = provider switch
-        {
-            ProviderKind.SqlServer => "Sql",
-            ProviderKind.PostgreSql => "Npgsql",
-            _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null)
-        };
-        
-        return $"{dtoName}{suffix}.{providerSuffix}.g.cs";
+        throw new InvalidOperationException($"Unknown provider {genType.Provider.Name}");
     }
-    
-    private static ImmutableArray<MetadataReference> GetReferences(ProviderKind provider) => provider switch
-    {
-        ProviderKind.SqlServer => SqlServerReferences!.Value,
-        ProviderKind.PostgreSql => NpgsqlReferences!.Value,
-        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null)
-    };
 
     private static ImmutableArray<MetadataReference>? SqlServerReferences
     {
@@ -121,49 +101,55 @@ internal static class TestHelpers
 
 public sealed record RunResult(GeneratorDriverRunResult Result, ImmutableArray<Diagnostic> Diagnostics);
 
-internal enum ProviderKind : byte
+internal readonly record struct DbProvider
 {
-    SqlServer = 1,
-    PostgreSql = 2
-}
-
-internal enum FileKind : byte
-{
-    Parameters = 1,
-    Mapper = 2,
-    Domain = 3,
-    Bulk = 4
-}
-
-internal readonly record struct AdoGenInterface
-{
-    private const string ProviderSqlServer = "SqlServer";
-    private const string ProviderNpgsql = "PostgreSql";
+    public string Name { get; }
+    public string ExtensionName { get; }
     
+    private DbProvider(string name, string extensionName)
+    {
+        Name = name;
+        ExtensionName = extensionName;
+    }
+    
+    public static readonly DbProvider SqlServer = new("SqlServer", "Sql");
+    public static readonly DbProvider PostgreSql = new("PostgreSql", "Npgsql");
+    
+    public static implicit operator string(DbProvider provider) => provider.Name;
+}
+
+internal readonly record struct AdoGenType
+{
     private const string NamespaceSqlServer = "AdoGen.SqlServer";
     private const string NamespaceNpgsql = "AdoGen.PostgreSql";
     
     private const string ProfileNameSqlServer = "SqlProfile";
     private const string ProfileNameNpgsql = "NpgsqlProfile";
     
-    public string Provider { get; }
+    private const string FileNameMapper = "Mapper";
+    private const string FileNameDomain = "Domain";
+    private const string FileNameBulk = "Bulk";
+    
+    public string FileName { get; }
+    public DbProvider Provider { get; }
     public string Namespace { get; }
     public string Interface { get; }
     public string ProfileName { get; }
 
-    private AdoGenInterface(string provider, string @namespace, string @interface, string profileName)
+    private AdoGenType(string fileName, DbProvider provider, string @namespace, string @interface, string profileName)
     {
+        FileName = fileName;
         Provider = provider;
         Namespace = @namespace;
         Interface = @interface;
         ProfileName = profileName;
     }
     
-    public static readonly AdoGenInterface SqlResult = new(ProviderSqlServer, NamespaceSqlServer, "ISqlResult", ProfileNameSqlServer);
-    public static readonly AdoGenInterface SqlDomainModel = new(ProviderSqlServer, NamespaceSqlServer, "ISqlDomainModel", ProfileNameSqlServer);
-    public static readonly AdoGenInterface SqlBulkModel = new(ProviderSqlServer, NamespaceSqlServer, "ISqlBulkModel", ProfileNameSqlServer);
+    public static readonly AdoGenType SqlMapper = new(FileNameMapper, DbProvider.SqlServer, NamespaceSqlServer, "ISqlMapper", ProfileNameSqlServer);
+    public static readonly AdoGenType SqlDomainModel = new(FileNameDomain, DbProvider.SqlServer, NamespaceSqlServer, "ISqlDomainModel", ProfileNameSqlServer);
+    public static readonly AdoGenType SqlBulkModel = new(FileNameBulk, DbProvider.SqlServer, NamespaceSqlServer, "ISqlBulkModel", ProfileNameSqlServer);
     
-    public static readonly AdoGenInterface NpgsqlResult = new(ProviderNpgsql, NamespaceNpgsql, "INpgsqlResult", ProfileNameNpgsql);
-    public static readonly AdoGenInterface NpgsqlDomainModel = new(ProviderNpgsql, NamespaceNpgsql, "INpgsqlDomainModel", ProfileNameNpgsql);
-    public static readonly AdoGenInterface NpgsqlBulkModel = new(ProviderNpgsql, NamespaceNpgsql, "INpgsqlBulkModel", ProfileNameNpgsql);
+    public static readonly AdoGenType NpgsqlMapper = new(FileNameMapper, DbProvider.PostgreSql, NamespaceNpgsql, "INpgsqlMapper", ProfileNameNpgsql);
+    public static readonly AdoGenType NpgsqlDomainModel = new(FileNameDomain, DbProvider.PostgreSql, NamespaceNpgsql, "INpgsqlDomainModel", ProfileNameNpgsql);
+    public static readonly AdoGenType NpgsqlBulkModel = new(FileNameBulk, DbProvider.PostgreSql, NamespaceNpgsql, "INpgsqlBulkModel", ProfileNameNpgsql);
 }

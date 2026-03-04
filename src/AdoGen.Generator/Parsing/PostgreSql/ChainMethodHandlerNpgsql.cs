@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Data;
 using System.Threading;
@@ -41,7 +42,7 @@ internal sealed class VarcharChainHandlerNpgsql : IChainMethodHandler
     public static VarcharChainHandlerNpgsql Instance { get; } = new();
 
     public bool IsMatch(SqlProviderKind provider, string methodName) =>
-        provider is SqlProviderKind.PostgreSql && methodName == MethodName;
+        provider is SqlProviderKind.PostgreSql && string.Equals(methodName, MethodName, StringComparison.OrdinalIgnoreCase);
 
     public void Handle(
         SemanticModel model, 

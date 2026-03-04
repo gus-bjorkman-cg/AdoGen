@@ -20,7 +20,7 @@ public static class SqlDataReaderExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             if (!await reader.ReadAsync(ct))
             {
@@ -42,7 +42,7 @@ public static class SqlDataReaderExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns>Null or the mapped object from the database</returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             if (!await reader.ReadAsync(ct))
             {
@@ -62,6 +62,6 @@ public static class SqlDataReaderExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T Map<T>() where T : ISqlResult<T> => T.Map(reader);
+        public T Map<T>() where T : ISqlMapper<T> => T.Map(reader);
     }
 }

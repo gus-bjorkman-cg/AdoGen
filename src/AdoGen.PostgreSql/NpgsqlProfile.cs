@@ -85,7 +85,7 @@ public sealed class PropertyBuilder<TProp>
     /// <summary>
     /// Shorthand config for setting db type as Varchar with its size.
     /// </summary>
-    public PropertyBuilder<TProp> Varchar(int size) => Type(NpgsqlDbType.Varchar).Size(size);
+    public PropertyBuilder<TProp> VarChar(int size) => Type(NpgsqlDbType.Varchar).Size(size);
 
     /// <summary>
     /// Shorthand config for setting db type as Char with its size.

@@ -197,7 +197,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
                }
                """";
 
-        spc.AddSource($"{dto.Name}Bulk.Sql.g.cs", src);
+        spc.AddSource($"{dto.Name}.Bulk.Sql.g.cs", src);
         return;
 
         string BuildApplySql()

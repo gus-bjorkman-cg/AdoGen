@@ -22,7 +22,7 @@ public static class NpgsqlCommandExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             if (command.Connection!.State != ConnectionState.Open)
                 await command.Connection.OpenAsync(ct).ConfigureAwait(false);
@@ -46,7 +46,7 @@ public static class NpgsqlCommandExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             if (command.Connection!.State != ConnectionState.Open)
                 await command.Connection.OpenAsync(ct).ConfigureAwait(false);

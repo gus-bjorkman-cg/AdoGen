@@ -20,7 +20,7 @@ public static class SqlCommandExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 
@@ -42,7 +42,7 @@ public static class SqlCommandExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
-            where T : ISqlResult<T>
+            where T : ISqlMapper<T>
         {
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 

@@ -20,7 +20,7 @@ public static class NpgsqlDataReaderExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             if (!await reader.ReadAsync(ct).ConfigureAwait(false))
             {
@@ -42,7 +42,7 @@ public static class NpgsqlDataReaderExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns>Null or the mapped object from the database</returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
-            where T : INpgsqlResult<T>
+            where T : INpgsqlMapper<T>
         {
             if (!await reader.ReadAsync(ct).ConfigureAwait(false))
             {
@@ -62,7 +62,7 @@ public static class NpgsqlDataReaderExtensions
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T Map<T>() where T : INpgsqlResult<T> => T.Map(reader);
+        public T Map<T>() where T : INpgsqlMapper<T> => T.Map(reader);
     }
 }
 

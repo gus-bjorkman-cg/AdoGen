@@ -256,7 +256,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               }
               """";
 
-        spc.AddSource($"{dto.Name}DomainOps.Npgsql.g.cs", src);
+        spc.AddSource($"{dto.Name}.Domain.Npgsql.g.cs", src);
         return;
 
         string ParamAdd(string modelName)

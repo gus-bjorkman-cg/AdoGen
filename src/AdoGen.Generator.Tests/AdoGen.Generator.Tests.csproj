@@ -42,8 +42,4 @@
       <ProjectReference Include="..\AdoGen.PostgreSql\AdoGen.PostgreSql.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="PostgreSql\" />
-    </ItemGroup>
-
 </Project>

@@ -152,7 +152,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 }
                 """";
 
-        spc.AddSource($"{dto.Name}Bulk.Npgsql.g.cs", src);
+        spc.AddSource($"{dto.Name}.Bulk.Npgsql.g.cs", src);
         return;
 
         string BuildApplySql()

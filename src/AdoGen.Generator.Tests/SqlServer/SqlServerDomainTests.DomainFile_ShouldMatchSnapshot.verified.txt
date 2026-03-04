@@ -12,11 +12,11 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.Tests.User, global::System.Guid>
+public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.Tests.User, Guid>
 {
     private const string SqlDeleteBatchTemplate = "DELETE FROM [dbo].[Users] WHERE [Id] IN (";
 
-    public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<global::System.Guid> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<Guid> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -33,7 +33,7 @@ public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.T
         
         for (var i = 0; i < ids.Count; i++)
         {
-            cmd.Parameters.Add(AdoGen.SqlServer.UserSql.CreateParameterId(ids[i], $"@p{i}"));
+            cmd.Parameters.Add(UserSql.CreateParameterId(ids[i], $"@p{i}"));
         }
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);

@@ -14,12 +14,10 @@ public sealed class SqlBuilderGenerator : IIncrementalGenerator
     private static readonly List<IEmitter> Emitters =
     [
         DtoMapperEmitterSqlServer.Instance,
-        ParameterHelpersEmitterSqlServer.Instance,
         DomainOpsEmitterSqlServer.Instance,
         BulkEmitterSqlServer.Instance,
         
         DtoMapperEmitterNpgSql.Instance,
-        ParameterHelpersEmitterNpgSql.Instance,
         DomainOpsEmitterNpgSql.Instance,
         BulkEmitterNpgSql.Instance
     ];

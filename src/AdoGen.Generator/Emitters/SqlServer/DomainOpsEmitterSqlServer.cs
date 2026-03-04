@@ -170,7 +170,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           
                           for (var i = 0; i < ids.Count; i++)
                           {
-                              cmd.Parameters.Add(AdoGen.SqlServer.{{dto.Name}}Sql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
+                              cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
                           }
                           
                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -315,7 +315,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
         // upsertSql is always non-null here (we validate conflict keys earlier). Remove dead check.
 
-        spc.AddSource($"{dto.Name}DomainOps.Sql.g.cs", src);
+        spc.AddSource($"{dto.Name}.Domain.Sql.g.cs", src);
         
         return;
         
