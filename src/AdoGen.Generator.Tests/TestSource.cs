@@ -6,7 +6,7 @@ internal static class TestSource
     
     extension(AdoGenType genType)
     {
-        public string UserSource =>
+        private string UserSource =>
             $$"""
               using {{genType.Namespace}};
 

@@ -13,10 +13,8 @@ public class SqlServerBulkTests
         GenType.GenerateUserFile(AdoGenType.SqlMapper).Should().NotBeEmpty();
     
     [Fact]
-    public void DomainFile_ShouldBeGenerated()
-    {
+    public void DomainFile_ShouldBeGenerated() => 
         GenType.GenerateUserFile(AdoGenType.SqlDomainModel).Should().NotBeEmpty();
-    }
 
     [Fact]
     public Task BulkFile_ShouldMatchSnapshot() => Verify(GenType.GenerateUserFile(GenType));

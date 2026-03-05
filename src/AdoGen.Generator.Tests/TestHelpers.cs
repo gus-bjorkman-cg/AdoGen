@@ -19,7 +19,7 @@ internal static class TestHelpers
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest));
         var compilation = CSharpCompilation.Create(
-            assemblyName: $"Tests{genType.ToString()}",
+            assemblyName: $"{genType.FileName}.{genType.Provider.ExtensionName}.Tests",
             syntaxTrees: [syntaxTree],
             references: GetReferences(genType),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
