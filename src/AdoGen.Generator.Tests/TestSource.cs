@@ -2,32 +2,20 @@ namespace AdoGen.Generator.Tests;
 
 internal static class TestSource
 {
-    private const string DtoName = "User";
+    private static readonly List<ITestTypeSource> TestTypeSources =
+    [
+        UserSourceHandler.Instance,
+        TestTypeSourceHandler.Instance,
+        AuditEventSourceHandler.Instance
+    ];
     
     extension(AdoGenType genType)
     {
-        private string UserSource =>
-            $$"""
-              using {{genType.Namespace}};
+        private string FileName(TestTypes testType) => $"{testType.Name}.{genType.FileName}.{genType.Provider.ExtensionName}.g.cs";
+        public RunResult RunUserGenerator(TestTypes testType) => 
+            TestTypeSources.First(x => x.IsMatch(testType)).Handle(genType).RunGenerator(genType);
 
-              namespace AdoGen.Generator.Tests;
-
-              public sealed partial record User(Guid Id, string Name, string Email) : {{genType.Interface}};
-
-              public sealed class UserProfile : {{genType.ProfileName}}<User>
-              {
-                  public UserProfile()
-                  {
-                      RuleFor(x => x.Name).VarChar(20);
-                      RuleFor(x => x.Email).VarChar(50);
-                  }
-              }
-              """;
-
-        private string UserFileName => $"{DtoName}.{genType.FileName}.{genType.Provider.ExtensionName}.g.cs";
-        public RunResult RunUserGenerator => genType.UserSource.RunGenerator(genType);
-
-        public string GenerateUserFile(AdoGenType forInterface) => 
-            genType.UserSource.RunGenerator(genType).Result.GetGeneratedText(forInterface.UserFileName);
+        public string GenerateFile(TestTypes testType, AdoGenType forInterface) => 
+            genType.RunUserGenerator(testType).Result.GetGeneratedText(forInterface.FileName(testType));
     }
 }

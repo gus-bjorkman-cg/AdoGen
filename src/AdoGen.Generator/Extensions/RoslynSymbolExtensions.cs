@@ -73,8 +73,8 @@ internal static class RoslynSymbolExtensions
                 _ => underlying.ToDisplayString(GetterKeyFormat) switch
                 {
                     "global::System.Guid" or "Guid" => SqlDbType.UniqueIdentifier,
-                    "global::System.DateTime" => SqlDbType.DateTime2,
-                    "global::System.DateTimeOffset" => SqlDbType.DateTimeOffset,
+                    "global::System.DateTime" or "DateTime" => SqlDbType.DateTime2,
+                    "global::System.DateTimeOffset" or "DateTimeOffset" => SqlDbType.DateTimeOffset,
                     "global::System.DateOnly" => SqlDbType.Date,
                     "global::System.TimeOnly" => SqlDbType.Time,
                     "global::System.Byte[]" => SqlDbType.VarBinary,
@@ -121,8 +121,8 @@ internal static class RoslynSymbolExtensions
                 _ => underlying.ToDisplayString(GetterKeyFormat) switch
                 {
                     "global::System.Guid" or "Guid" => "Uuid",
-                    "global::System.DateTime" => "Timestamp",
-                    "global::System.DateTimeOffset" => "TimestampTz",
+                    "global::System.DateTime" or "DateTime" => "Timestamp",
+                    "global::System.DateTimeOffset" or "DateTimeOffset" => "TimestampTz",
                     "global::System.DateOnly" => "Date",
                     "global::System.TimeOnly" => "Time",
                     "global::System.Byte[]" => "Bytea",
