@@ -1,12 +1,7 @@
 using System.Collections.Immutable;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using AdoGen.PostgreSql;
-using AdoGen.SqlServer;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.Data.SqlClient;
-using Npgsql;
 using Xunit.Abstractions;
 
 namespace AdoGen.Generator.Tests;
@@ -14,8 +9,6 @@ namespace AdoGen.Generator.Tests;
 internal static class TestHelpers
 {
     private static readonly GeneratorDriver Driver = CSharpGeneratorDriver.Create(new SqlBuilderGenerator());
-    private static PortableExecutableReference GetReference(this Assembly assembly) =>
-        MetadataReference.CreateFromFile(assembly.Location);
     
     public static RunResult RunGenerator(this string source, AdoGenType genType)
     {
@@ -42,62 +35,10 @@ internal static class TestHelpers
 
     private static ImmutableArray<MetadataReference> GetReferences(AdoGenType genType)
     {
-        if (genType.Provider.Name == DbProvider.SqlServer) return SqlServerReferences!.Value;
-        if (genType.Provider.Name == DbProvider.PostgreSql) return NpgsqlReferences!.Value;
+        if (genType.Provider.Name == DbProvider.SqlServer) return ModuleInitializer.SqlServerReferences;
+        if (genType.Provider.Name == DbProvider.PostgreSql) return ModuleInitializer.NpgsqlReferences;
         
         throw new InvalidOperationException($"Unknown provider {genType.Provider.Name}");
-    }
-
-    private static ImmutableArray<MetadataReference>? SqlServerReferences
-    {
-        get
-        {
-            if (field is not null) return field.Value;
-            
-            var result = ImmutableArray.CreateBuilder<MetadataReference>();
-            result.AddRange(TrustedPlatformAssemblyReferences!.Value);
-            result.Add(typeof(ISqlBulkModel).Assembly.GetReference());
-            result.Add(typeof(SqlBulkCopy).Assembly.GetReference());
-            field = result.ToImmutable();
-            
-            return field.Value;
-        }
-    }
-
-    private static ImmutableArray<MetadataReference>? NpgsqlReferences
-    {
-        get
-        {
-            if (field is not null) return field.Value;
-            
-            var result = ImmutableArray.CreateBuilder<MetadataReference>();
-            result.AddRange(TrustedPlatformAssemblyReferences!.Value);
-            result.Add(typeof(INpgsqlBulkModel).Assembly.GetReference());
-            result.Add(typeof(NpgsqlConnection).Assembly.GetReference());
-            field = result.ToImmutable();
-            
-            return field.Value;
-        }
-    }
-
-    private static ImmutableArray<MetadataReference>? TrustedPlatformAssemblyReferences
-    {
-        get
-        {
-            if (field is not null) return field.Value;
-            
-            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        
-            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies)) return [];
-            
-            field = trustedPlatformAssemblies
-                .Split(Path.PathSeparator)
-                .Where(static x => x.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-                .Select(static MetadataReference (x) => MetadataReference.CreateFromFile(x))
-                .ToImmutableArray();
-            
-            return field.Value;
-        }
     }
     
     extension(AdoGenType genType)

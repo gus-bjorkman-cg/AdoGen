@@ -20,7 +20,7 @@ public sealed class MapperTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public void MapperFile_ShouldMatchSnapshot(AdoGenType genType, TestTypes testType) =>
+    public Task MapperFile_ShouldMatchSnapshot(AdoGenType genType, TestTypes testType) =>
         Verify(genType.GenerateFile(testType, genType.GetMapperType()))
             .UseTextForParameters($"{testType.Name}.{genType.Provider.Name}");
 
