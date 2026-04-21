@@ -52,7 +52,8 @@ public static class NpgsqlCommandExtensions
                 await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 
             await using var reader = await command
-                .ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
+                .ExecuteReaderAsync(
+                    CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
                 .ConfigureAwait(false);
 
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return default;
@@ -82,10 +83,12 @@ public static class NpgsqlCommandExtensions
         /// <param name="size"></param>
         public void CreateParameter(string name, object? value, NpgsqlDbType type, int size = 0)
         {
-            var p = command.CreateParameter();
-            p.ParameterName = name;
-            p.NpgsqlDbType = type;
-            p.Value = value ?? DBNull.Value;
+            var p = new NpgsqlParameter
+            {
+                ParameterName = name,
+                NpgsqlDbType = type,
+                Value = value ?? DBNull.Value,
+            };
 
             if (size > 0) p.Size = size;
 

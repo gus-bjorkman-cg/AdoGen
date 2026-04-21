@@ -18,57 +18,57 @@ public static class NpgsqlConnectionExtensions
         /// Creates the database table.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask CreateTableAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : INpgsqlDomainModel<T> =>
-            await T.CreateTableAsync(connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask CreateTableAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.CreateTableAsync(connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Inserts a database record.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask InsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : INpgsqlDomainModel<T> =>
-            await T.InsertAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> InsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.InsertAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Inserts multiple database records in one roundtrip.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask InsertAsync<T>(List<T> models, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : INpgsqlDomainModel<T> =>
-            await T.InsertAsync(models, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> InsertAsync<T>(List<T> models, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.InsertAsync(models, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Updates a database record.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask UpdateAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : INpgsqlDomainModel<T> =>
-            await T.UpdateAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> UpdateAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.UpdateAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Inserts or updates a database record.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask UpsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : INpgsqlDomainModel<T> =>
-            await T.UpsertAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> UpsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.UpsertAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Deletes a database record.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask DeleteAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : INpgsqlDomainModel<T> =>
-            await T.DeleteAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> DeleteAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.DeleteAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Truncates a database table.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask TruncateAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : INpgsqlDomainModel<T> =>
-            await T.TruncateAsync(connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> TruncateAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.TruncateAsync(connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
