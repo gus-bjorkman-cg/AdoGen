@@ -10,7 +10,9 @@
     <ItemGroup>
         <PackageReference Include="Bogus" Version="35.6.5" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.3" />
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
         <PackageReference Include="Testcontainers.MsSql" Version="4.10.0" />
+        <PackageReference Include="Testcontainers.PostgreSql" Version="4.10.0" />
         <PackageReference Include="Dapper" Version="2.1.66" />
         <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
     </ItemGroup>
@@ -18,5 +20,6 @@
     <ItemGroup>
         <ProjectReference Include="..\..\examples\AdoGen.Sample\AdoGen.Sample.csproj"/>
         <ProjectReference Include="..\AdoGen.SqlServer\AdoGen.SqlServer.csproj" />
+        <ProjectReference Include="..\AdoGen.PostgreSql\AdoGen.PostgreSql.csproj" />
     </ItemGroup>
 </Project>

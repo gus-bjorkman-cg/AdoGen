@@ -4,149 +4,293 @@
 built around source‑generated mappings and explicit parameter metadata.
 
 AdoGen focuses on **predictable performance**, **Native AOT compatibility**,  
-and **doing parameter binding correctly**—without magic, reflection, or runtime code generation.
+and **doing parameter binding correctly** — without magic, reflection, or runtime code generation.
 
-Project description
--------------------
-First release, only supporting .net 10 & Sql server.
-Configuration inspired by [`FluentValidation`](https://github.com/JeremySkinner/FluentValidation).
-Querying inspired by [`Dapper`](https://github.com/DapperLib/Dapper)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Implementing ISqlResult triggers source generation for mapper helper classes.
-Implementing ISqlDomainModel triggers source generation of standard crud implementations.
-Implementing ISqlBulkModel triggers source generation of bulk implementations.
-Creating a SqlProfile triggers db parameter generation.
+---
 
-Class or record must be partial to trigger source generation.
-ISqlDomainModel inherits from ISqlResult, and ISqlBulkModel inherits from ISqlDomainModel, 
-so you can pick only the one that suits your usecase.
+## Motivation
 
-Benchmarks
--------------------
-DapperNoType (NT) = dapper with parameter as object and no cancellation token.
-Dapper = dapper with typed parameters and cancellation token.
-InsertMulti is benchmarked on insert of 10 records.
+AdoGen started from real frustrations with existing .NET data‑access libraries:
 
-BenchmarkDotNet v0.15.8, macOS Tahoe 26.2 (25C56) [Darwin 25.2.0]
-Apple M4, 1 CPU, 10 logical and 10 physical cores                                                                                                                                  
-.NET SDK 10.0.100                                                                                                                                                                  
-[Host]     : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a                                                                                                         
-DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
-```
-| Type           | Method     | Mean       | Error     | StdDev    | Gen0   | Allocated  |
-|--------------- |----------- |-----------:|----------:|----------:|-------:|-----------:|
-| FirstOrDefault | AdoGen     |   389.4 us |  15.36 us |  45.29 us |      - |    2.82 KB |
-| FirstOrDefault | Dapper     |   397.3 us |  13.74 us |  40.50 us |      - |    6.05 KB |
-| FirstOrDefault | EfCoreComp |   402.7 us |  13.57 us |  40.01 us |      - |     7.8 KB |
-| FirstOrDefault | EfCore     |   418.2 us |  15.40 us |  45.40 us |      - |   15.08 KB |
-| FirstOrDefault | DapperNT   |   433.8 us |  13.71 us |  40.43 us |      - |    5.89 KB |
-| ToList         | AdoGen     |   38.80 us |  0.771 us |  0.825 us |      - |      453 B |
-| ToList         | EfCore     |   39.98 us |  0.444 us |  0.393 us | 0.1563 |     1705 B |
-| ToList         | DapperNT   |   39.99 us |  0.691 us |  0.768 us | 0.0781 |      778 B |
-| ToList         | EfCoreComp |   39.99 us |  0.793 us |  1.187 us | 0.0781 |      835 B |
-| ToList         | Dapper     |   40.12 us |  0.787 us |  1.024 us | 0.0781 |      825 B |
-| Delete         | Dapper     |   1.835 ms | 0.1778 ms | 0.5129 ms |      - |    5.25 KB |
-| Delete         | AdoGen     |   1.837 ms | 0.1543 ms | 0.4477 ms |      - |    4.34 KB |
-| Delete         | DapperNT   |   1.870 ms | 0.2065 ms | 0.6088 ms |      - |     4.8 KB |
-| Delete         | EfCore     |   2.411 ms | 0.2269 ms | 0.6692 ms |      - |   19.52 KB |
-| Update         | AdoGen     |   1.728 ms | 0.1309 ms | 0.3819 ms |      - |    5.17 KB |
-| Update         | Dapper     |   1.777 ms | 0.1286 ms | 0.3712 ms |      - |    6.32 KB |
-| Update         | DapperNT   |   1.957 ms | 0.0966 ms | 0.2755 ms |      - |    5.52 KB |
-| Update         | EfCore     |   2.373 ms | 0.1987 ms | 0.5734 ms |      - |  142.53 KB |
-| Insert         | AdoGen     |   1.830 ms | 0.1178 ms | 0.3454 ms |      - |     5.3 KB |
-| Insert         | DapperNT   |   1.902 ms | 0.1093 ms | 0.3170 ms |      - |    5.59 KB |
-| Insert         | Dapper     |   1.986 ms | 0.1130 ms | 0.3279 ms |      - |    6.48 KB |
-| Insert         | EfCore     |   2.642 ms | 0.1911 ms | 0.5575 ms |      - |   20.09 KB |
-| InsertMulti 10 | AdoGen     |   2.012 ms | 0.1370 ms | 0.3974 ms |      - |    21.2 KB |
-| InsertMulti 10 | AdoGenBulk |   2.030 ms | 0.1248 ms | 0.3580 ms |      - |   21.63 KB |
-| InsertMulti 10 | EfCore     |   2.964 ms | 0.2426 ms | 0.7076 ms |      - |   76.87 KB |
-| InsertMulti 10 | DapperNT   |   5.997 ms | 0.3707 ms | 1.0516 ms |      - |   35.44 KB |
-| InsertMulti 10 | Dapper     |   6.618 ms | 0.6183 ms | 1.7839 ms |      - |   43.69 KB |
-| BulkInsert  1K | AdoGen     |   20.90 ms |  0.519 ms |  1.481 ms |      - |  161.98 KB |
-| BulkInsert  1K | EfCore     |   37.02 ms |  2.751 ms |  7.893 ms |      - | 6091.48 KB |
-| BulkUpdate  1K | AdoGen     |   22.34 ms |  0.759 ms |  2.154 ms |      - |   143.3 KB |
-| BulkUpdate  1K | EfCore     |   47.15 ms |  3.398 ms |  9.748 ms |      - | 7179.33 KB |
-| BulkDelete  1K | AdoGenBulk |  21.183 ms | 0.4218 ms | 1.0186 ms |      - |   131.4 KB |
-| BulkDelete  1K | EfCore     |  33.528 ms | 3.0904 ms | 8.9165 ms |      - | 4829.72 KB |
-| BulkDelete  1K | AdoGen     |  74.423 ms | 1.4864 ms | 2.0346 ms |      - |   459.7 KB |
+- **Dapper's `CancellationToken` story is awkward.** You can't pass one to async calls without constructing a `CommandDefinition` every time.
+- **Dapper's parameter binding is repetitive.** For every query with string parameters you end up redefining `DbType`, `Size`, etc. across the codebase — the same domain knowledge, scattered everywhere.
+- **Dapper's bulk performance is slow**, and the bulk extension is paid product.
+- **Native AOT broke everything.** When targeting AOT APIs, Dapper's reflection‑based mapping didn't work. There is an AOT‑compatible fork, but at that point the question became: *what if I just build what I actually want?*
 
+The key insight: if you require developers to declare their domain mapping once (string lengths, types, precision), that same metadata can power **parameter creation**, **table creation**, **CRUD generation**, and **bulk operations** — all at compile time, all reflection‑free.
 
-| Type          | Method | Mean      | Error    | StdDev    | Median    | Gen0      | Gen1      | Allocated   |
-|-------------- |------- |----------:|---------:|----------:|----------:|----------:|----------:|------------:|
-| BulkInsert10K | AdoGen |  83.97 ms | 1.648 ms |  3.292 ms |  82.85 ms |         - |         - |  1412.44 KB |
-| BulkInsert10K | EfCore | 337.39 ms | 7.844 ms | 23.004 ms | 329.94 ms | 7000.0000 | 2000.0000 | 60923.84 KB |
+---
+
+## Why AdoGen?
+
+| Goal | How |
+|------|-----|
+| **Fast by default** | Source‑generated mappers and parameter builders — no reflection, no runtime IL, no `AddWithValue`. |
+| **Native AOT ready** | Zero reliance on `System.Reflection` or expression‑tree compilation at runtime. |
+| **Explicit parameters** | String lengths, decimal precision, and DB types are declared up front and validated at compile time. |
+| **Familiar API** | Query and command extensions on `SqlConnection` / `NpgsqlConnection` — if you know Dapper, you know this. |
+
+---
+
+## Supported Providers
+
+| Provider | Runtime Package | Status |
+|----------|-----------------|--------|
+| SQL Server | `AdoGen.SqlServer` | ✅ Stable |
+| PostgreSQL | `AdoGen.PostgreSql` | ✅ Stable |
+
+---
+
+## Getting Started
+
+### 1. Install packages
+
+AdoGen requires **two** packages: a **runtime package** for your database provider and the **source generator**.
+
+#### SQL Server
+
+```shell
+dotnet add package AdoGen.SqlServer
+dotnet add package AdoGen.Generator
 ```
 
-Example usage
--------------------
+#### PostgreSQL
+
+```shell
+dotnet add package AdoGen.PostgreSql
+dotnet add package AdoGen.Generator
+```
+
+> [!IMPORTANT]
+> `AdoGen.Generator` is a compile‑time source generator only.  
+> You **must** also install a provider package (`AdoGen.SqlServer` and/or `AdoGen.PostgreSql`) — it contains the runtime types, interfaces, and extension methods that the generated code depends on.
+
+### 2. Define a model
+
+Models must be `partial` and implement one of the marker interfaces from your provider package:
+
+| Interface | What it generates |
+|-----------|-------------------|
+| `ISqlMapper` / `INpgsqlMapper` | Reader‑to‑object mapper + typed parameter factory methods |
+| `ISqlDomainModel` / `INpgsqlDomainModel` | Everything above + CRUD operations + batch delete by ID |
+| `ISqlBulkModel` / `INpgsqlBulkModel` | Everything above + bulk insert/update/delete via temp tables |
+
+Each interface inherits from the one above it — pick the one that matches your use case.
 
 ```csharp
-public sealed partial record User(Guid Id, string Name, string Email) : ISqlResult;
+// Read‑only — generates mapper + parameter helpers only
+public sealed partial record UserView(Guid Id, string Name, string Email) : ISqlMapper;
 
-public sealed class UserProfile : SqlProfile<User>
-{
+// Full CRUD — generates mapper + Insert, Update, Upsert, Delete, CreateTable, etc.
+public sealed partial record Order(Guid Id, string ProductName, Guid UserId) : ISqlDomainModel;
+
+// Bulk — generates everything above + bulk operations via SqlBulkCopy / COPY
+public sealed partial record User(Guid Id, string Name, string Email) : ISqlBulkModel;
+```
+
+### 3. Create a profile
+
+A profile tells the generator how to bind properties that need explicit metadata.  
+Configuration is inspired by [FluentValidation](https://github.com/JeremySkinner/FluentValidation).
+
+```csharp
+public sealed class UserProfile : SqlProfile<User>        // SqlProfile  → SQL Server
+{                                                          // NpgsqlProfile → PostgreSQL
     public UserProfile()
     {
         RuleFor(x => x.Name).VarChar(20);
         RuleFor(x => x.Email).VarChar(50);
     }
 }
+```
 
-public sealed partial record Order(Guid Id, string ProductName, Guid UserId) : ISqlBulkModel;
+**Rules:**
 
-public sealed class OrderProfile : SqlProfile<Order>
+- One profile per model per provider.
+- String properties **must** be explicitly configured with type and length (`VarChar`, `NVarChar`, `Char`, etc.).
+- `decimal` must declare precision and scale: `.Decimal(18, 2)`.
+- `Guid` has a default mapping — no configuration needed.
+- A property named `Id` is treated as the primary key by convention. Override with `Key(x => x.MyKey)`.
+- Custom table name and schema: `Table("MyTable")` / `Schema("myschema")`.
+- Invalid or incomplete configuration fails at compile time with a diagnostic error.
+
+### 4. Query
+
+Write your own SQL — AdoGen maps the results via the source‑generated mapper.
+
+```csharp
+// List
+var users = await connection.QueryAsync<User>(
+    "SELECT * FROM Users", ct);
+
+// Single row
+var user = await connection.QueryFirstOrDefaultAsync<User>(
+    "SELECT TOP(1) * FROM Users WHERE Email = @Email",
+    UserSql.CreateParameterEmail("jane@example.com"), ct);
+```
+
+`UserSql` is a source‑generated static class with factory methods that create properly typed `SqlParameter` / `NpgsqlParameter` instances — correct `DbType`, `Size`, and all.
+
+#### Multi‑result queries
+
+```csharp
+var reader = await connection.QueryMultiAsync(
+    "SELECT * FROM Users; SELECT * FROM Orders", ct);
+
+var users  = await reader.QueryAsync<User>(ct);
+var orders = await reader.QueryAsync<Order>(ct);
+```
+
+### 5. Commands (Insert, Update, Delete, …)
+
+Available when the model implements `ISqlDomainModel` / `INpgsqlDomainModel`:
+
+```csharp
+await connection.InsertAsync(order, ct);
+await connection.UpdateAsync(order, ct);
+await connection.UpsertAsync(order, ct);
+await connection.DeleteAsync(order, ct);
+```
+
+Insert multiple records in one roundtrip:
+
+```csharp
+await connection.InsertAsync(listOfOrders, ct);
+```
+
+Delete by a list of IDs (generated for single‑key models):
+
+```csharp
+await connection.DeleteAsync<User, Guid>(listOfIds, ct);
+```
+
+Create the table from the profile metadata:
+
+```csharp
+await connection.CreateTableAsync<Order>(ct);
+```
+
+### 6. Bulk operations
+
+Available when the model implements `ISqlBulkModel` / `INpgsqlBulkModel`.  
+Bulk operations use temp tables + `SqlBulkCopy` (SQL Server) or `COPY` (PostgreSQL) to handle large datasets efficiently.
+
+```csharp
+var bulk = new UserBulk(capacity: 300);    // UserNpgsqlBulk for PostgreSQL
+bulk.AddRange(usersToInsert);
+bulk.UpdateRange(usersToUpdate);
+bulk.RemoveRange(usersToDelete);
+
+await using var connection = new SqlConnection(connectionString);
+await connection.OpenAsync(ct);
+await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
+await bulk.SaveChangesAsync(connection, transaction, ct);
+await transaction.CommitAsync(ct);
+```
+
+### 7. CancellationToken policy
+
+Every public I/O method **requires** a `CancellationToken` — no convenience overloads that omit it.  
+If cancellation is not needed, pass `CancellationToken.None` explicitly.
+
+---
+
+## Dual‑Provider Models
+
+A model can target both providers at the same time:
+
+```csharp
+public sealed partial record Order(Guid Id, string ProductName, Guid UserId)
+    : ISqlDomainModel, INpgsqlDomainModel;
+
+// One profile per provider
+public sealed class OrderSqlProfile : SqlProfile<Order>
 {
-    public OrderProfile()
+    public OrderSqlProfile()
     {
         RuleFor(x => x.ProductName).VarChar(50);
     }
 }
 
-public sealed class Sample
+public sealed class OrderNpgsqlProfile : NpgsqlProfile<Order>
 {
-    public async ValueTask UserMethods(CancellationToken ct)
+    public OrderNpgsqlProfile()
     {
-        await connection.QueryAsync<User>("SELECT * FROM Users", ct);
-        await connection.QueryFirstOrDefaultAsync<User>("SELECT TOP(1) * FROM Users WHERE Name = @Name", 
-            UserSql.CreateParameterName("John Doe"), ct);
-    }
-    
-    public async ValueTask OrderMethods(Order order, CancellationToken ct)
-    {
-        await connection.QueryAsync<Order>("SELECT * FROM Orders", ct);
-        await connection.QueryFirstOrDefaultAsync<Order>("SELECT TOP(1) * FROM Orders WHERE ProductName = @ProductName", 
-            OrderSql.CreateParameterName("Car"), ct);
-        
-        await connection.InsertAsync(order, ct);
-        await connection.UpdateAsync(order, ct);
-        await connection.UpsertAsync(order, ct);
-        await connection.DeleteAsync(order, ct);
-    }
-    
-    public async ValueTask OrderBulkMethods(
-        Order[] ordersToAdd, 
-        Order[] ordersToUpdate, 
-        Order[] ordersToDelete, 
-        CancellationToken ct)
-    {
-        var bulk = new OrderBulk(ordersToAdd.Length + ordersToUpdate.Length + ordersToDelete.Length);
-        bulk.AddRange(ordersToAdd);
-        bulk.UpdateRange(ordersToUpdate);
-        bulk.RemoveRange(ordersToDelete);
-        
-        await using var transaction = connection.BeginTransaction();
-        await bulk.SaveChangesAsync(bulk, ct);
-        await transaction.CommitAsync(ct);
+        RuleFor(x => x.ProductName).VarChar(50);
     }
 }
-
-/* OUTPUT:
-UserSql.g.cs
-UserMapper.g.cs
-
-OrderSql.g.cs
-OrderMapper.g.cs
-OrderDomainOps.g.cs
-OrderBulk.g.cs
-*/
 ```
+
+The generator produces separate files for each provider. The correct extension methods resolve based on connection type (`SqlConnection` vs `NpgsqlConnection`).
+
+---
+
+## Advanced Profile Configuration
+
+```csharp
+public sealed class AuditEventProfile : SqlProfile<AuditEvent>
+{
+    public AuditEventProfile()
+    {
+        Table("Audits");              // custom table name (default: pluralized class name)
+        Schema("log");                // custom schema (default: dbo / public)
+        Identity(x => x.EventId);    // identity column
+        Key(x => x.EventId);         // primary key override (default: Id)
+
+        RuleFor(x => x.EventType).Name("Type").NVarChar(50);  // column name override
+        RuleFor(x => x.JsonPayload).VarBinary(8000);
+    }
+}
+```
+
+---
+
+## What Gets Generated
+
+For a model named `User` implementing `ISqlBulkModel`, the generator produces:
+
+| Generated code | Contents |
+|----------------|----------|
+| `UserMapper.g.cs` | `partial record User` with the `Map(SqlDataReader)` method, plus `static class UserSql` with typed parameter factory methods |
+| `UserDomainOps.g.cs` | `partial record User` with `InsertAsync`, `UpdateAsync`, `UpsertAsync`, `DeleteAsync`, `CreateTableAsync`, `TruncateAsync`, and batch delete by ID |
+| `UserBulk.g.cs` | `class UserBulk` — bulk operations via temp table + `SqlBulkCopy` |
+
+The mapper file and domain ops extend the model as `partial record`. The SQL helper (`UserSql`) and bulk class (`UserBulk`) are standalone static/regular classes. None of the generated code uses reflection.
+
+---
+
+## Benchmarks
+
+AdoGen is benchmarked against Dapper and EF Core on every release.  
+Below is a summary; full results are in the [docs](docs/) folder.
+
+**SQL Server — Highlights**  
+_(.NET 10, Apple M4, BenchmarkDotNet v0.15.8)_
+
+| Operation | AdoGen | Dapper | EF Core | AdoGen Alloc | Dapper Alloc | EF Core Alloc |
+|-----------|-------:|-------:|--------:|-------------:|-------------:|--------------:|
+| QueryFirstOrDefault | 389 µs | 397 µs | 418 µs | 2.82 KB | 6.05 KB | 15.08 KB |
+| QueryToList | 38.8 µs | 40.1 µs | 40.0 µs | 453 B | 825 B | 1,705 B |
+| Insert | 1.83 ms | 1.99 ms | 2.64 ms | 5.3 KB | 6.48 KB | 20.09 KB |
+| Update | 1.73 ms | 1.78 ms | 2.37 ms | 5.17 KB | 6.32 KB | 142.53 KB |
+| BulkInsert 1K | 20.9 ms | — | 37.0 ms | 162 KB | — | 6,091 KB |
+| BulkInsert 10K | 84.0 ms | — | 337 ms | 1,412 KB | — | 60,924 KB |
+
+📊 **Full results:** [SQL Server](docs/benchmarks-sqlserver.md) · [PostgreSQL](docs/benchmarks-postgresql.md)
+
+---
+
+## Design Principles
+
+1. **Runtime performance is the primary goal.** If it isn't at least as fast as Dapper, it doesn't ship.
+2. **Explicit over implicit.** No `AddWithValue`, no inferred types, no hidden allocations.
+3. **Compile‑time safety.** Invalid configurations fail during source generation, not at runtime.
+4. **No reflection. Ever.** The runtime code path is entirely generated, AOT‑safe, and allocation‑conscious.
+
+---
+
+## License
+
+[MIT](LICENSE)
