@@ -91,19 +91,22 @@ If a CancellationToken is not present in the method signature, it is a design bu
 Source generation is triggered only when:
 
 - The DTO is `partial`
-- The DTO implements `ISqlDomainModel` or `ISqlResult` or `IBulkModel`
+- The DTO implements one or more of the provider-specific marker interfaces:
+  - SQL Server: `ISqlMapper`, `ISqlDomainModel`, `ISqlBulkModel`
+  - PostgreSQL: `INpgsqlMapper`, `INpgsqlDomainModel`, `INpgsqlBulkModel`
+- A DTO may implement interfaces for **both** providers simultaneously, and each provider's code will be generated independently
 
 ### Profiles
 
-- Exactly **one profile per DTO**
-- Profiles are required only when configuration is needed
+- Exactly **one profile per DTO per provider** (e.g. `SqlProfile<T>` and `NpgsqlProfile<T>` are separate classes)
+- A profile is **always required** — even when all members can be automatically mapped
 - No shared or inherited profiles
 
 ### Rules
 
 - **Strings must always be explicitly configured**
     - Length is mandatory
-    - `varchar` vs `nvarchar` must be explicit
+    - `varchar` vs `nvarchar` must be explicit (SQL Server); `varchar`/`text` explicit for PostgreSQL
 - Other types requiring metadata (e.g. `decimal`) must also be explicitly configured
 - `Guid` has a default mapping
 - Nullability is inferred from `?`
@@ -153,18 +156,22 @@ This limitation is intentional and must not be relaxed.
 
 ---
 
-## 9. SQL Server (Current Reality)
+## 9. SQL Server & PostgreSQL (Current Reality)
 
-- SQL Server is the only supported provider
-- Usage of `SqlConnection`, `SqlCommand`, `SqlParameter`, and `SqlDbType` is intentional
-- Do not introduce provider abstraction layers yet
+- Both SQL Server and PostgreSQL are supported providers
+- SQL Server uses `SqlConnection`, `SqlCommand`, `SqlParameter`, `SqlDbType`
+- PostgreSQL uses `NpgsqlConnection`, `NpgsqlCommand`, `NpgsqlParameter`, `NpgsqlDbType`
+- Each provider has its own dedicated runtime package (`AdoGen.SqlServer`, `AdoGen.PostgreSql`) and its own set of interfaces and profiles
+- There is **no shared provider abstraction layer** — provider-specific code must stay within its own package boundary
+- Do not introduce `IDbProvider`, `ISqlDialect`, or similar strategy abstractions
 
 ---
 
 ## 10. Tests
 
 - xUnit only
-- Real database only (MSSQL Testcontainers)
+- **Generator unit tests** (`AdoGen.Generator.Tests`): in-process Roslyn compilation + [Verify](https://github.com/VerifyTests/Verify) snapshots; no Docker required
+- **Integration tests** (`AdoGen.SqlServer.Tests`, `AdoGen.PostgreSql.Tests`): real database via Testcontainers (MSSQL / PostgreSQL containers started automatically)
 - No mocked ADO.NET
 - No in‑memory providers
 - No hidden SQL behind helpers
@@ -178,6 +185,9 @@ This limitation is intentional and must not be relaxed.
 - Performance claims must be backed by benchmark results
 - Benchmark accuracy > readability
 - Regressions are unacceptable
+- **AdoGen's primary performance advantage is memory allocation**, not raw execution speed — allocations are consistently the lowest across all benchmark categories
+- EF Core benchmarks reuse a single `DbContext` instance, which is not representative of typical production usage; real-world EF Core overhead is higher than benchmarks suggest
+- Both SQL Server and PostgreSQL benchmarks exist and are tracked independently
 
 ---
 
@@ -223,14 +233,14 @@ If performance dictates another approach, it must be benchmark‑proven and expl
 
 ## 15. Provider Expansion Guardrails
 
-When additional database providers are introduced:
+Both SQL Server and PostgreSQL are supported. If additional providers are introduced in the future:
 
-- Do not generalize existing SQL Server behavior prematurely
-- Do not add IDbProvider, ISqlDialect, or strategy abstractions “for flexibility”
-- Prefer duplication over abstraction until real divergence exists
+- Do not generalize existing provider behavior prematurely
+- Do not add `IDbProvider`, `ISqlDialect`, or strategy abstractions "for flexibility"
+- Prefer duplication over abstraction until real divergence exists and a third provider is needed
 
 Abstractions must be justified by:
-- A second real provider
+- A third real provider
 - Measured benchmarks
 - Proven necessity
 

@@ -13,7 +13,7 @@ AdoGen is a **reflection-free, Native AOT-compatible micro-ORM** for .NET that u
 | `src/AdoGen.SqlServer/` | Runtime for SQL Server — extension methods on `SqlConnection`, interfaces, bulk ops |
 | `src/AdoGen.PostgreSql/` | Runtime for PostgreSQL — same shape, Npgsql types |
 | `src/AdoGen.Generator/` | Roslyn incremental generator (`netstandard2.0`). Pipelines → Emitters |
-| `src/AdoGen.Generator.Tests/` | Generator unit tests using in-process Roslyn compilation + Verify snapshots |
+| `src/AdoGen.Generator.Tests/` | Generator unit tests using in-process Roslyn compilation + Verify snapshots (no Docker needed) |
 | `src/AdoGen.SqlServer.Tests/` | Integration tests — real SQL Server via Testcontainers |
 | `src/AdoGen.PostgreSql.Tests/` | Integration tests — real PostgreSQL via Testcontainers |
 | `src/AdoGen.Benchmarks/` | BenchmarkDotNet project; benchmarks are authoritative on performance |
@@ -50,28 +50,45 @@ Integration tests spin up a real database container per test collection. `TestCo
 
 ### DTO + Profile → Generated Code
 
-1. Declare a `partial` record implementing one of: `ISqlMapper` / `ISqlDomainModel` / `ISqlBulkModel` (or Npgsql equivalents).
-2. Create a `SqlProfile<T>` / `NpgsqlProfile<T>` subclass to configure strings, decimals, keys, table name, schema.
-3. The generator emits `{Name}Mapper.g.cs`, `{Name}Domain.g.cs`, `{Name}Bulk.g.cs`.
+1. Declare a `partial` record implementing one or more marker interfaces per provider:
+   - SQL Server: `ISqlMapper`, `ISqlDomainModel`, `ISqlBulkModel`
+   - PostgreSQL: `INpgsqlMapper`, `INpgsqlDomainModel`, `INpgsqlBulkModel`
+   - A single DTO can implement interfaces for **both** providers simultaneously
+2. Create a provider-specific profile subclass for **each** provider the DTO targets:
+   - `SqlProfile<T>` for SQL Server
+   - `NpgsqlProfile<T>` for PostgreSQL
+   - A profile is **always required**, even when all members would map automatically
+3. The generator emits separate `*.g.cs` files per provider.
 
 ```csharp
-public sealed partial record User(Guid Id, string Name, string Email) : ISqlBulkModel;
+// DTO targeting both providers
+public sealed partial record Order(Guid Id, string ProductName, Guid UserId)
+    : ISqlDomainModel, INpgsqlDomainModel;
 
-public sealed class UserProfile : SqlProfile<User>
+// One profile per provider
+public sealed class OrderProfile : SqlProfile<Order>
 {
-    public UserProfile()
+    public OrderProfile()
     {
-        RuleFor(x => x.Name).VarChar(20);
-        RuleFor(x => x.Email).VarChar(50);
+        RuleFor(x => x.ProductName).VarChar(50);
+    }
+}
+
+public sealed class OrderNpgsqlProfile : NpgsqlProfile<Order>
+{
+    public OrderNpgsqlProfile()
+    {
+        RuleFor(x => x.ProductName).VarChar(50);
     }
 }
 ```
 
 ### Mandatory Configurations (fail at generation time if missing)
-- `string` → must call `.VarChar(n)`, `.NVarChar(n)`, `.Char(n)`, or `.NChar(n)`
+- `string` → must call `.VarChar(n)`, `.NVarChar(n)`, `.Char(n)`, or `.NChar(n)` (SQL Server); `.VarChar(n)` or equivalent (PostgreSQL)
 - `decimal` → must call `.Decimal(precision, scale)`
 - `Guid`, numeric types, `bool`, `DateTime` → default mappings, no config needed
 - `Id` property → treated as PK by convention; override with `Key(x => x.MyKey)`
+- **A profile is always required** — even when all members have default mappings
 
 ### CancellationToken — Non-Negotiable
 Every public async method requires an explicit `CancellationToken`. No overloads that omit it. Callers pass `CancellationToken.None` if cancellation is not needed.
@@ -95,7 +112,7 @@ The generator targets `netstandard2.0`. Modern C# syntax is available via PolySh
 
 ## Generator Tests
 
-Tests compile source strings in-process using `CSharpCompilation`, run the generator, and verify output with [Verify](https://github.com/VerifyTests/Verify) snapshots stored in `Snapshots/`.
+Tests compile source strings in-process using `CSharpCompilation`, run the generator, and verify output with [Verify](https://github.com/VerifyTests/Verify) snapshots stored in `Snapshots/`. No Docker or database required.
 
 To update snapshots after intentional generator changes:
 ```bash
@@ -113,15 +130,19 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - No LINQ in hot paths
 - No `AddWithValue`
 - Async-only public I/O APIs with mandatory `CancellationToken`
-- SQL Server types (`SqlConnection`, `SqlParameter`, `SqlDbType`) are intentional — no provider abstraction layer yet
+- SQL Server types (`SqlConnection`, `SqlParameter`, `SqlDbType`) stay in `AdoGen.SqlServer`
+- PostgreSQL types (`NpgsqlConnection`, `NpgsqlParameter`, `NpgsqlDbType`) stay in `AdoGen.PostgreSql`
+- No cross-provider abstractions
 
 ---
 
 ## Key Files to Read First
 
 - `.github/copilot-instructions.md` — full non-negotiable rule set
-- `src/AdoGen.SqlServer/GeneratorInterfaces.cs` — marker interfaces
-- `src/AdoGen.SqlServer/PropertyBuilder.cs` — profile fluent API
-- `examples/AdoGen.Sample/` — real models and profiles used by all tests
+- `src/AdoGen.SqlServer/GeneratorInterfaces.cs` — SQL Server marker interfaces
+- `src/AdoGen.PostgreSql/GeneratorInterfaces.cs` — PostgreSQL marker interfaces
+- `src/AdoGen.SqlServer/PropertyBuilder.cs` — SQL Server profile fluent API
+- `src/AdoGen.PostgreSql/NpgsqlProfile.cs` — PostgreSQL profile fluent API
+- `examples/AdoGen.Sample/` — real models and profiles used by all tests (includes dual-provider examples)
 - `src/AdoGen.Generator/Pipelines/Discovery.cs` — generator entry point
 
