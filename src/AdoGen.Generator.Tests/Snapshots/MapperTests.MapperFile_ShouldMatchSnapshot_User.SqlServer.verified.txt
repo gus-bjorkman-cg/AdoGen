@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
@@ -17,13 +18,13 @@ public sealed partial record User : ISqlMapper<global::AdoGen.Generator.Tests.Us
 
     public static global::AdoGen.Generator.Tests.User Map(SqlDataReader reader)
     {
-        if (!IsInitialized)
+        if (!Volatile.Read(ref IsInitialized))
         {
             IdOrdinal = reader.GetOrdinal("Id");
             NameOrdinal = reader.GetOrdinal("Name");
             EmailOrdinal = reader.GetOrdinal("Email");
 
-            IsInitialized = true;
+            Volatile.Write(ref IsInitialized, true);
         }
 
         return new global::AdoGen.Generator.Tests.User(

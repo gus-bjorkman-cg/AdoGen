@@ -4,6 +4,7 @@ using AdoGen.PostgreSql;
 using Npgsql;
 using NpgsqlTypes;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
@@ -40,7 +41,7 @@ public sealed partial record TestType : INpgsqlMapper<global::AdoGen.Generator.T
 
     public static global::AdoGen.Generator.Tests.TestType Map(NpgsqlDataReader reader)
     {
-        if (!Pg_IsInitialized)
+        if (!Volatile.Read(ref Pg_IsInitialized))
         {
             Pg_IntOrdinal = reader.GetOrdinal("Int");
             Pg_NullableIntOrdinal = reader.GetOrdinal("NullableInt");
@@ -70,7 +71,7 @@ public sealed partial record TestType : INpgsqlMapper<global::AdoGen.Generator.T
             Pg_IntEnumOrdinal = reader.GetOrdinal("IntEnum");
             Pg_LongEnumOrdinal = reader.GetOrdinal("LongEnum");
 
-            Pg_IsInitialized = true;
+            Volatile.Write(ref Pg_IsInitialized, true);
         }
 
         return new global::AdoGen.Generator.Tests.TestType(

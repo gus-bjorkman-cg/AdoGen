@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
@@ -41,7 +42,7 @@ public sealed partial record TestType : ISqlMapper<global::AdoGen.Generator.Test
 
     public static global::AdoGen.Generator.Tests.TestType Map(SqlDataReader reader)
     {
-        if (!IsInitialized)
+        if (!Volatile.Read(ref IsInitialized))
         {
             IntOrdinal = reader.GetOrdinal("Int");
             NullableIntOrdinal = reader.GetOrdinal("NullableInt");
@@ -71,7 +72,7 @@ public sealed partial record TestType : ISqlMapper<global::AdoGen.Generator.Test
             IntEnumOrdinal = reader.GetOrdinal("IntEnum");
             LongEnumOrdinal = reader.GetOrdinal("LongEnum");
 
-            IsInitialized = true;
+            Volatile.Write(ref IsInitialized, true);
         }
 
         return new global::AdoGen.Generator.Tests.TestType(

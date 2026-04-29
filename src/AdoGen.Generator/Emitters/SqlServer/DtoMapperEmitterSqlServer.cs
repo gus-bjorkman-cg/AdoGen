@@ -67,6 +67,7 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
             using System;
             using System.Data;
             using System.Runtime.CompilerServices;
+            using System.Threading;
 
             namespace {{ns}};
 
@@ -76,10 +77,10 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
             {{ordinals}}
                 public static {{dtoTypeName}} Map(SqlDataReader reader)
                 {
-                    if (!{{isInitField}})
+                    if (!Volatile.Read(ref {{isInitField}}))
                     {
             {{init}}
-                        {{isInitField}} = true;
+                        Volatile.Write(ref {{isInitField}}, true);
                     }
 
                     return new {{dtoTypeName}}{{read}};

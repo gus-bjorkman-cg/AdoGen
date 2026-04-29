@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
@@ -18,14 +19,14 @@ public sealed partial record AuditEvent : ISqlMapper<global::AdoGen.Generator.Te
 
     public static global::AdoGen.Generator.Tests.AuditEvent Map(SqlDataReader reader)
     {
-        if (!IsInitialized)
+        if (!Volatile.Read(ref IsInitialized))
         {
             EventIdOrdinal = reader.GetOrdinal("EventId");
             CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
             TypeOrdinal = reader.GetOrdinal("Type");
             JsonPayloadOrdinal = reader.GetOrdinal("JsonPayload");
 
-            IsInitialized = true;
+            Volatile.Write(ref IsInitialized, true);
         }
 
         return new global::AdoGen.Generator.Tests.AuditEvent(

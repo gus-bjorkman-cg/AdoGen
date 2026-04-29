@@ -4,6 +4,7 @@ using AdoGen.PostgreSql;
 using Npgsql;
 using NpgsqlTypes;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
@@ -17,14 +18,14 @@ public sealed partial record AuditEvent : INpgsqlMapper<global::AdoGen.Generator
 
     public static global::AdoGen.Generator.Tests.AuditEvent Map(NpgsqlDataReader reader)
     {
-        if (!Pg_IsInitialized)
+        if (!Volatile.Read(ref Pg_IsInitialized))
         {
             Pg_EventIdOrdinal = reader.GetOrdinal("EventId");
             Pg_CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
             Pg_TypeOrdinal = reader.GetOrdinal("Type");
             Pg_JsonPayloadOrdinal = reader.GetOrdinal("JsonPayload");
 
-            Pg_IsInitialized = true;
+            Volatile.Write(ref Pg_IsInitialized, true);
         }
 
         return new global::AdoGen.Generator.Tests.AuditEvent(

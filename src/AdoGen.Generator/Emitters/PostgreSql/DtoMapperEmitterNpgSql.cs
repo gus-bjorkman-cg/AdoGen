@@ -66,6 +66,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
               using Npgsql;
               using NpgsqlTypes;
               using System.Runtime.CompilerServices;
+              using System.Threading;
 
               namespace {{ns}};
 
@@ -75,10 +76,10 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
               {{ordinals}}
                   public static {{dtoTypeName}} Map(NpgsqlDataReader reader)
                   {
-                      if (!{{isInitField}})
+                      if (!Volatile.Read(ref {{isInitField}}))
                       {
               {{init}}
-                          {{isInitField}} = true;
+                          Volatile.Write(ref {{isInitField}}, true);
                       }
 
                       return new {{dtoTypeName}}{{read}};
