@@ -31,10 +31,31 @@ AdoGen is a **reflection-free, Native AOT-compatible micro-ORM** for .NET that u
 # Or just dotnet
 dotnet build
 
+# ⚠️ Always run `dotnet build` before `dotnet test` when generator emitters have changed.
+# The VS/dotnet test adapter caches test case serialisations from the previous run.
+# If the assembly has not been rebuilt first, the test runner will crash with
+# "Catastrophic failure: ArgumentNullException" during test discovery.
+# Running `dotnet build` (or the full `./build.sh`) before `dotnet test` avoids this.
+
 # Run generator unit tests (no Docker needed)
-dotnet test src/AdoGen.Generator.Tests/
+# Must run dotnet build first — dotnet test alone will fail with "Catastrophic failure"
+# on the first cold run after a generator change.
+dotnet build src/AdoGen.Generator.Tests/
+dotnet test src/AdoGen.Generator.Tests/ --no-build
+
+# If generator output changed and snapshots need updating:
+# 1. Run tests — they will fail and write *.received.txt files to Snapshots/
+# 2. Inspect the received files to confirm the changes are intentional
+# 3. Replace the verified snapshots:
+#    cd src/AdoGen.Generator.Tests/Snapshots
+#    for f in *.received.txt; do mv "$f" "${f/.received.txt/.verified.txt}"; done
+# 4. Re-run tests to confirm they pass
+# 5. Run integration tests to validate the generated code works against a real database
+#    (see below) — snapshot approval alone is NOT sufficient validation
 
 # Run integration tests (requires Docker — starts Testcontainers automatically)
+# These are the authoritative validation that generated code is correct.
+# Always run these after any generator or runtime change.
 dotnet test src/AdoGen.SqlServer.Tests/
 dotnet test src/AdoGen.PostgreSql.Tests/
 
@@ -133,6 +154,38 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - SQL Server types (`SqlConnection`, `SqlParameter`, `SqlDbType`) stay in `AdoGen.SqlServer`
 - PostgreSQL types (`NpgsqlConnection`, `NpgsqlParameter`, `NpgsqlDbType`) stay in `AdoGen.PostgreSql`
 - No cross-provider abstractions
+
+---
+
+## Agent Working Rules
+
+These rules apply to any AI agent working in this codebase:
+
+- **When you make a mistake, document it here immediately.** Add a note under "Lessons Learned" below so the same error is not repeated in a future session.
+- After any generator emitter change: build → generator tests → snapshot review → integration tests (in that order). Snapshot approval alone is not validation.
+- Never use `new StringBuilder(string)` and `new StringBuilder(int)` interchangeably — `(string)` sets the initial content, `(int)` sets only capacity.
+- `async ValueTask` wrappers that do nothing but `await` a single call are wasteful — return the inner `ValueTask`/`ValueTask<T>` directly.
+- Instance fields on `readonly record struct` are per-instance only. If a field is meant to be a shared registry (e.g. for xUnit deserialization), it must be `static`.
+
+---
+
+## Lessons Learned
+
+### 2026-04-29 — StringBuilder overload confusion
+`new StringBuilder(Pg_SqlInsertBatchTemplate)` (sets initial content) was changed to
+`new StringBuilder(Pg_SqlInsertBatchTemplate.Length + ...)` (sets capacity only), silently
+producing empty SQL that caused `syntax error at or near "$1"` at runtime.
+**Fix:** use `new StringBuilder(capacity); sb.Append(template);` explicitly.
+**Impact:** all integration tests failed; caught by running `dotnet test src/AdoGen.PostgreSql.Tests/`.
+
+### 2026-04-29 — Generator test "Catastrophic failure" on cold run
+`TestTypes._items` was declared as an instance field (`private readonly List<TestTypes> _items = []`).
+On cold run xUnit constructs a default struct instance to deserialise into, which has an empty
+`_items`, causing `ArgumentNullException` in `Deserialize`.
+**Fix:** make `_items` `static`.
+**Rule:** always run `dotnet build src/AdoGen.Generator.Tests/` before `dotnet test` after any
+generator change. If the test runner crashes with "Catastrophic failure: ArgumentNullException"
+during discovery, it is a serialisation bug in `TestHelpers.cs`, not a stale cache.
 
 ---
 
