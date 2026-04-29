@@ -37,11 +37,12 @@ public sealed class SqlBuilderGenerator : IIncrementalGenerator
                 if (validatedDto.Diagnostics.Length != 0) return;
 
                 var dto = validatedDto.Discovery;
+                var ctx = EmitContextBuilder.Build(validatedDto);
 
                 foreach (var emitter in Emitters)
                 {
                     if (!emitter.IsMatch(dto.Kind, dto.Provider)) continue;
-                    emitter.Handle(spc, validatedDto);
+                    emitter.Handle(spc, validatedDto, ctx);
                 }
             });
     }

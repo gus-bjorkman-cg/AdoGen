@@ -7,5 +7,5 @@ namespace AdoGen.Generator.Emitters;
 internal interface IEmitter
 {
     bool IsMatch(SqlModelKind kind, SqlProviderKind provider);
-    void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto);
+    void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto, EmitContext ctx);
 }

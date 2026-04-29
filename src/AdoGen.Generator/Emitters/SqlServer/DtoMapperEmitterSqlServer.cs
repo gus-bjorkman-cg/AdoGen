@@ -14,7 +14,7 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
     public bool IsMatch(SqlModelKind kind, SqlProviderKind provider) =>
         provider is SqlProviderKind.SqlServer && kind >= SqlModelKind.Mapper;
 
-    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto)
+    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto, EmitContext ctx)
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;

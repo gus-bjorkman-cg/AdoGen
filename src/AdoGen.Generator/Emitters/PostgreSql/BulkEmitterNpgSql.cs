@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Diagnostics;
@@ -9,18 +11,16 @@ namespace AdoGen.Generator.Emitters.PostgreSql;
 
 internal sealed class BulkEmitterNpgSql : IEmitter
 {
-    private const char Citation = '"';
     private BulkEmitterNpgSql() { }
     public static BulkEmitterNpgSql Instance { get; } = new();
     
     public bool IsMatch(SqlModelKind kind, SqlProviderKind provider)
         => provider is SqlProviderKind.PostgreSql && kind >= SqlModelKind.Bulk;
 
-    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto)
+    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto, EmitContext ctx)
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         var dtoProps = profileInfo.DtoProperties;
 
         var ns = profileInfo.Namespace;
@@ -29,48 +29,27 @@ internal sealed class BulkEmitterNpgSql : IEmitter
         var tempTableName = $"adoGen_{dto.Name.ToLowerInvariant()}_tmp";
         var bulkTypeName = dto.Name + "NpgsqlBulk";
 
-        var keys = profileInfo.Keys.ToArray();
-        if (keys.Length == 0)
+        if (ctx.Keys.Length == 0)
         {
             spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingKey,
                 dto.Locations.FirstOrDefault() ?? Location.None, dto.Name));
             return;
         }
 
-        // Build join condition using quoted identifiers
-        var joinOn = string.Join(" AND ", keys.Select(k =>
-        {
-            var col = profileInfo.ParamsByProperty[k].ParameterName;
-            return $"S.\"{col}\" = T.\"{col}\"";
-        }));
-
-        var insertCols = dtoProps
-            .Where(p => !profileInfo.IdentityKeys.Contains(p.Name))
-            .Select(p => profileInfo.ParamsByProperty[p.Name].ParameterName)
-            .ToArray();
-
-        var insertSelect = insertCols.Select(c => $"S.\"{c}\"").ToArray();
-
-        var nonKeyNonIdentity = dtoProps
-            .Where(p => !profileInfo.Keys.Contains(p.Name) && !profileInfo.IdentityKeys.Contains(p.Name))
-            .ToArray();
-
-        var updateSet = string.Join(",\n        ", nonKeyNonIdentity
-            .Select(p => profileInfo.ParamsByProperty[p.Name].ParameterName)
-            .Select(c => $"""        "{c}" = S."{c}{Citation}"""));
+        var joinOn = ctx.JoinOn;
+        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertSelect = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
+        var updateSet = string.Join(",\n        ", ctx.NonKeyNonIdentities
+            .Select(col => $"        \"{col.ParameterName}\" = S.\"{col.ParameterName}\""));
 
         // CREATE TEMP TABLE
         var sbColDefs = new StringBuilder();
-        for (var i = 0; i < dtoProps.Length; i++)
+        for (var i = 0; i < ctx.Columns.Length; i++)
         {
-            var p = dtoProps[i];
-            var cfg = profileInfo.ParamsByProperty[p.Name];
-            var sqlType = cfg.SqlTypeLiteral;
-            var isNullable = p.IsNullableProperty(cfg);
-            var nullability = isNullable ? "NULL" : "NOT NULL";
-            sbColDefs.AppendLine($"""        "{cfg.ParameterName}" {sqlType} {nullability},""");
+            var col = ctx.Columns[i];
+            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
+            sbColDefs.AppendLine($"""        "{col.ParameterName}" {col.SqlType} {nullability},""");
         }
-
         sbColDefs.Append("""        "operation" CHAR(1) NOT NULL""");
 
         var tempTableSql =
@@ -79,18 +58,14 @@ internal sealed class BulkEmitterNpgSql : IEmitter
              {sbColDefs});
              """;
 
-        var schemaTable = $"\"{profileInfo.Schema}\".\"{profileInfo.Table}\"";
+        var schemaTable = ctx.SchemaTableQuoted;
         var tempTableRef = $"\"{tempTableName}\"";
-
         var applySql = BuildApplySql();
         var typeKeyword = dto.IsRecord ? "record" : "class";
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
-        var copyColumnsEscaped = dtoProps
-            .Select(p => Citation + profileInfo.ParamsByProperty[p.Name].ParameterName + Citation)
-            .Concat([Citation + "operation" + Citation])
-            .ToArray();
-        
-        var copyCommand = $"""COPY "{tempTableName}" ({string.Join(", ", copyColumnsEscaped)}) FROM STDIN (FORMAT BINARY)""";
+        var copyColumnsEscaped = BuildJoined(ctx.Columns, col => $"\"{col.ParameterName}\"") + ", \"operation\"";
+        var copyCommand = $"""COPY "{tempTableName}" ({copyColumnsEscaped}) FROM STDIN (FORMAT BINARY)""";
 
         var src =
             $$$$""""
@@ -159,18 +134,15 @@ internal sealed class BulkEmitterNpgSql : IEmitter
         {
             var sb = new StringBuilder();
             
-            var keyCols = keys.Select(k => profileInfo.ParamsByProperty[k].ParameterName)
-                .Select(c => $"{Citation}{c}{Citation}");
-
-            var idxCols = $"{Citation}operation{Citation}, " + string.Join(", ", keyCols);
+            var keyCols = BuildJoined(ctx.Keys, col => $"\"{col.ParameterName}\"");
+            var idxCols = $"\"operation\", {keyCols}";
             var idxName = $"ix_{tempTableName}_op_keys";
 
             sb.AppendLine($"""    CREATE INDEX IF NOT EXISTS "{idxName}" ON {tempTableRef} ({idxCols});""");
             sb.AppendLine();
             
-            // we keep it simple/explicit (no TRY/CATCH). Temp tables are scoped to session.
             sb.AppendLine("    WITH updated AS (");
-            if (nonKeyNonIdentity.Length > 0)
+            if (ctx.NonKeyNonIdentities.Length > 0)
             {
                 sb.AppendLine($"        UPDATE {schemaTable} AS T");
                 sb.AppendLine("            SET " + updateSet.TrimStart());
@@ -183,13 +155,11 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 sb.AppendLine("        SELECT 1 WHERE false),");
             }
             
-            // INSERT
             sb.AppendLine("    inserted AS (");
-            if (insertCols.Length > 0)
+            if (ctx.NonIdentities.Length > 0)
             {
-                sb.AppendLine(
-                    $"        INSERT INTO {schemaTable} ({string.Join(", ", insertCols.Select(c => $"\"{c}\""))})");
-                sb.AppendLine($"            SELECT {string.Join(", ", insertSelect)}");
+                sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
+                sb.AppendLine($"            SELECT {insertSelect}");
                 sb.AppendLine($"            FROM {tempTableRef} AS S");
                 sb.AppendLine("            WHERE S.\"operation\" = 'I'");
                 sb.AppendLine("        RETURNING 1),");
@@ -199,7 +169,6 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 sb.AppendLine("        SELECT 1 WHERE false),");
             }
             
-            // DELETE
             sb.AppendLine("    deleted AS (");
             sb.AppendLine($"        DELETE FROM {schemaTable} AS T");
             sb.AppendLine($"        USING {tempTableRef} AS S");
@@ -221,14 +190,25 @@ internal sealed class BulkEmitterNpgSql : IEmitter
             {
                 var p = dtoProps[i];
                 var accessor = ResolveNpgsqlBulkWriteAccessor(p);
-                sb.AppendLine(
-                    $"            importer.Write({accessor});");
+                sb.AppendLine($"            importer.Write({accessor});");
             }
-
             return sb.ToString().TrimEnd();
         }
     }
-    
+
+    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector)
+    {
+        if (columns.Length == 0) return string.Empty;
+        if (columns.Length == 1) return selector(columns[0]);
+        var sb = new StringBuilder(capacity: columns.Length * 24);
+        for (var i = 0; i < columns.Length; i++)
+        {
+            if (i > 0) sb.Append(", ");
+            sb.Append(selector(columns[i]));
+        }
+        return sb.ToString();
+    }
+
     /// <summary>
     /// Returns the accessor expression for a property in a COPY BINARY write.
     /// Enum values must be cast to their underlying type because Npgsql COPY BINARY

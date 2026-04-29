@@ -1,6 +1,7 @@
+using System;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
-using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
 
@@ -14,128 +15,71 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
     public bool IsMatch(SqlModelKind kind, SqlProviderKind provider) => 
         provider is SqlProviderKind.SqlServer && kind >= SqlModelKind.Domain;
 
-    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto)
+    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto, EmitContext ctx)
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        var dtoProps = profileInfo.DtoProperties;
-        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
-
-        var ns = profileInfo.Namespace;
-        var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var typeKeyword = dto.IsRecord ? "record" : "class";
 
         // CREATE TABLE
         var sbColDefs = new StringBuilder();
-        for (var i = 0; i < dtoProps.Length; i++)
+        for (var i = 0; i < ctx.Columns.Length; i++)
         {
-            var p = dtoProps[i];
-            var cfg = profileInfo.ParamsByProperty[p.Name];
-            var sqlType = cfg.SqlTypeLiteral;
-            var isNullable = p.IsNullableProperty(cfg);
-            var nullability = isNullable ? "NULL" : "NOT NULL";
-            var identity = profileInfo.IdentityKeys.Contains(p.Name) ? " IDENTITY(1,1)" : "";
-            var defaultSql = p.ResolveDefaultSql(cfg);
-            var defaultClause = defaultSql is not null ? $" {defaultSql}" : "";
+            var col = ctx.Columns[i];
+            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
+            var identity = col.IsIdentity ? " IDENTITY(1,1)" : "";
+            var defaultClause = col.DefaultSqlExpression is not null ? $" {col.DefaultSqlExpression}" : "";
 
             const string spaces = "            ";
-            var comma = i == dtoProps.Length - 1 ? "" : ",";
-            var line = $"{spaces}[{cfg.ParameterName}] {sqlType}{identity}{defaultClause} {nullability}{comma}";
-            sbColDefs.AppendLine(line);
+            var comma = i == ctx.Columns.Length - 1 ? "" : ",";
+            sbColDefs.AppendLine($"{spaces}{col.ColumnNameQuoted} {col.SqlType}{identity}{defaultClause} {nullability}{comma}");
         }
 
-        if (profileInfo.Keys.Length > 0)
-            sbColDefs.AppendLine($"        ,CONSTRAINT [PK_{profileInfo.Table}] PRIMARY KEY ({string.Join(", ", profileInfo.Keys.Select(k => $"[{k}]"))})");
+        if (ctx.Keys.Length > 0)
+        {
+            var pkCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
+            sbColDefs.AppendLine($"        ,CONSTRAINT [PK_{profileInfo.Table}] PRIMARY KEY ({pkCols})");
+        }
 
         var colDefs = sbColDefs.ToString().TrimEnd();
         var createTableSql = 
             $"""
-            CREATE TABLE [{profileInfo.Schema}].[{profileInfo.Table}](
+            CREATE TABLE {ctx.SchemaTableQuoted}(
             {colDefs});
             """;
 
-        // INSERT (skip identity)
-        var insertCols = dtoProps
-            .Where(p => !profileInfo.IdentityKeys.Contains(p.Name))
-            .Select(p => $"[{profileInfo.ParamsByProperty[p.Name].ParameterName}]")
-            .ToArray();
-
-        var insertParams = dtoProps
-            .Where(p => !profileInfo.IdentityKeys.Contains(p.Name))
-            .Select(p => "@" + profileInfo.ParamsByProperty[p.Name].ParameterName)
-            .ToArray();
+        // INSERT (skip identity) — use pre-computed NonIdentities subset
+        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertParams = BuildJoined(ctx.NonIdentities, col => "@" + col.ParameterName);
+        var nonIdentityPropCount = ctx.NonIdentities.Length;
 
         var insertSql =
-            $"INSERT INTO [{profileInfo.Schema}].[{profileInfo.Table}] ({string.Join(", ", insertCols)}) VALUES ({string.Join(", ", insertParams)});";
-
-        var insertBatchSql = $"INSERT INTO [{profileInfo.Schema}].[{profileInfo.Table}] ({string.Join(", ", insertCols)}) VALUES";
+            $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
+        var insertBatchSql = $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES";
 
         // UPDATE (non-key, non-identity)
-        var nonKeyNonIdentity = dtoProps
-            .Where(p => !profileInfo.Keys.Contains(p.Name) && !profileInfo.IdentityKeys.Contains(p.Name))
-            .ToArray();
+        var updateSet = BuildJoined(ctx.NonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
+        var updateSql = $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
+        var deleteSql = $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey};";
 
-        var updateSet = string.Join(", ", nonKeyNonIdentity.Select(p =>
-        {
-            var col = profileInfo.ParamsByProperty[p.Name].ParameterName;
-            return $"[{col}] = @{col}";
-        }));
+        // UPSERT via MERGE — ON clause uses non-identity keys only (matching original behavior)
+        var usingColumns = BuildJoined(ctx.Columns, col => col.ColumnNameQuoted);
+        var usingValues = BuildJoined(ctx.Columns, col => "@" + col.ParameterName);
+        var nonIdentityKeys = ctx.Keys.Where(col => !col.IsIdentity).ToArray();
+        var onExpr = BuildJoined(ImmutableArray.Create(nonIdentityKeys),
+            col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}",
+            separator: " AND ");
 
-        var whereClause = string.Join(" AND ", profileInfo.Keys.Select(k =>
-        {
-            var col = profileInfo.ParamsByProperty[k].ParameterName;
-            return $"[{col}] = @{col}";
-        }));
-
-        var updateSql = $"UPDATE [{profileInfo.Schema}].[{profileInfo.Table}] SET {updateSet} WHERE {whereClause};";
-        var deleteSql = $"DELETE FROM [{profileInfo.Schema}].[{profileInfo.Table}] WHERE {whereClause};";
-
-        // UPSERT via MERGE
-        var matchKeys = profileInfo.Keys
-            .Where(k => !profileInfo.IdentityKeys.Contains(k))
-            .Select(k =>
-            {
-                var col = profileInfo.ParamsByProperty[k].ParameterName;
-                return $"T.[{col}] = S.[{col}]";
-            });
-
-        var allCols = dtoProps
-            .Select(p => $"[{profileInfo.ParamsByProperty[p.Name].ParameterName}]")
-            .ToArray();
-
-        var allParams = dtoProps
-            .Select(p => "@" + profileInfo.ParamsByProperty[p.Name].ParameterName)
-            .ToArray();
-
-        var usingColumns = string.Join(", ", allCols);
-        var usingValues = string.Join(", ", allParams);
-        var onExpr = string.Join(" AND ", matchKeys);
-
-        var updateSetFromS = string.Join(", ", dtoProps
-            .Where(p => !profileInfo.Keys.Contains(p.Name))
-            .Select(p =>
-            {
-                var col = profileInfo.ParamsByProperty[p.Name].ParameterName;
-                return $"T.[{col}] = S.[{col}]";
-            }));
-
-        var nonIdentityProp = dtoProps.Where(p => !profileInfo.IdentityKeys.Contains(p.Name)).ToArray();
-        var nonIdentityPropCount = nonIdentityProp.Length;
-
-        var insertCols2 = dtoProps
-            .Where(p => !profileInfo.IdentityKeys.Contains(p.Name))
-            .Select(p => $"[{profileInfo.ParamsByProperty[p.Name].ParameterName}]")
-            .ToArray();
-
-        var insertValues2 = insertCols2.Select(c => $"S.{c}").ToArray();
+        var updateSetFromS = BuildJoined(ctx.NonKeyNonIdentities, col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}");
+        var insertCols2 = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertValues2 = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
 
         var upsertSql =
             $"""
-             MERGE [{profileInfo.Schema}].[{profileInfo.Table}] AS T
+             MERGE {ctx.SchemaTableQuoted} AS T
                         USING (VALUES({usingValues})) AS S({usingColumns})
                         ON ({onExpr})
                         WHEN MATCHED THEN UPDATE SET {updateSetFromS}
-                        WHEN NOT MATCHED THEN INSERT ({string.Join(", ", insertCols2)}) VALUES ({string.Join(", ", insertValues2)});
+                        WHEN NOT MATCHED THEN INSERT ({insertCols2}) VALUES ({insertValues2});
              """;
 
         var deleteSrc = "";
@@ -144,12 +88,12 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             var keyName = profileInfo.Keys[0];
             var keyType = profileInfo.ParamsByProperty[keyName].PropertyType
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var deleteBatchSql = $"DELETE FROM [{profileInfo.Schema}].[{profileInfo.Table}] WHERE [{keyName}] IN (";
+            var deleteBatchSql = $"DELETE FROM {ctx.SchemaTableQuoted} WHERE [{keyName}] IN (";
             
             deleteSrc =
                 $$""""
                   
-                  {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{dtoTypeName}}, {{keyType}}>
+                  {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
                   {
                       private const string SqlDeleteBatchTemplate = "{{deleteBatchSql}}";
                   
@@ -180,7 +124,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                   """";
         }
 
-        var truncateSql = $"TRUNCATE TABLE [{profileInfo.Schema}].[{profileInfo.Table}];";
+        var truncateSql = $"TRUNCATE TABLE {ctx.SchemaTableQuoted};";
         
         var src = 
             $$""""
@@ -196,9 +140,9 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             using Microsoft.Data.SqlClient;
             using AdoGen.SqlServer;
 
-            namespace {{ns}};
+            namespace {{ctx.Namespace}};
             {{deleteSrc}}
-            {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : ISqlDomainModel<{{dtoTypeName}}>
+            {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlDomainModel<{{ctx.DtoTypeName}}>
             {
                 private const string SqlCreateTable = 
                     """
@@ -223,7 +167,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask<int> InsertAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> InsertAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
@@ -234,7 +178,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 /// <summary>
                 /// Inserts multiple database records in one roundtrip. 
                 /// Will throw if parameter count exceeds SQL Server limit (2100).
-                /// For type {{dtoTypeName}}, each record will use {{nonIdentityPropCount}} parameters.
+                /// For type {{ctx.DtoTypeName}}, each record will use {{nonIdentityPropCount}} parameters.
                 /// Resulting in a max insert count of {{2100 / nonIdentityPropCount}} per batch.
                 /// For larger inserts, consider using SqlBulkCopy or multiple batches.
                 /// </summary>
@@ -244,7 +188,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 /// <param name="transaction"></param>
                 /// <param name="commandTimeout"></param>
                 /// <returns>Number of affected rows</returns>
-                public static async ValueTask<int> InsertAsync(List<{{dtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> InsertAsync(List<{{ctx.DtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (models is null || models.Count == 0) return 0;
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -280,7 +224,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask<int> UpdateAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> UpdateAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
@@ -288,7 +232,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask<int> DeleteAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> DeleteAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
@@ -296,7 +240,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
-                public static async ValueTask<int> UpsertAsync({{dtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                public static async ValueTask<int> UpsertAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
@@ -322,38 +266,51 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         string ParamAdd(string modelName)
         {
             var sb = new StringBuilder();
-            foreach (var p in dtoProps)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{p.Name}({modelName}.{p.Name}));");
+            foreach (var col in ctx.Columns)
+                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
             return sb.ToString();
         }
 
         string ParamAddForUpdate(string modelName)
         {
             var sb = new StringBuilder();
-            foreach (var p in nonKeyNonIdentity)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{p.Name}({modelName}.{p.Name}));");
-            foreach (var k in profileInfo.Keys)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{k}({modelName}.{k}));");
+            foreach (var col in ctx.NonKeyNonIdentities)
+                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
+            foreach (var col in ctx.Keys)
+                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
             return sb.ToString();
         }
 
         string ParamAddForDelete(string modelName)
         {
             var sb = new StringBuilder();
-            foreach (var k in profileInfo.Keys)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{k}({modelName}.{k}));");
+            foreach (var col in ctx.Keys)
+                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
             return sb.ToString();
         }
         
         string ParamAddBatchFlat(string modelName, string indexName)
         {
             var sb = new StringBuilder();
-            foreach (var p in nonIdentityProp)
+            foreach (var col in ctx.NonIdentities)
             {
-                sb.AppendLine($"            cmd.Parameters.Add({dto.Name}Sql.CreateParameter{p.Name}({modelName}.{p.Name}, $\"@p{{{indexName}}}\"));");
+                sb.AppendLine($"            cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}, $\"@p{{{indexName}}}\"));");
                 sb.AppendLine($"            {indexName}++;");
             }
             return sb.ToString().TrimEnd();
         }
+    }
+
+    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector, string separator = ", ")
+    {
+        if (columns.Length == 0) return string.Empty;
+        if (columns.Length == 1) return selector(columns[0]);
+        var sb = new StringBuilder(capacity: columns.Length * 24);
+        for (var i = 0; i < columns.Length; i++)
+        {
+            if (i > 0) sb.Append(separator);
+            sb.Append(selector(columns[i]));
+        }
+        return sb.ToString();
     }
 }

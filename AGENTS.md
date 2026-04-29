@@ -187,6 +187,37 @@ On cold run xUnit constructs a default struct instance to deserialise into, whic
 generator change. If the test runner crashes with "Catastrophic failure: ArgumentNullException"
 during discovery, it is a serialisation bug in `TestHelpers.cs`, not a stale cache.
 
+### 2026-04-29 — Step 1 (`EmitContext`) completed; Steps 2–6 pending
+`EmitContext`, `ColumnInfo`, `ColumnRole`, `IIdentifierQuoter`, `SqlServerIdentifierQuoter`,
+`PostgreSqlIdentifierQuoter`, and `EmitContextBuilder` were added. All 6 emitters now receive
+`EmitContext ctx` via the updated `IEmitter.Handle` signature. All duplicated LINQ subset chains
+(`dtoProps.Where(p => !profileInfo.IdentityKeys.Contains(...))`) are eliminated from emitters.
+**72/72 generator tests pass. Zero snapshot diffs.**
+`ProfileInfo.IdentityKeys` remains `ImmutableHashSet<string>` — deferred to Step 5 per plan.
+`ParamAdd`/`ParamAddForUpdate`/`ParamAddForDelete`/`ParamAddBatchFlat` closure helpers remain in
+Domain emitters — they belong to Step 3 (`ParameterBindingEmitter`), not Step 1.
+Steps 2–6 of `docs/handover-claude-sonnet-generator-refactor.md` are **not yet started**.
+
+### 2026-04-29 — MERGE ON clause and upsert conflict keys must exclude identity keys
+The SQL Server MERGE `ON (...)` predicate and PostgreSQL `ON CONFLICT (...)` target must only
+include non-identity key columns. `EmitContext.JoinOn` uses ALL keys (correct for JOIN predicates
+in bulk ops). For MERGE/ON CONFLICT, filter with `ctx.Keys.Where(col => !col.IsIdentity)`.
+**Fix:** `DomainOpsEmitterSqlServer` and `DomainOpsEmitterNpgSql` now compute `nonIdentityKeys`
+separately for the upsert ON expression.
+
+### 2026-04-29 — Raw string literal indentation changes SQL whitespace in generated constants
+When `BuildApplySql` was rewritten from `sb.AppendLine("        UPDATE T")` chains to `$"""..."""`
+raw string literals, the indentation of the raw-string opener changed the effective leading
+spaces inside the stored constant, causing snapshot diffs.
+**Fix:** `BuildApplySql` in both bulk emitters keeps `sb.AppendLine` chains — the output is
+dynamic SQL built per-DTO, not a static template. Raw string literals are appropriate only for
+the *outer* generated C# source structure, not for dynamically-assembled SQL content.
+
+### 2026-04-29 — `BuildJoined` separator must be parameterised; `AND` vs `, ` are not the same
+A shared `BuildJoined` helper defaulted to `", "`. The MERGE `ON` clause needs `" AND "`.
+**Fix:** added a `separator` parameter with default `", "` to `BuildJoined` in
+`DomainOpsEmitterSqlServer`; callers that need `" AND "` pass it explicitly.
+
 ---
 
 ## Key Files to Read First

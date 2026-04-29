@@ -1,7 +1,8 @@
+using System;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Diagnostics;
-using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
 
@@ -15,82 +16,56 @@ internal sealed class BulkEmitterSqlServer : IEmitter
     public bool IsMatch(SqlModelKind kind, SqlProviderKind provider) => 
         provider is SqlProviderKind.SqlServer && kind >= SqlModelKind.Bulk;
 
-    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto)
+    public void Handle(SourceProductionContext spc, ValidatedDiscoveryDto validatedDto, EmitContext ctx)
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
         var dtoProps = profileInfo.DtoProperties;
-        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         var ns = profileInfo.Namespace;
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-        // --- Bulk metadata ---
-        // Temp table name is stable per DTO type
         var tempTableName = $"#AdoGen_{dto.Name}";
         var bulkTypeName = dto.Name + "Bulk";
 
-        // Keys / join predicate
-        var keys = profileInfo.Keys.ToArray();
-        if (keys.Length == 0)
+        if (ctx.Keys.Length == 0)
         {
             spc.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.MissingKey,
                 dto.Locations.FirstOrDefault() ?? Location.None, dto.Name));
             return;
         }
 
-        var joinOn = string.Join(" AND ", keys.Select(k => $"S.[{k}] = T.[{k}]"));
-        var idxCols = string.Join(", ", keys.Select(k => $"[{k}]"));
+        var joinOn = ctx.JoinOn;
+        var idxCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
         var idxClause =
             $"        CREATE INDEX [IX_AdoGen_{profileInfo.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
 
-        // INSERT columns: skip identity keys (same rule as DomainOpsEmitter)
-        var insertCols = dtoProps
-            .Where(p => !profileInfo.IdentityKeys.Contains(p.Name))
-            .Select(p => $"[{profileInfo.ParamsByProperty[p.Name].ParameterName}]")
-            .ToArray();
+        var insertCols = ctx.NonIdentities.Select(col => col.ColumnNameQuoted).ToArray();
+        var insertSelect = ctx.NonIdentities.Select(col => $"S.{col.ColumnNameQuoted}").ToArray();
+        var updateSet = string.Join(",\n        ", ctx.NonKeyNonIdentities
+            .Select(col => $"    T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}"));
 
-        var insertSelect = dtoProps
-            .Where(p => !profileInfo.IdentityKeys.Contains(p.Name))
-            .Select(p => $"S.[{profileInfo.ParamsByProperty[p.Name].ParameterName}]")
-            .ToArray();
-
-        // UPDATE SET: non-key, non-identity (same as DomainOpsEmitter)
-        var nonKeyNonIdentity = dtoProps
-            .Where(p => !profileInfo.Keys.Contains(p.Name) && !profileInfo.IdentityKeys.Contains(p.Name))
-            .ToArray();
-
-        var updateSet = string.Join(",\n        ", nonKeyNonIdentity
-            .Select(x => profileInfo.ParamsByProperty[x.Name].ParameterName)
-            .Select(x => $"    T.[{x}] = S.[{x}]"));
-
-        // CREATE TEMP TABLE (no identity clause here; it's just staging)
+        // CREATE TEMP TABLE (no identity clause; it's just staging)
         var sbColDefs = new StringBuilder();
-        for (var i = 0; i < dtoProps.Length; i++)
+        for (var i = 0; i < ctx.Columns.Length; i++)
         {
-            var p = dtoProps[i];
-            var cfg = profileInfo.ParamsByProperty[p.Name];
-            var sqlType = cfg.SqlTypeLiteral;
-            var isNullable = p.IsNullableProperty(cfg);
-            var nullability = isNullable ? "NULL" : "NOT NULL";
-
-            const string spaces = "            ";
-            sbColDefs.AppendLine($"{spaces}[{cfg.ParameterName}] {sqlType} {nullability},");
+            var col = ctx.Columns[i];
+            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
+            sbColDefs.AppendLine($"            {col.ColumnNameQuoted} {col.SqlType} {nullability},");
         }
-
-        sbColDefs.AppendLine("            [Operation] CHAR(1) NOT NULL");
+        sbColDefs.Append("            [Operation] CHAR(1) NOT NULL");
+        var colDefs = sbColDefs.ToString();
 
         var tempTableSql =
             $"""
              CREATE TABLE {tempTableName}(
-             {sbColDefs.ToString().TrimEnd()});
+             {colDefs});
              """;
 
-        // APPLY SQL variants
-        var schemaTable = $"[{profileInfo.Schema}].[{profileInfo.Table}]";
-
+        var schemaTable = ctx.SchemaTableQuoted;
         var applySql = BuildApplySql();
         var typeKeyword = dto.IsRecord ? "record" : "class";
+        var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         // Generated file
         var src =
@@ -209,7 +184,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             sb.AppendLine(idxClause);
             sb.AppendLine();
 
-            if (nonKeyNonIdentity.Length > 0)
+            if (ctx.NonKeyNonIdentities.Length > 0)
             {
                 sb.AppendLine("        UPDATE T");
                 sb.AppendLine("        SET");
@@ -237,38 +212,34 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             sb.AppendLine("        WHERE S.[Operation] = 'D';");
             sb.AppendLine("        SET @deleted = @@ROWCOUNT;");
             sb.AppendLine();
-
             sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;");
             sb.AppendLine();
-
             sb.AppendLine("        END TRY");
             sb.AppendLine("        BEGIN CATCH");
             sb.AppendLine($"    {DropGuard(tempTableName)}");
             sb.AppendLine("            THROW;");
             sb.AppendLine("        END CATCH;");
-
             sb.AppendLine(DropGuard(tempTableName));
 
             return sb.ToString().TrimEnd();
+
+            static string DropGuard(string name)
+                => $"        IF OBJECT_ID('tempdb..{name}') IS NOT NULL DROP TABLE {name};";
         }
 
         string BulkCopyMappings()
         {
             var sb = new StringBuilder();
-            foreach (var p in dtoProps)
-            {
-                var propName = profileInfo.ParamsByProperty[p.Name].ParameterName;
-                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{propName}\", \"{propName}\");");
-            }
-
+            foreach (var col in ctx.Columns)
+                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{col.ParameterName}\", \"{col.ParameterName}\");");
             return sb.ToString().TrimEnd();
         }
 
         string GetNameSwitch()
         {
             var sb = new StringBuilder();
-            for (var i = 0; i < dtoProps.Length; i++)
-                sb.AppendLine($"            {i} => \"{profileInfo.ParamsByProperty[dtoProps[i].Name].ParameterName}\",");
+            for (var i = 0; i < ctx.Columns.Length; i++)
+                sb.AppendLine($"            {i} => \"{ctx.Columns[i].ParameterName}\",");
             return sb.ToString().TrimEnd();
         }
 
@@ -282,7 +253,6 @@ internal sealed class BulkEmitterSqlServer : IEmitter
                 var typeName = t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat).TrimEnd('?');
                 sb.AppendLine($"            {i} => typeof({typeName}),");
             }
-
             return sb.ToString().TrimEnd();
         }
 
@@ -292,13 +262,10 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             for (var i = 0; i < dtoProps.Length; i++)
             {
                 var p = dtoProps[i];
-                var cfg = profileInfo.ParamsByProperty[p.Name];
-                var isNullable = p.IsNullableProperty(cfg);
-
-                var expr = GetValueExpression(p, isNullable);
+                var col = ctx.Columns[i];
+                var expr = GetValueExpression(p, col.IsNullable);
                 sb.AppendLine($"            {i} => {expr},");
             }
-
             return sb.ToString().TrimEnd();
         }
 
@@ -310,37 +277,41 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             {
                 return nts.TypeArguments[0];
             }
-
             return type;
         }
 
         string GetValueExpression(IPropertySymbol p, bool isNullable)
         {
-            // Reference nullable: item.Prop ?? (object)DBNull.Value
             if (isNullable && p.Type.IsReferenceType)
                 return $"_item.{p.Name} ?? (object)DBNull.Value";
 
-            // Nullable value type: item.Prop.HasValue ? item.Prop.Value : DBNull.Value
             if (isNullable && p.Type is INamedTypeSymbol nts &&
                 nts.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
-            {
                 return $"_item.{p.Name}.HasValue ? _item.{p.Name}.Value : DBNull.Value";
-            }
 
-            // Non-nullable
             return $"_item.{p.Name}";
         }
 
         string GetOrdinalSwitch()
         {
             var sb = new StringBuilder();
-            for (var i = 0; i < dtoProps.Length; i++)
-                sb.AppendLine($"            \"{profileInfo.ParamsByProperty[dtoProps[i].Name].ParameterName}\" => {i},");
-            sb.AppendLine($"            \"Operation\" => {dtoProps.Length},");
+            for (var i = 0; i < ctx.Columns.Length; i++)
+                sb.AppendLine($"            \"{ctx.Columns[i].ParameterName}\" => {i},");
+            sb.AppendLine($"            \"Operation\" => {ctx.Columns.Length},");
             return sb.ToString().TrimEnd();
         }
+    }
 
-        static string DropGuard(string tempTableName)
-            => $"        IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName};";
+    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector)
+    {
+        if (columns.Length == 0) return string.Empty;
+        if (columns.Length == 1) return selector(columns[0]);
+        var sb = new StringBuilder(capacity: columns.Length * 24);
+        for (var i = 0; i < columns.Length; i++)
+        {
+            if (i > 0) sb.Append(", ");
+            sb.Append(selector(columns[i]));
+        }
+        return sb.ToString();
     }
 }
