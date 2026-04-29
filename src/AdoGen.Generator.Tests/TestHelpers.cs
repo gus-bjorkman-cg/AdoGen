@@ -131,13 +131,13 @@ public readonly record struct AdoGenType : IXunitSerializable
 
 public readonly record struct TestTypes : IXunitSerializable
 {
-    private readonly List<TestTypes> _items = [];
+    private static readonly List<TestTypes> Items = [];
     public string Name { get; }
     
     private TestTypes(string name)
     {
         Name = name;
-        _items.Add(this);
+        Items.Add(this);
     }
 
     public static readonly TestTypes User = new(nameof(User));
@@ -145,7 +145,7 @@ public readonly record struct TestTypes : IXunitSerializable
     public static readonly TestTypes TestType = new(nameof(TestType));
 
     public void Deserialize(IXunitSerializationInfo info) => 
-        Unsafe.AsRef(in this) = _items.First(x => x.Name == info.GetValue<string>(nameof(Name)));
+        Unsafe.AsRef(in this) = Items.First(x => x.Name == info.GetValue<string>(nameof(Name)));
 
     public void Serialize(IXunitSerializationInfo info) => info.AddValue(nameof(Name), Name);
     
