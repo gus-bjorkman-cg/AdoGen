@@ -22,9 +22,9 @@ public static class SqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask CreateTableAsync<T>(CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : ISqlDomainModel<T> =>
-            await T.CreateTableAsync(connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask CreateTableAsync<T>(CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.CreateTableAsync(connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Inserts a database record.
@@ -35,9 +35,9 @@ public static class SqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask InsertAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : ISqlDomainModel<T> =>
-            await T.InsertAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> InsertAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.InsertAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Inserts multiple database records in one roundtrip.
@@ -48,9 +48,9 @@ public static class SqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask InsertAsync<T>(List<T> models, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : ISqlDomainModel<T> =>
-            await T.InsertAsync(models, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> InsertAsync<T>(List<T> models, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.InsertAsync(models, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Updates a database record.
@@ -61,9 +61,9 @@ public static class SqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask UpdateAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : ISqlDomainModel<T> =>
-            await T.UpdateAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> UpdateAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.UpdateAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Inserts or updates a database record.
@@ -74,9 +74,9 @@ public static class SqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask UpsertAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : ISqlDomainModel<T> =>
-            await T.UpsertAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> UpsertAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.UpsertAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Deletes a database record.
@@ -87,9 +87,9 @@ public static class SqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask DeleteAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : ISqlDomainModel<T> =>
-            await T.DeleteAsync(model, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> DeleteAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.DeleteAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Truncates a database table.
@@ -99,9 +99,9 @@ public static class SqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask TruncateAsync<T>(CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
-            where T : ISqlDomainModel<T> =>
-            await T.TruncateAsync(connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+        public ValueTask<int> TruncateAsync<T>(CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.TruncateAsync(connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
