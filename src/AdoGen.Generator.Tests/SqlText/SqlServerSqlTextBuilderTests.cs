@@ -103,13 +103,11 @@ public sealed class SqlServerSqlTextBuilderTests
         var actual = SqlServerSqlTextBuilder.Upsert(EmitContextFixtures.SqlServerUser());
 
         actual.Should().Be(
-            """
-            MERGE [dbo].[Users] AS T
-                       USING (VALUES(@Id, @Name, @Email)) AS S([Id], [Name], [Email])
-                       ON (T.[Id] = S.[Id])
-                       WHEN MATCHED THEN UPDATE SET T.[Name] = S.[Name], T.[Email] = S.[Email]
-                       WHEN NOT MATCHED THEN INSERT ([Id], [Name], [Email]) VALUES (S.[Id], S.[Name], S.[Email]);
-            """);
+            "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email " +
+            "WHERE [Id] = @Id; " +
+            "IF @@ROWCOUNT = 0 " +
+            "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) " +
+            "VALUES (@Id, @Name, @Email);");
     }
 
     [Fact]
@@ -118,13 +116,11 @@ public sealed class SqlServerSqlTextBuilderTests
         var actual = SqlServerSqlTextBuilder.Upsert(EmitContextFixtures.SqlServerAuditEvent());
 
         actual.Should().Be(
-            """
-            MERGE [log].[Audits] AS T
-                       USING (VALUES(@EventId, @CreatedAt, @Type, @JsonPayload)) AS S([EventId], [CreatedAt], [Type], [JsonPayload])
-                       ON ()
-                       WHEN MATCHED THEN UPDATE SET T.[CreatedAt] = S.[CreatedAt], T.[Type] = S.[Type], T.[JsonPayload] = S.[JsonPayload]
-                       WHEN NOT MATCHED THEN INSERT ([CreatedAt], [Type], [JsonPayload]) VALUES (S.[CreatedAt], S.[Type], S.[JsonPayload]);
-            """);
+            "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload " +
+            "WHERE [EventId] = @EventId; " +
+            "IF @@ROWCOUNT = 0 " +
+            "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) " +
+            "VALUES (@CreatedAt, @Type, @JsonPayload);");
     }
 
     [Fact]
@@ -133,13 +129,11 @@ public sealed class SqlServerSqlTextBuilderTests
         var actual = SqlServerSqlTextBuilder.Upsert(EmitContextFixtures.SqlServerCompositeKey());
         
         actual.Should().Be(
-            """
-            MERGE [dbo].[OrderLines] AS T
-                       USING (VALUES(@OrderId, @ProductId, @Quantity)) AS S([OrderId], [ProductId], [Quantity])
-                       ON (T.[OrderId] = S.[OrderId] AND T.[ProductId] = S.[ProductId])
-                       WHEN MATCHED THEN UPDATE SET T.[Quantity] = S.[Quantity]
-                       WHEN NOT MATCHED THEN INSERT ([OrderId], [ProductId], [Quantity]) VALUES (S.[OrderId], S.[ProductId], S.[Quantity]);
-            """
+            "UPDATE [dbo].[OrderLines] SET [Quantity] = @Quantity " +
+            "WHERE [OrderId] = @OrderId AND [ProductId] = @ProductId; " +
+            "IF @@ROWCOUNT = 0 " +
+            "INSERT INTO [dbo].[OrderLines] ([OrderId], [ProductId], [Quantity]) " +
+            "VALUES (@OrderId, @ProductId, @Quantity);"
             );
     }
 

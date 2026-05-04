@@ -61,25 +61,12 @@ internal static class SqlServerSqlTextBuilder
 
     public static string Upsert(EmitContext ctx)
     {
-        var usingColumns = BuildJoined(ctx.Columns, col => col.ColumnNameQuoted);
-        var usingValues = BuildJoined(ctx.Columns, col => "@" + col.ParameterName);
-        var nonIdentityKeys = FilterNonIdentityKeys(ctx.Keys);
-        var onExpr = BuildJoined(nonIdentityKeys,
-            col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}",
-            separator: " AND ");
-        var updateSetFromS = BuildJoined(ctx.NonKeyNonIdentities, col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}");
+        var updateSet = BuildJoined(ctx.NonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
         var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertValues = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
-
-        // Explicit construction to guarantee exact whitespace matching the original emitter.
-        // The generated C# constant embeds this with 4 leading spaces, so the constant value
-        // in the generated file starts with "    MERGE..." (4 spaces before MERGE) and 
-        // "       USING..." (7 spaces before continuation lines).
-        return $"MERGE {ctx.SchemaTableQuoted} AS T\n" +
-               $"           USING (VALUES({usingValues})) AS S({usingColumns})\n" +
-               $"           ON ({onExpr})\n" +
-               $"           WHEN MATCHED THEN UPDATE SET {updateSetFromS}\n" +
-               $"           WHEN NOT MATCHED THEN INSERT ({insertCols}) VALUES ({insertValues});";
+        var insertParams = BuildJoined(ctx.NonIdentities, col => "@" + col.ParameterName);
+        
+        return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey}; " +
+               $"IF @@ROWCOUNT = 0 INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
     }
 
     public static string Truncate(EmitContext ctx)
@@ -166,17 +153,7 @@ internal static class SqlServerSqlTextBuilder
 
     private static string DropGuard(string name)
         => $"        IF OBJECT_ID('tempdb..{name}') IS NOT NULL DROP TABLE {name};";
-
-    private static ImmutableArray<ColumnInfo> FilterNonIdentityKeys(ImmutableArray<ColumnInfo> keys)
-    {
-        var builder = ImmutableArray.CreateBuilder<ColumnInfo>(keys.Length);
-        for (var i = 0; i < keys.Length; i++)
-        {
-            if (!keys[i].IsIdentity) builder.Add(keys[i]);
-        }
-        return builder.ToImmutable();
-    }
-
+    
     private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector, string separator = ", ")
     {
         if (columns.Length == 0) return string.Empty;

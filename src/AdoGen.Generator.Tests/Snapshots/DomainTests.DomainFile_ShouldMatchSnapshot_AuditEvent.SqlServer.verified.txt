@@ -55,15 +55,8 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     private const string SqlInsertBatchTemplate = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES";
     private const string SqlUpdate = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId;";
     private const string SqlDelete = "DELETE FROM [log].[Audits] WHERE [EventId] = @EventId;";
+    private const string SqlUpsert = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId; IF @@ROWCOUNT = 0 INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES (@CreatedAt, @Type, @JsonPayload);";
     private const string SqlTruncate = "TRUNCATE TABLE [log].[Audits];";
-    private const string SqlUpsert = 
-        """
-        MERGE [log].[Audits] AS T
-           USING (VALUES(@EventId, @CreatedAt, @Type, @JsonPayload)) AS S([EventId], [CreatedAt], [Type], [JsonPayload])
-           ON ()
-           WHEN MATCHED THEN UPDATE SET T.[CreatedAt] = S.[CreatedAt], T.[Type] = S.[Type], T.[JsonPayload] = S.[JsonPayload]
-           WHEN NOT MATCHED THEN INSERT ([CreatedAt], [Type], [JsonPayload]) VALUES (S.[CreatedAt], S.[Type], S.[JsonPayload]);
-        """;
 
     private const int NonIdentityPropertyCount = 3;
 
@@ -165,10 +158,10 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
         cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
         cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
+        cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }

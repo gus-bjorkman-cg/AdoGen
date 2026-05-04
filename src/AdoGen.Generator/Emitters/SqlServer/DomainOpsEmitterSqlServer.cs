@@ -97,11 +97,8 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 private const string SqlInsertBatchTemplate = "{{insertBatchSql}}";
                 private const string SqlUpdate = "{{updateSql}}";
                 private const string SqlDelete = "{{deleteSql}}";
+                private const string SqlUpsert = "{{upsertSql}}";
                 private const string SqlTruncate = "{{truncateSql}}";
-                private const string SqlUpsert = 
-                    """
-                    {{upsertSql}}
-                    """;
             
                 private const int NonIdentityPropertyCount = {{nonIdentityPropCount}};
 
@@ -189,7 +186,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
-            {{ParamAdd("model")}}
+            {{ParamAddForUpsert("model")}}
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
@@ -211,18 +208,23 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         string ParamAdd(string modelName)
         {
             var sb = new StringBuilder();
+            
             foreach (var col in ctx.Columns)
                 sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
+            
             return sb.ToString();
         }
 
         string ParamAddForUpdate(string modelName)
         {
             var sb = new StringBuilder();
+            
             foreach (var col in ctx.NonKeyNonIdentities)
                 sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
+            
             foreach (var col in ctx.Keys)
                 sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
+            
             return sb.ToString();
         }
 
@@ -231,6 +233,23 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             var sb = new StringBuilder();
             foreach (var col in ctx.Keys)
                 sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
+            
+            return sb.ToString();
+        }
+
+        string ParamAddForUpsert(string modelName)
+        {
+            var sb = new StringBuilder();
+            
+            foreach (var col in ctx.NonIdentities)
+                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
+            
+            foreach (var col in ctx.Keys)
+            {
+                if (col.IsIdentity)
+                    sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
+            }
+            
             return sb.ToString();
         }
         

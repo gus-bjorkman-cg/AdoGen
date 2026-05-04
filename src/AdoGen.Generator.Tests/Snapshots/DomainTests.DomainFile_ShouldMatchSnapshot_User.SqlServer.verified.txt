@@ -54,15 +54,8 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
     private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES";
     private const string SqlUpdate = "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id;";
     private const string SqlDelete = "DELETE FROM [dbo].[Users] WHERE [Id] = @Id;";
+    private const string SqlUpsert = "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES (@Id, @Name, @Email);";
     private const string SqlTruncate = "TRUNCATE TABLE [dbo].[Users];";
-    private const string SqlUpsert = 
-        """
-        MERGE [dbo].[Users] AS T
-           USING (VALUES(@Id, @Name, @Email)) AS S([Id], [Name], [Email])
-           ON (T.[Id] = S.[Id])
-           WHEN MATCHED THEN UPDATE SET T.[Name] = S.[Name], T.[Email] = S.[Email]
-           WHEN NOT MATCHED THEN INSERT ([Id], [Name], [Email]) VALUES (S.[Id], S.[Name], S.[Email]);
-        """;
 
     private const int NonIdentityPropertyCount = 3;
 
