@@ -1,0 +1,195 @@
+using System;
+using System.Collections.Immutable;
+using System.Text;
+using AdoGen.Generator.Models;
+
+namespace AdoGen.Generator.Emitters.SqlServer;
+
+/// <summary>
+/// Pure SQL string production for SQL Server. All methods are stateless and testable
+/// with hand-built EmitContext fixtures — no Roslyn compilation required.
+/// </summary>
+internal static class SqlServerSqlTextBuilder
+{
+    public static string CreateTable(EmitContext ctx)
+    {
+        var sbColDefs = new StringBuilder();
+        for (var i = 0; i < ctx.Columns.Length; i++)
+        {
+            var col = ctx.Columns[i];
+            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
+            var identity = col.IsIdentity ? " IDENTITY(1,1)" : "";
+            var defaultClause = col.DefaultSqlExpression is not null ? $" {col.DefaultSqlExpression}" : "";
+            var comma = i == ctx.Columns.Length - 1 ? "" : ",";
+            sbColDefs.AppendLine($"            {col.ColumnNameQuoted} {col.SqlType}{identity}{defaultClause} {nullability}{comma}");
+        }
+
+        if (ctx.Keys.Length > 0)
+        {
+            var pkCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
+            sbColDefs.AppendLine($"        ,CONSTRAINT [PK_{ctx.Profile.Table}] PRIMARY KEY ({pkCols})");
+        }
+
+        var colDefs = sbColDefs.ToString().TrimEnd();
+        return $"""
+            CREATE TABLE {ctx.SchemaTableQuoted}(
+            {colDefs});
+            """;
+    }
+
+    public static string Insert(EmitContext ctx)
+    {
+        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertParams = BuildJoined(ctx.NonIdentities, col => "@" + col.ParameterName);
+        return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
+    }
+
+    public static string InsertBatchPrefix(EmitContext ctx)
+    {
+        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES";
+    }
+
+    public static string Update(EmitContext ctx)
+    {
+        var updateSet = BuildJoined(ctx.NonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
+        return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
+    }
+
+    public static string Delete(EmitContext ctx)
+        => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey};";
+
+    public static string Upsert(EmitContext ctx)
+    {
+        var usingColumns = BuildJoined(ctx.Columns, col => col.ColumnNameQuoted);
+        var usingValues = BuildJoined(ctx.Columns, col => "@" + col.ParameterName);
+        var nonIdentityKeys = FilterNonIdentityKeys(ctx.Keys);
+        var onExpr = BuildJoined(nonIdentityKeys,
+            col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}",
+            separator: " AND ");
+        var updateSetFromS = BuildJoined(ctx.NonKeyNonIdentities, col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}");
+        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertValues = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
+
+        // Explicit construction to guarantee exact whitespace matching the original emitter.
+        // The generated C# constant embeds this with 4 leading spaces, so the constant value
+        // in the generated file starts with "    MERGE..." (4 spaces before MERGE) and 
+        // "       USING..." (7 spaces before continuation lines).
+        return $"MERGE {ctx.SchemaTableQuoted} AS T\n" +
+               $"           USING (VALUES({usingValues})) AS S({usingColumns})\n" +
+               $"           ON ({onExpr})\n" +
+               $"           WHEN MATCHED THEN UPDATE SET {updateSetFromS}\n" +
+               $"           WHEN NOT MATCHED THEN INSERT ({insertCols}) VALUES ({insertValues});";
+    }
+
+    public static string Truncate(EmitContext ctx)
+        => $"TRUNCATE TABLE {ctx.SchemaTableQuoted};";
+
+    public static string DeleteBatchTemplate(EmitContext ctx, string keyName)
+        => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE [{keyName}] IN (";
+
+    public static string BulkCreateTempTable(EmitContext ctx, string tempTableName)
+    {
+        var sbColDefs = new StringBuilder();
+        for (var i = 0; i < ctx.Columns.Length; i++)
+        {
+            var col = ctx.Columns[i];
+            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
+            sbColDefs.AppendLine($"            {col.ColumnNameQuoted} {col.SqlType} {nullability},");
+        }
+        sbColDefs.Append("            [Operation] CHAR(1) NOT NULL");
+        var colDefs = sbColDefs.ToString();
+
+        return $"""
+             CREATE TABLE {tempTableName}(
+             {colDefs});
+             """;
+    }
+
+    public static string BulkApply(EmitContext ctx, string tempTableName, BulkApplyOptions options)
+    {
+        var schemaTable = ctx.SchemaTableQuoted;
+        var joinOn = ctx.JoinOn;
+        var idxCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
+        var idxClause = $"        CREATE INDEX [IX_AdoGen_{ctx.Profile.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
+        var updateSet = string.Join(",\n        ", System.Linq.Enumerable.Select(ctx.NonKeyNonIdentities,
+            col => $"    T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}"));
+        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertSelect = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
+
+        var sb = new StringBuilder();
+
+        sb.AppendLine("BEGIN TRY");
+        sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;");
+        sb.AppendLine(idxClause);
+        sb.AppendLine();
+
+        if (options.HasUpdates && ctx.NonKeyNonIdentities.Length > 0)
+        {
+            sb.AppendLine("        UPDATE T");
+            sb.AppendLine("        SET");
+            sb.AppendLine("        " + updateSet);
+            sb.AppendLine($"        FROM {schemaTable} AS T");
+            sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
+            sb.AppendLine("        WHERE S.[Operation] = 'U';");
+            sb.AppendLine("        SET @updated = @@ROWCOUNT;");
+            sb.AppendLine();
+        }
+
+        if (options.HasInserts && ctx.NonIdentities.Length > 0)
+        {
+            sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
+            sb.AppendLine($"        SELECT {insertSelect}");
+            sb.AppendLine($"        FROM {tempTableName} AS S");
+            sb.AppendLine("        WHERE S.[Operation] = 'I';");
+            sb.AppendLine("        SET @inserted = @@ROWCOUNT;");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("        DELETE T");
+        sb.AppendLine($"        FROM {schemaTable} AS T");
+        sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
+        sb.AppendLine("        WHERE S.[Operation] = 'D';");
+        sb.AppendLine("        SET @deleted = @@ROWCOUNT;");
+        sb.AppendLine();
+        sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;");
+        sb.AppendLine();
+        sb.AppendLine("        END TRY");
+        sb.AppendLine("        BEGIN CATCH");
+        sb.AppendLine($"    {DropGuard(tempTableName)}");
+        sb.AppendLine("            THROW;");
+        sb.AppendLine("        END CATCH;");
+        sb.AppendLine(DropGuard(tempTableName));
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string DropGuard(string name)
+        => $"        IF OBJECT_ID('tempdb..{name}') IS NOT NULL DROP TABLE {name};";
+
+    private static ImmutableArray<ColumnInfo> FilterNonIdentityKeys(ImmutableArray<ColumnInfo> keys)
+    {
+        var builder = ImmutableArray.CreateBuilder<ColumnInfo>(keys.Length);
+        for (var i = 0; i < keys.Length; i++)
+        {
+            if (!keys[i].IsIdentity) builder.Add(keys[i]);
+        }
+        return builder.ToImmutable();
+    }
+
+    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector, string separator = ", ")
+    {
+        if (columns.Length == 0) return string.Empty;
+        if (columns.Length == 1) return selector(columns[0]);
+        var sb = new StringBuilder(capacity: columns.Length * 24);
+        for (var i = 0; i < columns.Length; i++)
+        {
+            if (i > 0) sb.Append(separator);
+            sb.Append(selector(columns[i]));
+        }
+        return sb.ToString();
+    }
+}
+
+/// <summary>Options controlling which DML operations to include in the BulkApply SQL.</summary>
+public readonly record struct BulkApplyOptions(bool HasInserts, bool HasUpdates);

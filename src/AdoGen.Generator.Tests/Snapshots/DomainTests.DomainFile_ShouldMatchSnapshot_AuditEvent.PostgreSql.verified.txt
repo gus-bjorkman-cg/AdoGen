@@ -56,7 +56,7 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
     private const string Pg_SqlUpdate = """UPDATE "log"."Audits" SET "CreatedAt" = @CreatedAt, "Type" = @Type, "JsonPayload" = @JsonPayload WHERE "EventId" = @EventId;""";
     private const string Pg_SqlDelete = """DELETE FROM "log"."Audits" WHERE "EventId" = @EventId;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "log"."Audits";""";
-    private const string Pg_SqlUpsert = """INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload) ON CONFLICT () DO UPDATE SET "CreatedAt" = EXCLUDED."CreatedAt" , "Type" = EXCLUDED."Type" , "JsonPayload" = EXCLUDED."JsonPayload" ;""";
+    private const string Pg_SqlUpsert = """INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload) ON CONFLICT () DO UPDATE SET "CreatedAt" = EXCLUDED."CreatedAt", "Type" = EXCLUDED."Type", "JsonPayload" = EXCLUDED."JsonPayload";""";
     
     private const int Pg_NonIdentityPropertyCount = 3;
 

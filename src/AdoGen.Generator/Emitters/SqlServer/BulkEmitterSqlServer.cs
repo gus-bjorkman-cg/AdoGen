@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using AdoGen.Generator.Diagnostics;
@@ -35,35 +33,11 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             return;
         }
 
-        var joinOn = ctx.JoinOn;
-        var idxCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
-        var idxClause =
-            $"        CREATE INDEX [IX_AdoGen_{profileInfo.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
-
-        var insertCols = ctx.NonIdentities.Select(col => col.ColumnNameQuoted).ToArray();
-        var insertSelect = ctx.NonIdentities.Select(col => $"S.{col.ColumnNameQuoted}").ToArray();
-        var updateSet = string.Join(",\n        ", ctx.NonKeyNonIdentities
-            .Select(col => $"    T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}"));
-
-        // CREATE TEMP TABLE (no identity clause; it's just staging)
-        var sbColDefs = new StringBuilder();
-        for (var i = 0; i < ctx.Columns.Length; i++)
-        {
-            var col = ctx.Columns[i];
-            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
-            sbColDefs.AppendLine($"            {col.ColumnNameQuoted} {col.SqlType} {nullability},");
-        }
-        sbColDefs.Append("            [Operation] CHAR(1) NOT NULL");
-        var colDefs = sbColDefs.ToString();
-
-        var tempTableSql =
-            $"""
-             CREATE TABLE {tempTableName}(
-             {colDefs});
-             """;
-
-        var schemaTable = ctx.SchemaTableQuoted;
-        var applySql = BuildApplySql();
+        // SQL strings — produced by SqlServerSqlTextBuilder
+        var tempTableSql = SqlServerSqlTextBuilder.BulkCreateTempTable(ctx, tempTableName);
+        var applySql = SqlServerSqlTextBuilder.BulkApply(ctx, tempTableName,
+            new BulkApplyOptions(HasInserts: ctx.NonIdentities.Length > 0,
+                HasUpdates: ctx.NonKeyNonIdentities.Length > 0));
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
@@ -175,57 +149,6 @@ internal sealed class BulkEmitterSqlServer : IEmitter
         spc.AddSource($"{dto.Name}.Bulk.Sql.g.cs", src);
         return;
 
-        string BuildApplySql()
-        {
-            var sb = new StringBuilder();
-
-            sb.AppendLine("BEGIN TRY");
-            sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;");
-            sb.AppendLine(idxClause);
-            sb.AppendLine();
-
-            if (ctx.NonKeyNonIdentities.Length > 0)
-            {
-                sb.AppendLine("        UPDATE T");
-                sb.AppendLine("        SET");
-                sb.AppendLine("        " + updateSet);
-                sb.AppendLine($"        FROM {schemaTable} AS T");
-                sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
-                sb.AppendLine("        WHERE S.[Operation] = 'U';");
-                sb.AppendLine("        SET @updated = @@ROWCOUNT;");
-                sb.AppendLine();
-            }
-
-            if (insertCols.Length > 0)
-            {
-                sb.AppendLine($"        INSERT INTO {schemaTable} ({string.Join(", ", insertCols)})");
-                sb.AppendLine($"        SELECT {string.Join(", ", insertSelect)}");
-                sb.AppendLine($"        FROM {tempTableName} AS S");
-                sb.AppendLine("        WHERE S.[Operation] = 'I';");
-                sb.AppendLine("        SET @inserted = @@ROWCOUNT;");
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("        DELETE T");
-            sb.AppendLine($"        FROM {schemaTable} AS T");
-            sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
-            sb.AppendLine("        WHERE S.[Operation] = 'D';");
-            sb.AppendLine("        SET @deleted = @@ROWCOUNT;");
-            sb.AppendLine();
-            sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;");
-            sb.AppendLine();
-            sb.AppendLine("        END TRY");
-            sb.AppendLine("        BEGIN CATCH");
-            sb.AppendLine($"    {DropGuard(tempTableName)}");
-            sb.AppendLine("            THROW;");
-            sb.AppendLine("        END CATCH;");
-            sb.AppendLine(DropGuard(tempTableName));
-
-            return sb.ToString().TrimEnd();
-
-            static string DropGuard(string name)
-                => $"        IF OBJECT_ID('tempdb..{name}') IS NOT NULL DROP TABLE {name};";
-        }
 
         string BulkCopyMappings()
         {
@@ -300,18 +223,5 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             sb.AppendLine($"            \"Operation\" => {ctx.Columns.Length},");
             return sb.ToString().TrimEnd();
         }
-    }
-
-    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector)
-    {
-        if (columns.Length == 0) return string.Empty;
-        if (columns.Length == 1) return selector(columns[0]);
-        var sb = new StringBuilder(capacity: columns.Length * 24);
-        for (var i = 0; i < columns.Length; i++)
-        {
-            if (i > 0) sb.Append(", ");
-            sb.Append(selector(columns[i]));
-        }
-        return sb.ToString();
     }
 }

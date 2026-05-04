@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Text;
 using AdoGen.Generator.Emitters;
 using AdoGen.Generator.Emitters.PostgreSql;
@@ -12,8 +13,10 @@ namespace AdoGen.Generator.Pipelines;
 
 internal static class EmitContextBuilder
 {
-    public static EmitContext Build(ValidatedDiscoveryDto v)
-        => BuildOne(v);
+    private static readonly IIdentifierQuoter[] Quoters = 
+        [PostgreSqlIdentifierQuoter.Instance, SqlServerIdentifierQuoter.Instance];
+    
+    public static EmitContext Build(ValidatedDiscoveryDto v) => BuildOne(v);
 
     private static EmitContext BuildOne(ValidatedDiscoveryDto v)
     {
@@ -21,9 +24,7 @@ internal static class EmitContextBuilder
         var dto = discovery.Dto;
         var provider = discovery.Provider;
 
-        IIdentifierQuoter quoter = provider == SqlProviderKind.PostgreSql
-            ? PostgreSqlIdentifierQuoter.Instance
-            : SqlServerIdentifierQuoter.Instance;
+        var quoter = Quoters.First(x => x.IsMatch(v));
 
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
@@ -31,10 +32,11 @@ internal static class EmitContextBuilder
         var schemaQuoted = quoter.Quote(profile.Schema);
         var tableQuoted = quoter.Quote(profile.Table);
         var schemaTableQuoted = quoter.QuoteSchemaTable(profile.Schema, profile.Table);
-        var factoryClassName = dto.Name + (provider == SqlProviderKind.PostgreSql ? "Npgsql" : "Sql");
+        var factoryClassName = quoter.FactoryClassName(dto.Name);
 
         // Build ColumnInfo array from properties
         var columnsBuilder = ImmutableArray.CreateBuilder<ColumnInfo>(profile.DtoProperties.Length);
+        
         for (var i = 0; i < profile.DtoProperties.Length; i++)
         {
             var p = profile.DtoProperties[i];
@@ -119,11 +121,13 @@ internal static class EmitContextBuilder
         if (columns.Length == 1) return predicate(columns[0]);
 
         var sb = new StringBuilder(capacity: columns.Length * 32);
+        
         for (var i = 0; i < columns.Length; i++)
         {
             if (i > 0) sb.Append(" AND ");
             sb.Append(predicate(columns[i]));
         }
+        
         return sb.ToString();
     }
 }

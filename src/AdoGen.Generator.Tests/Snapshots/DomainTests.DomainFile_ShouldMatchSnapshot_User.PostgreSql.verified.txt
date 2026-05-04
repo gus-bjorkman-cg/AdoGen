@@ -55,7 +55,7 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
     private const string Pg_SqlUpdate = """UPDATE "public"."Users" SET "Name" = @Name, "Email" = @Email WHERE "Id" = @Id;""";
     private const string Pg_SqlDelete = """DELETE FROM "public"."Users" WHERE "Id" = @Id;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "public"."Users";""";
-    private const string Pg_SqlUpsert = """INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email) ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name" , "Email" = EXCLUDED."Email" ;""";
+    private const string Pg_SqlUpsert = """INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email) ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Email" = EXCLUDED."Email";""";
     
     private const int Pg_NonIdentityPropertyCount = 3;
 

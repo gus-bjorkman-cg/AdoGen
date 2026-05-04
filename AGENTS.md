@@ -218,6 +218,32 @@ A shared `BuildJoined` helper defaulted to `", "`. The MERGE `ON` clause needs `
 **Fix:** added a `separator` parameter with default `", "` to `BuildJoined` in
 `DomainOpsEmitterSqlServer`; callers that need `" AND "` pass it explicitly.
 
+### 2026-04-30 — Step 2 (`SqlTextBuilder`) completed
+`SqlServerSqlTextBuilder` and `PostgreSqlSqlTextBuilder` added. All SQL strings extracted from
+`DomainOpsEmitterSqlServer`, `BulkEmitterSqlServer`, `DomainOpsEmitterNpgSql`, and
+`BulkEmitterNpgSql` — zero inline SQL keywords remain in those emitters.
+`SqlText/` unit test folder added with `SqlServerSqlTextBuilderTests`, `PostgreSqlSqlTextBuilderTests`,
+and `EmitContextFixtures` (covers `User`, `Order`, `AuditEvent`, composite-key for both providers).
+**110/110 generator tests pass. Zero snapshot diffs.**
+
+### 2026-04-30 — `[ModuleInitializer]` conflicts with PolySharp polyfill in test project
+The generator project uses PolySharp which polyfills `ModuleInitializerAttribute` for `netstandard2.0`.
+When the test project references the generator assembly, the PolySharp-defined
+`ModuleInitializerAttribute` (a `class`, not an `Attribute`) leaks into scope, causing
+`CS0616: 'ModuleInitializer' is not an attribute class` in `ModuleInitializer.cs`.
+**Fix:** replace `[ModuleInitializer]` + `public static void Initialize()` with a `static` constructor.
+Static constructors on `static` classes run exactly once before first use — same semantics, no attribute needed.
+The `DerivePathInfo` (Verify) call and reference-list setup both work correctly in a `static` constructor.
+
+### 2026-04-30 — Test fixture must match test assertion; AuditEvent has non-key plain columns
+`PostgreSqlAuditEvent` fixture has `EventId` (Identity+Key) + 3 Plain columns, so
+`NonKeyNonIdentities.Length > 0` and the update block is always generated.
+Asserting `SELECT 1 WHERE false` against this fixture always fails.
+**Fix:** added `PostgreSqlIdentityOnlyKey` fixture (single identity key, no other columns) and
+used it in the test that checks for the empty-update-block path.
+**Rule:** when testing a conditional code path (e.g. "no updatable columns"), verify the fixture
+actually satisfies the condition before writing the assertion.
+
 ---
 
 ## Key Files to Read First

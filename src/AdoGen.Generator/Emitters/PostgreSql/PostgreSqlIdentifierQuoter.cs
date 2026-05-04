@@ -7,8 +7,12 @@ internal sealed class PostgreSqlIdentifierQuoter : IIdentifierQuoter
     public static readonly PostgreSqlIdentifierQuoter Instance = new();
     private PostgreSqlIdentifierQuoter() { }
 
-    public SqlProviderKind Provider => SqlProviderKind.PostgreSql;
-    public string Quote(string identifier) => $"\"{identifier}\"";
-    public string QuoteSchemaTable(string? schema, string table)
+    bool IIdentifierQuoter.IsMatch(ValidatedDiscoveryDto discovery) =>
+        discovery.Discovery.Provider == SqlProviderKind.PostgreSql;
+    
+    string IIdentifierQuoter.Quote(string identifier) => $"\"{identifier}\"";
+    string IIdentifierQuoter.QuoteSchemaTable(string? schema, string table)
         => schema is { Length: > 0 } ? $"\"{schema}\".\"{table}\"" : $"\"{table}\"";
+    
+    string IIdentifierQuoter.FactoryClassName(string dtoName) => dtoName + "Npgsql";
 }

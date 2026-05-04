@@ -4,7 +4,8 @@ namespace AdoGen.Generator.Emitters;
 
 internal interface IIdentifierQuoter
 {
-    SqlProviderKind Provider { get; }
+    bool IsMatch(ValidatedDiscoveryDto discovery);
     string Quote(string identifier);
     string QuoteSchemaTable(string? schema, string table);
+    string FactoryClassName(string dtoName);
 }

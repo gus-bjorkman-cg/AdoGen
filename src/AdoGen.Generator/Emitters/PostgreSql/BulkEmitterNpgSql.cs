@@ -35,32 +35,10 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 dto.Locations.FirstOrDefault() ?? Location.None, dto.Name));
             return;
         }
-
-        var joinOn = ctx.JoinOn;
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertSelect = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
-        var updateSet = string.Join(",\n        ", ctx.NonKeyNonIdentities
-            .Select(col => $"        \"{col.ParameterName}\" = S.\"{col.ParameterName}\""));
-
-        // CREATE TEMP TABLE
-        var sbColDefs = new StringBuilder();
-        for (var i = 0; i < ctx.Columns.Length; i++)
-        {
-            var col = ctx.Columns[i];
-            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
-            sbColDefs.AppendLine($"""        "{col.ParameterName}" {col.SqlType} {nullability},""");
-        }
-        sbColDefs.Append("""        "operation" CHAR(1) NOT NULL""");
-
-        var tempTableSql =
-            $"""
-                 CREATE TEMP TABLE IF NOT EXISTS "{tempTableName}"(
-             {sbColDefs});
-             """;
-
-        var schemaTable = ctx.SchemaTableQuoted;
-        var tempTableRef = $"\"{tempTableName}\"";
-        var applySql = BuildApplySql();
+        
+        // SQL strings — produced by PostgreSqlSqlTextBuilder
+        var tempTableSql = PostgreSqlSqlTextBuilder.BulkCreateTempTable(ctx, tempTableName);
+        var applySql = PostgreSqlSqlTextBuilder.BulkApply(ctx, tempTableName, ctx.SchemaTableQuoted);
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
@@ -129,59 +107,6 @@ internal sealed class BulkEmitterNpgSql : IEmitter
 
         spc.AddSource($"{dto.Name}.Bulk.Npgsql.g.cs", src);
         return;
-
-        string BuildApplySql()
-        {
-            var sb = new StringBuilder();
-            
-            var keyCols = BuildJoined(ctx.Keys, col => $"\"{col.ParameterName}\"");
-            var idxCols = $"\"operation\", {keyCols}";
-            var idxName = $"ix_{tempTableName}_op_keys";
-
-            sb.AppendLine($"""    CREATE INDEX IF NOT EXISTS "{idxName}" ON {tempTableRef} ({idxCols});""");
-            sb.AppendLine();
-            
-            sb.AppendLine("    WITH updated AS (");
-            if (ctx.NonKeyNonIdentities.Length > 0)
-            {
-                sb.AppendLine($"        UPDATE {schemaTable} AS T");
-                sb.AppendLine("            SET " + updateSet.TrimStart());
-                sb.AppendLine($"        FROM {tempTableRef} AS S");
-                sb.AppendLine($"""        WHERE S."operation" = 'U' AND {joinOn}""");
-                sb.AppendLine("        RETURNING 1),");
-            }
-            else
-            {
-                sb.AppendLine("        SELECT 1 WHERE false),");
-            }
-            
-            sb.AppendLine("    inserted AS (");
-            if (ctx.NonIdentities.Length > 0)
-            {
-                sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
-                sb.AppendLine($"            SELECT {insertSelect}");
-                sb.AppendLine($"            FROM {tempTableRef} AS S");
-                sb.AppendLine("            WHERE S.\"operation\" = 'I'");
-                sb.AppendLine("        RETURNING 1),");
-            }
-            else
-            {
-                sb.AppendLine("        SELECT 1 WHERE false),");
-            }
-            
-            sb.AppendLine("    deleted AS (");
-            sb.AppendLine($"        DELETE FROM {schemaTable} AS T");
-            sb.AppendLine($"        USING {tempTableRef} AS S");
-            sb.AppendLine($"        WHERE S.\"operation\" = 'D' AND {joinOn}");
-            sb.AppendLine("        RETURNING 1)");
-
-            sb.AppendLine("    SELECT");
-            sb.AppendLine("        (SELECT COUNT(*) FROM inserted) AS Inserted,");
-            sb.AppendLine("        (SELECT COUNT(*) FROM updated) AS Updated,");
-            sb.AppendLine("        (SELECT COUNT(*) FROM deleted) AS Deleted;");
-
-            return sb.ToString().TrimEnd();
-        }
         
         string EmitImporterWrites()
         {

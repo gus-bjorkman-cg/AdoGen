@@ -7,9 +7,13 @@ internal sealed class SqlServerIdentifierQuoter : IIdentifierQuoter
     public static readonly SqlServerIdentifierQuoter Instance = new();
     private SqlServerIdentifierQuoter() { }
 
-    public SqlProviderKind Provider => SqlProviderKind.SqlServer;
-    public string Quote(string identifier) => $"[{identifier}]";
-    public string QuoteSchemaTable(string? schema, string table)
+    bool IIdentifierQuoter.IsMatch(ValidatedDiscoveryDto discovery) =>
+        discovery.Discovery.Provider == SqlProviderKind.SqlServer;
+    
+    string IIdentifierQuoter.Quote(string identifier) => $"[{identifier}]";
+    string IIdentifierQuoter.QuoteSchemaTable(string? schema, string table)
         => schema is { Length: > 0 } ? $"[{schema}].[{table}]" : $"[{table}]";
+    
+    string IIdentifierQuoter.FactoryClassName(string dtoName) => dtoName + "Sql";
 }
 

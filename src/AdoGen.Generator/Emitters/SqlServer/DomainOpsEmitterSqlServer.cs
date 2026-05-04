@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Immutable;
-using System.Linq;
 using System.Text;
 using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
@@ -20,67 +17,15 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
 
-        // CREATE TABLE
-        var sbColDefs = new StringBuilder();
-        for (var i = 0; i < ctx.Columns.Length; i++)
-        {
-            var col = ctx.Columns[i];
-            var nullability = col.IsNullable ? "NULL" : "NOT NULL";
-            var identity = col.IsIdentity ? " IDENTITY(1,1)" : "";
-            var defaultClause = col.DefaultSqlExpression is not null ? $" {col.DefaultSqlExpression}" : "";
-
-            const string spaces = "            ";
-            var comma = i == ctx.Columns.Length - 1 ? "" : ",";
-            sbColDefs.AppendLine($"{spaces}{col.ColumnNameQuoted} {col.SqlType}{identity}{defaultClause} {nullability}{comma}");
-        }
-
-        if (ctx.Keys.Length > 0)
-        {
-            var pkCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
-            sbColDefs.AppendLine($"        ,CONSTRAINT [PK_{profileInfo.Table}] PRIMARY KEY ({pkCols})");
-        }
-
-        var colDefs = sbColDefs.ToString().TrimEnd();
-        var createTableSql = 
-            $"""
-            CREATE TABLE {ctx.SchemaTableQuoted}(
-            {colDefs});
-            """;
-
-        // INSERT (skip identity) — use pre-computed NonIdentities subset
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertParams = BuildJoined(ctx.NonIdentities, col => "@" + col.ParameterName);
+        // SQL strings — produced by SqlServerSqlTextBuilder
+        var createTableSql = SqlServerSqlTextBuilder.CreateTable(ctx);
+        var insertSql = SqlServerSqlTextBuilder.Insert(ctx);
+        var insertBatchSql = SqlServerSqlTextBuilder.InsertBatchPrefix(ctx);
+        var updateSql = SqlServerSqlTextBuilder.Update(ctx);
+        var deleteSql = SqlServerSqlTextBuilder.Delete(ctx);
+        var upsertSql = SqlServerSqlTextBuilder.Upsert(ctx);
         var nonIdentityPropCount = ctx.NonIdentities.Length;
 
-        var insertSql =
-            $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
-        var insertBatchSql = $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES";
-
-        // UPDATE (non-key, non-identity)
-        var updateSet = BuildJoined(ctx.NonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
-        var updateSql = $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
-        var deleteSql = $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey};";
-
-        // UPSERT via MERGE — ON clause uses non-identity keys only (matching original behavior)
-        var usingColumns = BuildJoined(ctx.Columns, col => col.ColumnNameQuoted);
-        var usingValues = BuildJoined(ctx.Columns, col => "@" + col.ParameterName);
-        var nonIdentityKeys = ctx.Keys.Where(col => !col.IsIdentity).ToArray();
-        var onExpr = BuildJoined(ImmutableArray.Create(nonIdentityKeys),
-            col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}",
-            separator: " AND ");
-
-        var updateSetFromS = BuildJoined(ctx.NonKeyNonIdentities, col => $"T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}");
-        var insertCols2 = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertValues2 = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
-
-        var upsertSql =
-            $"""
-             MERGE {ctx.SchemaTableQuoted} AS T
-                        USING (VALUES({usingValues})) AS S({usingColumns})
-                        ON ({onExpr})
-                        WHEN MATCHED THEN UPDATE SET {updateSetFromS}
-                        WHEN NOT MATCHED THEN INSERT ({insertCols2}) VALUES ({insertValues2});
-             """;
 
         var deleteSrc = "";
         if (profileInfo.Keys.Length == 1)
@@ -88,7 +33,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             var keyName = profileInfo.Keys[0];
             var keyType = profileInfo.ParamsByProperty[keyName].PropertyType
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var deleteBatchSql = $"DELETE FROM {ctx.SchemaTableQuoted} WHERE [{keyName}] IN (";
+            var deleteBatchSql = SqlServerSqlTextBuilder.DeleteBatchTemplate(ctx, keyName);
             
             deleteSrc =
                 $$""""
@@ -124,7 +69,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                   """";
         }
 
-        var truncateSql = $"TRUNCATE TABLE {ctx.SchemaTableQuoted};";
+        var truncateSql = SqlServerSqlTextBuilder.Truncate(ctx);
         
         var src = 
             $$""""
@@ -299,18 +244,5 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             }
             return sb.ToString().TrimEnd();
         }
-    }
-
-    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector, string separator = ", ")
-    {
-        if (columns.Length == 0) return string.Empty;
-        if (columns.Length == 1) return selector(columns[0]);
-        var sb = new StringBuilder(capacity: columns.Length * 24);
-        for (var i = 0; i < columns.Length; i++)
-        {
-            if (i > 0) sb.Append(separator);
-            sb.Append(selector(columns[i]));
-        }
-        return sb.ToString();
     }
 }
