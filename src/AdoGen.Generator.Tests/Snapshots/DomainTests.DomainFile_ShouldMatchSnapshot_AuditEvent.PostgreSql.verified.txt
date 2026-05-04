@@ -106,11 +106,11 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
         foreach (var model in models)
         {
             cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt, $"@p{paramIndex}"));
-            paramIndex++; 
+            paramIndex++;
             cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType, $"@p{paramIndex}"));
-            paramIndex++; 
+            paramIndex++;
             cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload, $"@p{paramIndex}"));
-            paramIndex++; 
+            paramIndex++;
         
         }
 

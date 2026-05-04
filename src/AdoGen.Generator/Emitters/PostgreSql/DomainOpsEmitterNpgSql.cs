@@ -1,4 +1,3 @@
-using System.Text;
 using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
 
@@ -111,7 +110,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   {
                       if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                       await using var cmd = connection.CreateCommand(Pg_SqlInsert, CommandType.Text, transaction, commandTimeout);
-              {{ParamAdd("model")}}        
+              {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}        
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                   }
 
@@ -141,7 +140,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                       foreach (var model in models)
                       {
-              {{ParamAddBatchFlat("model", "paramIndex")}}        
+              {{ParameterBindingEmitter.BindBatchFlat(ctx, "model", "paramIndex", 12)}}        
                       }
 
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -151,7 +150,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   {
                       if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                       await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
-              {{ParamAddForUpdate("model")}}        
+              {{ParameterBindingEmitter.BindForUpdate(ctx, "model", 8)}}        
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                   }
 
@@ -159,7 +158,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   {
                       if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                       await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
-              {{ParamAddForDelete("model")}}        
+              {{ParameterBindingEmitter.BindForDelete(ctx, "model", 8)}}        
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                   }
 
@@ -167,7 +166,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   {
                       if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                       await using var cmd = connection.CreateCommand(Pg_SqlUpsert, CommandType.Text, transaction, commandTimeout);
-              {{ParamAdd("model")}}        
+              {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}        
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                   }
     
@@ -181,43 +180,5 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               """";
 
         spc.AddSource($"{dto.Name}.Domain.Npgsql.g.cs", src);
-        return;
-
-        string ParamAdd(string modelName)
-        {
-            var sb = new StringBuilder();
-            foreach (var col in ctx.Columns)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Npgsql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            return sb.ToString();
-        }
-
-        string ParamAddForUpdate(string modelName)
-        {
-            var sb = new StringBuilder();
-            foreach (var col in ctx.NonKeyNonIdentities)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Npgsql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            foreach (var col in ctx.Keys)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Npgsql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            return sb.ToString();
-        }
-
-        string ParamAddForDelete(string modelName)
-        {
-            var sb = new StringBuilder();
-            foreach (var col in ctx.Keys)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Npgsql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            return sb.ToString();
-        }
-
-        string ParamAddBatchFlat(string modelName, string indexName)
-        {
-            var sb = new StringBuilder();
-            foreach (var col in ctx.NonIdentities)
-            {
-                sb.AppendLine($"            cmd.Parameters.Add({dto.Name}Npgsql.CreateParameter{col.Name}({modelName}.{col.Name}, $\"@p{{{indexName}}}\"));");
-                sb.AppendLine($"            {indexName}++; ");
-            }
-            return sb.ToString();
-        }
     }
 }

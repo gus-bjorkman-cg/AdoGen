@@ -104,11 +104,11 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
         foreach (var model in models)
         {
             cmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id, $"@p{paramIndex}"));
-            paramIndex++; 
+            paramIndex++;
             cmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name, $"@p{paramIndex}"));
-            paramIndex++; 
+            paramIndex++;
             cmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email, $"@p{paramIndex}"));
-            paramIndex++; 
+            paramIndex++;
         
         }
 

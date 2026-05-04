@@ -218,6 +218,16 @@ A shared `BuildJoined` helper defaulted to `", "`. The MERGE `ON` clause needs `
 **Fix:** added a `separator` parameter with default `", "` to `BuildJoined` in
 `DomainOpsEmitterSqlServer`; callers that need `" AND "` pass it explicitly.
 
+### 2026-05-04 — Step 3 (`ParameterBindingEmitter`) completed
+`ParameterBindingEmitter` added with `BindAll`, `BindForUpdate`, `BindForDelete`, `BindForUpsertSqlServer`,
+and `BindBatchFlat` static string-returning methods. All local closure helpers (`ParamAdd`,
+`ParamAddForUpdate`, `ParamAddForDelete`, `ParamAddBatchFlat`) removed from `DomainOpsEmitterSqlServer`
+and `DomainOpsEmitterNpgSql`. Bulk emitters had no param-binding closures.
+The NpgSql `ParamAddBatchFlat` previously emitted a trailing space on the `++;` line — this quirk
+was cleaned up (no trailing space) and the three affected NpgSql domain snapshots updated accordingly.
+**110/110 generator tests pass.**
+Steps 4–6 of `docs/handover-claude-sonnet-generator-refactor.md` are **not yet started**.
+
 ### 2026-04-30 — Step 2 (`SqlTextBuilder`) completed
 `SqlServerSqlTextBuilder` and `PostgreSqlSqlTextBuilder` added. All SQL strings extracted from
 `DomainOpsEmitterSqlServer`, `BulkEmitterSqlServer`, `DomainOpsEmitterNpgSql`, and

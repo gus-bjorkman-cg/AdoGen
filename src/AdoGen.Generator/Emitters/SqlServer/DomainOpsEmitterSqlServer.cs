@@ -1,4 +1,3 @@
-using System.Text;
 using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
 
@@ -113,7 +112,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
-            {{ParamAdd("model")}}
+            {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
@@ -160,7 +159,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 
                     foreach (var model in models)
                     {
-            {{ParamAddBatchFlat("model", "paramIndex")}}
+            {{ParameterBindingEmitter.BindBatchFlat(ctx, "model", "paramIndex", 12, trimEnd: true)}}
                     }
             
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -170,7 +169,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
-            {{ParamAddForUpdate("model")}}
+            {{ParameterBindingEmitter.BindForUpdate(ctx, "model", 8)}}
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
@@ -178,7 +177,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
-            {{ParamAddForDelete("model")}}
+            {{ParameterBindingEmitter.BindForDelete(ctx, "model", 8)}}
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
@@ -186,7 +185,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 {
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                     await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
-            {{ParamAddForUpsert("model")}}
+            {{ParameterBindingEmitter.BindForUpsertSqlServer(ctx, "model", 8)}}
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
@@ -202,66 +201,5 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         // upsertSql is always non-null here (we validate conflict keys earlier). Remove dead check.
 
         spc.AddSource($"{dto.Name}.Domain.Sql.g.cs", src);
-        
-        return;
-        
-        string ParamAdd(string modelName)
-        {
-            var sb = new StringBuilder();
-            
-            foreach (var col in ctx.Columns)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            
-            return sb.ToString();
-        }
-
-        string ParamAddForUpdate(string modelName)
-        {
-            var sb = new StringBuilder();
-            
-            foreach (var col in ctx.NonKeyNonIdentities)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            
-            foreach (var col in ctx.Keys)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            
-            return sb.ToString();
-        }
-
-        string ParamAddForDelete(string modelName)
-        {
-            var sb = new StringBuilder();
-            foreach (var col in ctx.Keys)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            
-            return sb.ToString();
-        }
-
-        string ParamAddForUpsert(string modelName)
-        {
-            var sb = new StringBuilder();
-            
-            foreach (var col in ctx.NonIdentities)
-                sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            
-            foreach (var col in ctx.Keys)
-            {
-                if (col.IsIdentity)
-                    sb.AppendLine($"        cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}));");
-            }
-            
-            return sb.ToString();
-        }
-        
-        string ParamAddBatchFlat(string modelName, string indexName)
-        {
-            var sb = new StringBuilder();
-            foreach (var col in ctx.NonIdentities)
-            {
-                sb.AppendLine($"            cmd.Parameters.Add({dto.Name}Sql.CreateParameter{col.Name}({modelName}.{col.Name}, $\"@p{{{indexName}}}\"));");
-                sb.AppendLine($"            {indexName}++;");
-            }
-            return sb.ToString().TrimEnd();
-        }
     }
 }
