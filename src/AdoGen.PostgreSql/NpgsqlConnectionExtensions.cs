@@ -129,6 +129,7 @@ public static class NpgsqlConnectionExtensions
             where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             return await command.QueryAsync<T>(ct);
         }
 
@@ -154,6 +155,7 @@ public static class NpgsqlConnectionExtensions
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
+            
             return await command.QueryAsync<T>(ct);
         }
 
@@ -178,7 +180,9 @@ public static class NpgsqlConnectionExtensions
             where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
             return await command.QueryAsync<T>(ct);
         }
 
@@ -201,6 +205,7 @@ public static class NpgsqlConnectionExtensions
             where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             return await command.QueryFirstOrDefaultAsync<T>(ct);
         }
 
@@ -226,6 +231,7 @@ public static class NpgsqlConnectionExtensions
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
+            
             return await command.QueryFirstOrDefaultAsync<T>(ct);
         }
 
@@ -250,7 +256,9 @@ public static class NpgsqlConnectionExtensions
             where T : INpgsqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
             return await command.QueryFirstOrDefaultAsync<T>(ct);
         }
 
@@ -271,6 +279,7 @@ public static class NpgsqlConnectionExtensions
             int? commandTimeout = null)
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             return await command.QueryMultiAsync(ct);
         }
 
@@ -294,6 +303,7 @@ public static class NpgsqlConnectionExtensions
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
+            
             return await command.QueryMultiAsync(ct);
         }
 
@@ -316,7 +326,9 @@ public static class NpgsqlConnectionExtensions
             int? commandTimeout = null)
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
             return await command.QueryMultiAsync(ct);
         }
 
@@ -363,6 +375,7 @@ public static class NpgsqlConnectionExtensions
             if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
         
@@ -413,12 +426,9 @@ public static class NpgsqlConnectionExtensions
             if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
-                                    
-            foreach (var parameter in parameters)
-            {
-                command.Parameters.Add(parameter);
-            }
-
+            
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
             return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
         
@@ -441,6 +451,7 @@ public static class NpgsqlConnectionExtensions
             if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
             return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         }
 
@@ -492,10 +503,7 @@ public static class NpgsqlConnectionExtensions
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
                         
-            foreach (var parameter in parameters)
-            {
-                command.Parameters.Add(parameter);
-            }
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
             
             return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         }
