@@ -15,6 +15,38 @@ public sealed class TruncateTests(TestContext testContext) : TestBase(testContex
     }
 
     [Fact]
+    public async Task Truncate_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.TruncateAsync<User>(cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    
+    [Fact]
+    public async Task Truncate_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
+    {
+        // Arrange
+        await using var transaction = await LockTable("Users");
+        
+        // Act
+        var act = async () =>
+        {
+            await using var connectionB = new NpgsqlConnection(ConnectionString);
+            await connectionB.TruncateAsync<User>(CancellationToken, commandTimeout: 1);
+        };
+
+        // Assert
+        (await act.Should().ThrowAsync<NpgsqlException>()).WithInnerException<TimeoutException>();
+        await transaction.RollbackAsync(CancellationToken);
+    }
+    
+    [Fact]
     public async Task Truncate_ShouldRespectDbTransaction()
     {
         // Arrange

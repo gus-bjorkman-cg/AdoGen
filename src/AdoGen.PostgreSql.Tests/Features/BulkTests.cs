@@ -138,5 +138,40 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         // Assert
         actual.Should().Be(new BulkApplyResult(usersToAdd.Count, usersToUpdate.Count, usersToDelete.Count));
     }
+    
+    [Fact]
+    public async Task Bulk_ShouldUseTransaction()
+    {
+        // Arrange
+        var users = UserFaker.Generate(10);
+        _bulk.AddRange(users);
+        await using var transaction = await Connection.BeginTransactionAsync(CancellationToken);
+        
+        // Act
+        await _bulk.SaveChangesAsync(Connection, transaction, CancellationToken);
+        await transaction.RollbackAsync(CancellationToken);
+        
+        // Assert
+        (await GetAllUsers()).Should().BeEquivalentTo(DefaultUsers);
+    }
+
+    [Fact]
+    public async Task Bulk_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        _bulk.AddRange(UserFaker.Generate(10));
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () =>
+        {
+            await using var transaction = Connection.BeginTransaction();
+            await _bulk.SaveChangesAsync(Connection, transaction, cts.Token);
+        };
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }
 

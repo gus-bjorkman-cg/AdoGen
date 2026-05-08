@@ -112,7 +112,7 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
-     protected override int FieldCount => 28;
+    protected override int FieldCount => 28;
 
      /// <summary>
      /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
@@ -130,32 +130,32 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
      protected override void ApplyColumnMappings(SqlBulkCopy bulk)
      {
          bulk.ColumnMappings.Add("Int", "Int");
-        bulk.ColumnMappings.Add("NullableInt", "NullableInt");
-        bulk.ColumnMappings.Add("Decimal", "Decimal");
-        bulk.ColumnMappings.Add("NullableDecimal", "NullableDecimal");
-        bulk.ColumnMappings.Add("NullableGuid", "NullableGuid");
-        bulk.ColumnMappings.Add("NullableStringVarchar", "NullableStringVarchar");
-        bulk.ColumnMappings.Add("NullableStringNVarchar", "NullableStringNVarchar");
-        bulk.ColumnMappings.Add("StringVarcharRuledNull", "StringVarcharRuledNull");
-        bulk.ColumnMappings.Add("CharString", "CharString");
-        bulk.ColumnMappings.Add("NCharString", "NCharString");
-        bulk.ColumnMappings.Add("Float", "Float");
-        bulk.ColumnMappings.Add("NullableFloat", "NullableFloat");
-        bulk.ColumnMappings.Add("DateTime", "DateTime");
-        bulk.ColumnMappings.Add("NullableDateTime", "NullableDateTime");
-        bulk.ColumnMappings.Add("Double", "Double");
-        bulk.ColumnMappings.Add("NullableDouble", "NullableDouble");
-        bulk.ColumnMappings.Add("Char", "Char");
-        bulk.ColumnMappings.Add("NChar", "NChar");
-        bulk.ColumnMappings.Add("NullableChar", "NullableChar");
-        bulk.ColumnMappings.Add("NullableBytes", "NullableBytes");
-        bulk.ColumnMappings.Add("Bytes", "Bytes");
-        bulk.ColumnMappings.Add("Fruits", "Fruits");
-        bulk.ColumnMappings.Add("Flags", "Flags");
-        bulk.ColumnMappings.Add("ByteEnum", "ByteEnum");
-        bulk.ColumnMappings.Add("ShortEnum", "ShortEnum");
-        bulk.ColumnMappings.Add("IntEnum", "IntEnum");
-        bulk.ColumnMappings.Add("LongEnum", "LongEnum");
+         bulk.ColumnMappings.Add("NullableInt", "NullableInt");
+         bulk.ColumnMappings.Add("Decimal", "Decimal");
+         bulk.ColumnMappings.Add("NullableDecimal", "NullableDecimal");
+         bulk.ColumnMappings.Add("NullableGuid", "NullableGuid");
+         bulk.ColumnMappings.Add("NullableStringVarchar", "NullableStringVarchar");
+         bulk.ColumnMappings.Add("NullableStringNVarchar", "NullableStringNVarchar");
+         bulk.ColumnMappings.Add("StringVarcharRuledNull", "StringVarcharRuledNull");
+         bulk.ColumnMappings.Add("CharString", "CharString");
+         bulk.ColumnMappings.Add("NCharString", "NCharString");
+         bulk.ColumnMappings.Add("Float", "Float");
+         bulk.ColumnMappings.Add("NullableFloat", "NullableFloat");
+         bulk.ColumnMappings.Add("DateTime", "DateTime");
+         bulk.ColumnMappings.Add("NullableDateTime", "NullableDateTime");
+         bulk.ColumnMappings.Add("Double", "Double");
+         bulk.ColumnMappings.Add("NullableDouble", "NullableDouble");
+         bulk.ColumnMappings.Add("Char", "Char");
+         bulk.ColumnMappings.Add("NChar", "NChar");
+         bulk.ColumnMappings.Add("NullableChar", "NullableChar");
+         bulk.ColumnMappings.Add("NullableBytes", "NullableBytes");
+         bulk.ColumnMappings.Add("Bytes", "Bytes");
+         bulk.ColumnMappings.Add("Fruits", "Fruits");
+         bulk.ColumnMappings.Add("Flags", "Flags");
+         bulk.ColumnMappings.Add("ByteEnum", "ByteEnum");
+         bulk.ColumnMappings.Add("ShortEnum", "ShortEnum");
+         bulk.ColumnMappings.Add("IntEnum", "IntEnum");
+         bulk.ColumnMappings.Add("LongEnum", "LongEnum");
      }
 
      private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
@@ -182,32 +182,32 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
          public override object GetValue(int i) => i switch
          {
              0 => _item.Int,
-            1 => _item.NullableInt.HasValue ? _item.NullableInt.Value : DBNull.Value,
-            2 => _item.Decimal,
-            3 => _item.NullableDecimal.HasValue ? _item.NullableDecimal.Value : DBNull.Value,
-            4 => _item.NullableGuid.HasValue ? _item.NullableGuid.Value : DBNull.Value,
-            5 => _item.NullableStringVarchar ?? (object)DBNull.Value,
-            6 => _item.NullableStringNVarchar ?? (object)DBNull.Value,
-            7 => _item.StringVarcharRuledNull ?? (object)DBNull.Value,
-            8 => _item.CharString,
-            9 => _item.NCharString,
-            10 => _item.Float,
-            11 => _item.NullableFloat.HasValue ? _item.NullableFloat.Value : DBNull.Value,
-            12 => _item.DateTime,
-            13 => _item.NullableDateTime ?? (object)DBNull.Value,
-            14 => _item.Double,
-            15 => _item.NullableDouble.HasValue ? _item.NullableDouble.Value : DBNull.Value,
-            16 => _item.Char,
-            17 => _item.NChar,
-            18 => _item.NullableChar.HasValue ? _item.NullableChar.Value : DBNull.Value,
-            19 => _item.NullableBytes ?? (object)DBNull.Value,
-            20 => _item.Bytes,
-            21 => _item.Fruits,
-            22 => _item.Flags,
-            23 => _item.ByteEnum,
-            24 => _item.ShortEnum,
-            25 => _item.IntEnum,
-            26 => _item.LongEnum,
+             1 => _item.NullableInt.HasValue ? _item.NullableInt.Value : DBNull.Value,
+             2 => _item.Decimal,
+             3 => _item.NullableDecimal.HasValue ? _item.NullableDecimal.Value : DBNull.Value,
+             4 => _item.NullableGuid.HasValue ? _item.NullableGuid.Value : DBNull.Value,
+             5 => _item.NullableStringVarchar ?? (object)DBNull.Value,
+             6 => _item.NullableStringNVarchar ?? (object)DBNull.Value,
+             7 => _item.StringVarcharRuledNull ?? (object)DBNull.Value,
+             8 => _item.CharString,
+             9 => _item.NCharString,
+             10 => _item.Float,
+             11 => _item.NullableFloat.HasValue ? _item.NullableFloat.Value : DBNull.Value,
+             12 => _item.DateTime,
+             13 => _item.NullableDateTime ?? (object)DBNull.Value,
+             14 => _item.Double,
+             15 => _item.NullableDouble.HasValue ? _item.NullableDouble.Value : DBNull.Value,
+             16 => _item.Char,
+             17 => _item.NChar,
+             18 => _item.NullableChar.HasValue ? _item.NullableChar.Value : DBNull.Value,
+             19 => _item.NullableBytes ?? (object)DBNull.Value,
+             20 => _item.Bytes,
+             21 => _item.Fruits,
+             22 => _item.Flags,
+             23 => _item.ByteEnum,
+             24 => _item.ShortEnum,
+             25 => _item.IntEnum,
+             26 => _item.LongEnum,
              27 => _op,
              _ => throw new IndexOutOfRangeException()
          };
@@ -215,32 +215,32 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
          public override string GetName(int i) => i switch
          {
              0 => "Int",
-            1 => "NullableInt",
-            2 => "Decimal",
-            3 => "NullableDecimal",
-            4 => "NullableGuid",
-            5 => "NullableStringVarchar",
-            6 => "NullableStringNVarchar",
-            7 => "StringVarcharRuledNull",
-            8 => "CharString",
-            9 => "NCharString",
-            10 => "Float",
-            11 => "NullableFloat",
-            12 => "DateTime",
-            13 => "NullableDateTime",
-            14 => "Double",
-            15 => "NullableDouble",
-            16 => "Char",
-            17 => "NChar",
-            18 => "NullableChar",
-            19 => "NullableBytes",
-            20 => "Bytes",
-            21 => "Fruits",
-            22 => "Flags",
-            23 => "ByteEnum",
-            24 => "ShortEnum",
-            25 => "IntEnum",
-            26 => "LongEnum",
+             1 => "NullableInt",
+             2 => "Decimal",
+             3 => "NullableDecimal",
+             4 => "NullableGuid",
+             5 => "NullableStringVarchar",
+             6 => "NullableStringNVarchar",
+             7 => "StringVarcharRuledNull",
+             8 => "CharString",
+             9 => "NCharString",
+             10 => "Float",
+             11 => "NullableFloat",
+             12 => "DateTime",
+             13 => "NullableDateTime",
+             14 => "Double",
+             15 => "NullableDouble",
+             16 => "Char",
+             17 => "NChar",
+             18 => "NullableChar",
+             19 => "NullableBytes",
+             20 => "Bytes",
+             21 => "Fruits",
+             22 => "Flags",
+             23 => "ByteEnum",
+             24 => "ShortEnum",
+             25 => "IntEnum",
+             26 => "LongEnum",
              27 => "Operation",
              _ => throw new IndexOutOfRangeException()
          };
@@ -248,32 +248,32 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
          public override Type GetFieldType(int i) => i switch
          {
              0 => typeof(int),
-            1 => typeof(int),
-            2 => typeof(decimal),
-            3 => typeof(decimal),
-            4 => typeof(Guid),
-            5 => typeof(string),
-            6 => typeof(string),
-            7 => typeof(string),
-            8 => typeof(string),
-            9 => typeof(string),
-            10 => typeof(float),
-            11 => typeof(float),
-            12 => typeof(DateTime),
-            13 => typeof(DateTime),
-            14 => typeof(double),
-            15 => typeof(double),
-            16 => typeof(char),
-            17 => typeof(char),
-            18 => typeof(char),
-            19 => typeof(byte[]),
-            20 => typeof(byte[]),
-            21 => typeof(Fruits),
-            22 => typeof(Flags),
-            23 => typeof(ByteEnum),
-            24 => typeof(ShortEnum),
-            25 => typeof(IntEnum),
-            26 => typeof(LongEnum),
+             1 => typeof(int),
+             2 => typeof(decimal),
+             3 => typeof(decimal),
+             4 => typeof(Guid),
+             5 => typeof(string),
+             6 => typeof(string),
+             7 => typeof(string),
+             8 => typeof(string),
+             9 => typeof(string),
+             10 => typeof(float),
+             11 => typeof(float),
+             12 => typeof(DateTime),
+             13 => typeof(DateTime),
+             14 => typeof(double),
+             15 => typeof(double),
+             16 => typeof(char),
+             17 => typeof(char),
+             18 => typeof(char),
+             19 => typeof(byte[]),
+             20 => typeof(byte[]),
+             21 => typeof(Fruits),
+             22 => typeof(Flags),
+             23 => typeof(ByteEnum),
+             24 => typeof(ShortEnum),
+             25 => typeof(IntEnum),
+             26 => typeof(LongEnum),
              27 => typeof(char),
              _ => throw new IndexOutOfRangeException()
          };
@@ -281,33 +281,33 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
          public override int GetOrdinal(string name) => name switch
          {
              "Int" => 0,
-            "NullableInt" => 1,
-            "Decimal" => 2,
-            "NullableDecimal" => 3,
-            "NullableGuid" => 4,
-            "NullableStringVarchar" => 5,
-            "NullableStringNVarchar" => 6,
-            "StringVarcharRuledNull" => 7,
-            "CharString" => 8,
-            "NCharString" => 9,
-            "Float" => 10,
-            "NullableFloat" => 11,
-            "DateTime" => 12,
-            "NullableDateTime" => 13,
-            "Double" => 14,
-            "NullableDouble" => 15,
-            "Char" => 16,
-            "NChar" => 17,
-            "NullableChar" => 18,
-            "NullableBytes" => 19,
-            "Bytes" => 20,
-            "Fruits" => 21,
-            "Flags" => 22,
-            "ByteEnum" => 23,
-            "ShortEnum" => 24,
-            "IntEnum" => 25,
-            "LongEnum" => 26,
-            "Operation" => 27,
+             "NullableInt" => 1,
+             "Decimal" => 2,
+             "NullableDecimal" => 3,
+             "NullableGuid" => 4,
+             "NullableStringVarchar" => 5,
+             "NullableStringNVarchar" => 6,
+             "StringVarcharRuledNull" => 7,
+             "CharString" => 8,
+             "NCharString" => 9,
+             "Float" => 10,
+             "NullableFloat" => 11,
+             "DateTime" => 12,
+             "NullableDateTime" => 13,
+             "Double" => 14,
+             "NullableDouble" => 15,
+             "Char" => 16,
+             "NChar" => 17,
+             "NullableChar" => 18,
+             "NullableBytes" => 19,
+             "Bytes" => 20,
+             "Fruits" => 21,
+             "Flags" => 22,
+             "ByteEnum" => 23,
+             "ShortEnum" => 24,
+             "IntEnum" => 25,
+             "LongEnum" => 26,
+             "Operation" => 27,
              _ => -1
          };
      }

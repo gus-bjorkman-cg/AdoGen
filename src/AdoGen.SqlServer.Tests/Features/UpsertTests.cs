@@ -27,6 +27,20 @@ public sealed class UpsertTests(TestContext testContext) : TestBase(testContext)
         // Assert
         (await GetUser(user.Id)).Should().Be(user);
     }
+    
+    [Fact]
+    public async Task Upsert_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.InsertAsync(UserFaker.Generate(), cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 
     [Fact]
     public async Task Upsert_ShouldRespectDbTransaction()
@@ -44,7 +58,7 @@ public sealed class UpsertTests(TestContext testContext) : TestBase(testContext)
     }
 
     [Fact]
-    public async Task Upsert_ShouldRespectCommandTimeout()
+    public async Task Upsert_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
     {
         // Arrange
         await using var transaction = await LockTable("Users");
@@ -53,11 +67,11 @@ public sealed class UpsertTests(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.UpsertAsync(DefaultUsers[0], CancellationToken, commandTimeout: 1);
+            await connectionB.UpsertAsync(DefaultUsers[0], CancellationToken, commandTimeout: 1);
         };
 
         // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await act.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(-2);
         transaction.Rollback();
     }
 }

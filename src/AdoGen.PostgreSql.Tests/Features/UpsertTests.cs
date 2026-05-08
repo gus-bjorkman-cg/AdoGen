@@ -27,6 +27,38 @@ public sealed class UpsertTests(TestContext testContext) : TestBase(testContext)
         // Assert
         (await GetUser(user.Id)).Should().Be(user);
     }
+    
+    [Fact]
+    public async Task Upsert_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.UpsertAsync(UserFaker.Generate(), cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    
+    [Fact]
+    public async Task Upsert_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
+    {
+        // Arrange
+        await using var transaction = await LockTable("Users");
+        
+        // Act
+        var act = async () =>
+        {
+            await using var connectionB = new NpgsqlConnection(ConnectionString);
+            await connectionB.UpsertAsync(UserFaker.Generate(), CancellationToken, commandTimeout: 1);
+        };
+
+        // Assert
+        (await act.Should().ThrowAsync<NpgsqlException>()).WithInnerException<TimeoutException>();
+        await transaction.RollbackAsync(CancellationToken);
+    }
 
     [Fact]
     public async Task Upsert_ShouldRespectDbTransaction()

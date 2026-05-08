@@ -15,7 +15,39 @@ public sealed class InsertListTests(TestContext testContext) : TestBase(testCont
         // Assert
         (await GetUsers()).Should().BeEquivalentTo(_users);
     }
+    
+    [Fact]
+    public async Task Insert_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.InsertAsync(_users, cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    
+    [Fact]
+    public async Task Insert_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
+    {
+        // Arrange
+        await using var transaction = await LockTable("Users");
+        
+        // Act
+        var act = async () =>
+        {
+            await using var connectionB = new NpgsqlConnection(ConnectionString);
+            await connectionB.InsertAsync(_users, CancellationToken, commandTimeout: 1);
+        };
 
+        // Assert
+        (await act.Should().ThrowAsync<NpgsqlException>()).WithInnerException<TimeoutException>();
+        await transaction.RollbackAsync(CancellationToken);
+    }
+    
     [Fact]
     public async Task Insert_ShouldRespectDbTransaction()
     {

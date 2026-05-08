@@ -17,6 +17,20 @@ public sealed class InsertListTests(TestContext testContext) : TestBase(testCont
     }
 
     [Fact]
+    public async Task Insert_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.InsertAsync(_users, cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    
+    [Fact]
     public async Task Insert_ShouldRespectDbTransaction()
     {
         // Arrange
@@ -31,7 +45,7 @@ public sealed class InsertListTests(TestContext testContext) : TestBase(testCont
     }
 
     [Fact]
-    public async Task Insert_ShouldRespectCommandTimeout()
+    public async Task Insert_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
     {
         // Arrange
         await using var transaction = await LockTable("Users");
@@ -40,11 +54,11 @@ public sealed class InsertListTests(TestContext testContext) : TestBase(testCont
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.InsertAsync(_users, CancellationToken, commandTimeout: 1);
+            await connectionB.InsertAsync(_users, CancellationToken, commandTimeout: 1);
         };
 
         // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await act.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(-2);
         transaction.Rollback();
     }
     

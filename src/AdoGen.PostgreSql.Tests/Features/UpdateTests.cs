@@ -1,20 +1,58 @@
+using AdoGen.Sample.Features.Users;
+
 namespace AdoGen.PostgreSql.Tests.Features;
 
-public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
+public sealed class UpdateTests : TestBase
 {
+    private readonly User _user;
+    
+    public UpdateTests(TestContext testContext) : base(testContext)
+    {
+        _user = DefaultUsers[0] with { Name = "other name" };
+    }
+
     [Fact]
     public async Task User_ShouldBeUpdated()
     {
-        // Arrange
-        var user = DefaultUsers[0] with { Name = "other name" };
-
         // Act
-        await Connection.UpdateAsync(user, CancellationToken);
+        await Connection.UpdateAsync(_user, CancellationToken);
 
         // Assert
-        (await GetUser(user.Id)).Should().Be(user);
+        (await GetUser(_user.Id)).Should().Be(_user);
     }
+    
+    [Fact]
+    public async Task Update_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.UpdateAsync(_user, cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    
+    [Fact]
+    public async Task Update_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
+    {
+        // Arrange
+        await using var transaction = await LockTable("Users");
+        
+        // Act
+        var act = async () =>
+        {
+            await using var connectionB = new NpgsqlConnection(ConnectionString);
+            await connectionB.UpdateAsync(_user, CancellationToken, commandTimeout: 1);
+        };
 
+        // Assert
+        (await act.Should().ThrowAsync<NpgsqlException>()).WithInnerException<TimeoutException>();
+        await transaction.RollbackAsync(CancellationToken);
+    }
+    
     [Fact]
     public async Task Update_ShouldRespectDbTransaction()
     {

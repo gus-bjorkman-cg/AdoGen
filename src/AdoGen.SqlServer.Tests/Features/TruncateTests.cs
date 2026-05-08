@@ -15,6 +15,20 @@ public sealed class TruncateTests(TestContext testContext) : TestBase(testContex
     }
     
     [Fact]
+    public async Task Truncate_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.TruncateAsync<User>(cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    
+    [Fact]
     public async Task Truncate_ShouldRespectDbTransaction()
     {
         // Arrange
@@ -29,7 +43,7 @@ public sealed class TruncateTests(TestContext testContext) : TestBase(testContex
     }
     
     [Fact]
-    public async Task Truncate_ShouldRespectCommandTimeout()
+    public async Task Truncate_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
     {
         // Arrange
         await using var transaction = await LockTable("Users");
@@ -42,7 +56,7 @@ public sealed class TruncateTests(TestContext testContext) : TestBase(testContex
         };
 
         // Assert
-        await act.Should().ThrowAsync<SqlException>();
+        (await act.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(-2);
         transaction.Rollback();
     }
 

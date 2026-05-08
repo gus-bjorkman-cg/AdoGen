@@ -13,8 +13,7 @@ public sealed class ExecuteTests(TestContext testContext) : TestBase(testContext
         var actual = await Connection.ExecuteAsync(SqlUpdate, CancellationToken);
 
         // Assert
-        var count = (await GetAllUsers()).Count;
-        actual.Should().Be(count);
+        actual.Should().Be((await GetAllUsers()).Count);
     }
 
     [Fact]

@@ -14,7 +14,22 @@ public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
         // Assert
         (await GetUser(user.Id)).Should().Be(user);
     }
-
+    
+    [Fact]
+    public async Task Update_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
+    {
+        // Arrange
+        var user = DefaultUsers[0] with { Name = "other name" };
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        
+        // Act
+        var act = async () => await Connection.UpdateAsync(user, cts.Token);
+        
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    
     [Fact]
     public async Task Update_ShouldRespectDbTransaction()
     {
@@ -31,7 +46,7 @@ public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
     }
 
     [Fact]
-    public async Task Update_ShouldRespectCommandTimeout()
+    public async Task Update_ShouldThrowSqlException_WhenCommandTimeoutIsReached()
     {
         // Arrange
         await using var transaction = await LockTable("Users");
@@ -40,11 +55,11 @@ public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await Connection.UpdateAsync(DefaultUsers[0], CancellationToken, commandTimeout: 1);
+            await connectionB.UpdateAsync(DefaultUsers[0], CancellationToken, commandTimeout: 1);
         };
 
         // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await act.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(-2);
         transaction.Rollback();
     }
 }

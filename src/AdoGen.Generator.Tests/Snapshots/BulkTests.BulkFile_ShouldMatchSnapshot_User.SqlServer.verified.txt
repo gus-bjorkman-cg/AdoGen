@@ -65,7 +65,7 @@ public sealed class UserBulk : BulkBatchSql<global::AdoGen.Generator.Tests.User>
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
-     protected override int FieldCount => 4;
+    protected override int FieldCount => 4;
 
      /// <summary>
      /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
@@ -83,8 +83,8 @@ public sealed class UserBulk : BulkBatchSql<global::AdoGen.Generator.Tests.User>
      protected override void ApplyColumnMappings(SqlBulkCopy bulk)
      {
          bulk.ColumnMappings.Add("Id", "Id");
-        bulk.ColumnMappings.Add("Name", "Name");
-        bulk.ColumnMappings.Add("Email", "Email");
+         bulk.ColumnMappings.Add("Name", "Name");
+         bulk.ColumnMappings.Add("Email", "Email");
      }
 
      private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
@@ -111,8 +111,8 @@ public sealed class UserBulk : BulkBatchSql<global::AdoGen.Generator.Tests.User>
          public override object GetValue(int i) => i switch
          {
              0 => _item.Id,
-            1 => _item.Name,
-            2 => _item.Email,
+             1 => _item.Name,
+             2 => _item.Email,
              3 => _op,
              _ => throw new IndexOutOfRangeException()
          };
@@ -120,8 +120,8 @@ public sealed class UserBulk : BulkBatchSql<global::AdoGen.Generator.Tests.User>
          public override string GetName(int i) => i switch
          {
              0 => "Id",
-            1 => "Name",
-            2 => "Email",
+             1 => "Name",
+             2 => "Email",
              3 => "Operation",
              _ => throw new IndexOutOfRangeException()
          };
@@ -129,8 +129,8 @@ public sealed class UserBulk : BulkBatchSql<global::AdoGen.Generator.Tests.User>
          public override Type GetFieldType(int i) => i switch
          {
              0 => typeof(Guid),
-            1 => typeof(string),
-            2 => typeof(string),
+             1 => typeof(string),
+             2 => typeof(string),
              3 => typeof(char),
              _ => throw new IndexOutOfRangeException()
          };
@@ -138,9 +138,9 @@ public sealed class UserBulk : BulkBatchSql<global::AdoGen.Generator.Tests.User>
          public override int GetOrdinal(string name) => name switch
          {
              "Id" => 0,
-            "Name" => 1,
-            "Email" => 2,
-            "Operation" => 3,
+             "Name" => 1,
+             "Email" => 2,
+             "Operation" => 3,
              _ => -1
          };
      }

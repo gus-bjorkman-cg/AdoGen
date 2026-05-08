@@ -67,7 +67,7 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
-     protected override int FieldCount => 5;
+    protected override int FieldCount => 5;
 
      /// <summary>
      /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
@@ -85,9 +85,9 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
      protected override void ApplyColumnMappings(SqlBulkCopy bulk)
      {
          bulk.ColumnMappings.Add("EventId", "EventId");
-        bulk.ColumnMappings.Add("CreatedAt", "CreatedAt");
-        bulk.ColumnMappings.Add("Type", "Type");
-        bulk.ColumnMappings.Add("JsonPayload", "JsonPayload");
+         bulk.ColumnMappings.Add("CreatedAt", "CreatedAt");
+         bulk.ColumnMappings.Add("Type", "Type");
+         bulk.ColumnMappings.Add("JsonPayload", "JsonPayload");
      }
 
      private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
@@ -114,9 +114,9 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
          public override object GetValue(int i) => i switch
          {
              0 => _item.EventId,
-            1 => _item.CreatedAt,
-            2 => _item.EventType,
-            3 => _item.JsonPayload,
+             1 => _item.CreatedAt,
+             2 => _item.EventType,
+             3 => _item.JsonPayload,
              4 => _op,
              _ => throw new IndexOutOfRangeException()
          };
@@ -124,9 +124,9 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
          public override string GetName(int i) => i switch
          {
              0 => "EventId",
-            1 => "CreatedAt",
-            2 => "Type",
-            3 => "JsonPayload",
+             1 => "CreatedAt",
+             2 => "Type",
+             3 => "JsonPayload",
              4 => "Operation",
              _ => throw new IndexOutOfRangeException()
          };
@@ -134,9 +134,9 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
          public override Type GetFieldType(int i) => i switch
          {
              0 => typeof(long),
-            1 => typeof(DateTimeOffset),
-            2 => typeof(string),
-            3 => typeof(byte[]),
+             1 => typeof(DateTimeOffset),
+             2 => typeof(string),
+             3 => typeof(byte[]),
              4 => typeof(char),
              _ => throw new IndexOutOfRangeException()
          };
@@ -144,10 +144,10 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
          public override int GetOrdinal(string name) => name switch
          {
              "EventId" => 0,
-            "CreatedAt" => 1,
-            "Type" => 2,
-            "JsonPayload" => 3,
-            "Operation" => 4,
+             "CreatedAt" => 1,
+             "Type" => 2,
+             "JsonPayload" => 3,
+             "Operation" => 4,
              _ => -1
          };
      }
