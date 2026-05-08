@@ -12,11 +12,11 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Generator.Tests.AuditEvent, long>
+public sealed partial record ReadOnlyDoc : ISqlSingleIdModel<global::AdoGen.Generator.Tests.ReadOnlyDoc, global::System.Guid>
 {
-    private const string SqlDeleteBatchTemplate = "DELETE FROM [log].[Audits] WHERE [EventId] IN (";
+    private const string SqlDeleteBatchTemplate = "DELETE FROM [dbo].[ReadOnlyDocs] WHERE [Id] IN (";
 
-    public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<long> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<global::System.Guid> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -33,32 +33,32 @@ public sealed partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Gener
         
         for (var i = 0; i < ids.Count; i++)
         {
-            cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(ids[i], $"@p{i}"));
+            cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterId(ids[i], $"@p{i}"));
         }
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 }
 
-public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generator.Tests.AuditEvent>
+public sealed partial record ReadOnlyDoc : ISqlDomainModel<global::AdoGen.Generator.Tests.ReadOnlyDoc>
 {
     private const string SqlCreateTable = 
         """
-        CREATE TABLE [log].[Audits](
-            [EventId] BIGINT IDENTITY(1,1) NOT NULL,
-            [CreatedAt] DATETIMEOFFSET NOT NULL,
-            [Type] NVARCHAR(50) NOT NULL,
-            [JsonPayload] VARBINARY(8000) NOT NULL
-        ,CONSTRAINT [PK_Audits] PRIMARY KEY ([EventId]));
+        CREATE TABLE [dbo].[ReadOnlyDocs](
+            [Id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+            [Title] VARCHAR(200) NOT NULL,
+            [CreatedAt] DATETIMEOFFSET DEFAULT SYSUTCDATETIME() NOT NULL,
+            [LastModifiedAt] DATETIMEOFFSET DEFAULT SYSUTCDATETIME() NOT NULL
+        ,CONSTRAINT [PK_ReadOnlyDocs] PRIMARY KEY ([Id]));
         """;
-    private const string SqlInsert = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES (@CreatedAt, @Type, @JsonPayload);";
-    private const string SqlInsertBatchTemplate = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES";
-    private const string SqlUpdate = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId;";
-    private const string SqlDelete = "DELETE FROM [log].[Audits] WHERE [EventId] = @EventId;";
-    private const string SqlUpsert = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId; IF @@ROWCOUNT = 0 INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES (@CreatedAt, @Type, @JsonPayload);";
-    private const string SqlTruncate = "TRUNCATE TABLE [log].[Audits];";
+    private const string SqlInsert = "INSERT INTO [dbo].[ReadOnlyDocs] ([Id], [Title]) VALUES (@Id, @Title);";
+    private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[ReadOnlyDocs] ([Id], [Title]) VALUES";
+    private const string SqlUpdate = "UPDATE [dbo].[ReadOnlyDocs] SET [Title] = @Title WHERE [Id] = @Id;";
+    private const string SqlDelete = "DELETE FROM [dbo].[ReadOnlyDocs] WHERE [Id] = @Id;";
+    private const string SqlUpsert = "UPDATE [dbo].[ReadOnlyDocs] SET [Title] = @Title WHERE [Id] = @Id; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[ReadOnlyDocs] ([Id], [Title]) VALUES (@Id, @Title);";
+    private const string SqlTruncate = "TRUNCATE TABLE [dbo].[ReadOnlyDocs];";
 
-    private const int NonIdentityPropertyCount = 3;
+    private const int NonIdentityPropertyCount = 2;
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -67,13 +67,12 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.ReadOnlyDoc model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
+        cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterTitle(model.Title));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -81,8 +80,8 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     /// <summary>
     /// Inserts multiple database records in one roundtrip. 
     /// Will throw if parameter count exceeds SQL Server limit (2100).
-    /// For type global::AdoGen.Generator.Tests.AuditEvent, each record will use 3 parameters.
-    /// Resulting in a max insert count of 700 per batch.
+    /// For type global::AdoGen.Generator.Tests.ReadOnlyDoc, each record will use 2 parameters.
+    /// Resulting in a max insert count of 1050 per batch.
     /// For larger inserts, consider using SqlBulkCopy or multiple batches.
     /// </summary>
     /// <param name="models"></param>
@@ -91,7 +90,7 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
     /// <returns>Number of affected rows</returns>
-    public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.AuditEvent> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.ReadOnlyDoc> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -121,46 +120,40 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     
         foreach (var model in models)
         {
-            cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt, $"@p{paramIndex}"));
+            cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterId(model.Id, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType, $"@p{paramIndex}"));
-            paramIndex++;
-            cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload, $"@p{paramIndex}"));
+            cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterTitle(model.Title, $"@p{paramIndex}"));
             paramIndex++;
         }
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.ReadOnlyDoc model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
+        cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterTitle(model.Title));
+        cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterId(model.Id));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.ReadOnlyDoc model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
+        cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterId(model.Id));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.ReadOnlyDoc model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
-        cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
+        cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(ReadOnlyDocSql.CreateParameterTitle(model.Title));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }

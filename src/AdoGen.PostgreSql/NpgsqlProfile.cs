@@ -113,6 +113,15 @@ public sealed class PropertyBuilder<TProp>
     public PropertyBuilder<TProp> NotNull() => this;
 
     /// <summary>
+    /// Marks the column as read-only.
+    /// The column is excluded from INSERT/UPDATE/bulk-write column lists but is still
+    /// included in CREATE TABLE DDL and read back by the mapper.
+    /// Use this for server-managed columns such as computed columns or audit timestamps
+    /// that have a DEFAULT expression set via <see cref="DefaultValue"/>.
+    /// </summary>
+    public PropertyBuilder<TProp> ReadOnly() => this;
+
+    /// <summary>
     /// Sets a default SQL expression for the database column.
     /// </summary>
     public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;

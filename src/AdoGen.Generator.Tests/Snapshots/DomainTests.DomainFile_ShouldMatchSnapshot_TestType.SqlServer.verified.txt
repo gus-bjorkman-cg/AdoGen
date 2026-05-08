@@ -43,7 +43,8 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
             [ByteEnum] TINYINT NOT NULL,
             [ShortEnum] SMALLINT NOT NULL,
             [IntEnum] INT NOT NULL,
-            [LongEnum] BIGINT NOT NULL
+            [LongEnum] BIGINT NOT NULL,
+            [CreatedAt] DATETIMEOFFSET DEFAULT SYSUTCDATETIME() NOT NULL
         ,CONSTRAINT [PK_TestTypes] PRIMARY KEY ([Int], [Decimal]));
         """;
     private const string SqlInsert = "INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);";

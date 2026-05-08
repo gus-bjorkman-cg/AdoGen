@@ -42,6 +42,15 @@ public abstract class TestBase : IAsyncLifetime
 
     protected async ValueTask<List<User>> GetAllUsers() =>
         await Connection.QueryAsync<User>("""SELECT * FROM "public"."Users" """, CancellationToken);
+    
+    protected async ValueTask<NpgsqlTransaction> LockTable(string tableName)
+    {
+        var transaction = await Connection.BeginTransactionAsync(CancellationToken);
+        await using var cmd = new NpgsqlCommand($"""LOCK TABLE "public"."{tableName}" IN ACCESS EXCLUSIVE MODE""", Connection, transaction);
+        await cmd.ExecuteNonQueryAsync(CancellationToken);
+    
+        return transaction;
+    }
 
     protected virtual ValueTask InitializeAsync() => ValueTask.CompletedTask;
     protected virtual ValueTask DisposeAsync() => ValueTask.CompletedTask;

@@ -147,6 +147,28 @@ internal sealed class NotNullChainHandler : IChainMethodHandler
     }
 }
 
+internal sealed class ReadOnlyChainHandler : IChainMethodHandler
+{
+    private const string MethodName = "ReadOnly";
+    private ReadOnlyChainHandler() { }
+    public static ReadOnlyChainHandler Instance { get; } = new();
+
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
+
+    public void Handle(
+        SemanticModel model,
+        INamedTypeSymbol dtoType,
+        string propertyName,
+        ChainMethod chain,
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder,
+        CancellationToken ct)
+    {
+        if (chain.Args.Count == 0) cfg.IsReadOnly = true;
+        else diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
+    }
+}
+
 internal sealed class DefaultValueChainHandler : IChainMethodHandler
 {
     private const string MethodName = "DefaultValue";

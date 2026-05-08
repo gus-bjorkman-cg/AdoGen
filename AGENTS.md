@@ -254,6 +254,23 @@ used it in the test that checks for the empty-update-block path.
 **Rule:** when testing a conditional code path (e.g. "no updatable columns"), verify the fixture
 actually satisfies the condition before writing the assertion.
 
+### 2026-05-05 — Milestone 1 (`ReadOnly`) integration tests completed
+`DateTimeOffset CreatedAt` added to `TestType` in the sample project with `.DefaultValue("DEFAULT SYSUTCDATETIME()").ReadOnly()` (SQL Server) and `.DefaultValue("DEFAULT now()").ReadOnly()` (PostgreSQL).
+Both `TestTypeTests` (SS + PG) updated: Faker gained `.RuleFor(x => x.CreatedAt, _ => default)` (StrictMode requires every property). Existing `BulkMixed_ShouldPerformAllOperations` assertion updated to `.Excluding(x => x.CreatedAt)`. Two new tests added to each: `Insert_ReadOnly_ShouldNotBeWritten` (sentinel value, DB must override) and `Update_ReadOnly_ShouldNotBeOverwritten` (capture DB value post-insert, update with sentinel, assert DB value unchanged).
+**Avoid duplicate methods when replacing test bodies** — check for existing test method before adding; the replace_string_in_file tool copies context and can duplicate a method if the context block includes the original and the replacement target is just the inner assertion.
+
+
+`.ReadOnly()` added to both `PropertyBuilder<TProp>` types (SQL Server + PostgreSQL).
+`ParamConfig.IsReadOnly` and `ColumnInfo.IsReadOnly` added. `EmitContext` gains `Writables`
+(NonIdentities excluding ReadOnly, used for INSERT/batch INSERT/Upsert) and
+`WritableNonKeyNonIdentities` (used for UPDATE SET / Upsert UPDATE part).
+`ParameterBindingEmitter` updated to use `Writables`/`WritableNonKeyNonIdentities`.
+Both SQL text builders (`SqlServerSqlTextBuilder`, `PostgreSqlSqlTextBuilder`) updated accordingly.
+Bulk emitters exclude read-only non-key columns from temp table, column mappings, and
+`WriteItemsToServerAsync` — keys are always kept for JOIN matching.
+`TestType` in generator tests gained a `DateTimeOffset CreatedAt` field with `.DefaultValue(...).ReadOnly()`.
+**110/110 generator tests pass.**
+
 ---
 
 ## Key Files to Read First

@@ -38,6 +38,7 @@ public sealed partial record TestType : INpgsqlMapper<global::AdoGen.Generator.T
     private static int Pg_ShortEnumOrdinal;
     private static int Pg_IntEnumOrdinal;
     private static int Pg_LongEnumOrdinal;
+    private static int Pg_CreatedAtOrdinal;
 
     public static global::AdoGen.Generator.Tests.TestType Map(NpgsqlDataReader reader)
     {
@@ -70,6 +71,7 @@ public sealed partial record TestType : INpgsqlMapper<global::AdoGen.Generator.T
             Pg_ShortEnumOrdinal = reader.GetOrdinal("ShortEnum");
             Pg_IntEnumOrdinal = reader.GetOrdinal("IntEnum");
             Pg_LongEnumOrdinal = reader.GetOrdinal("LongEnum");
+            Pg_CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
 
             Volatile.Write(ref Pg_IsInitialized, true);
         }
@@ -101,7 +103,8 @@ public sealed partial record TestType : INpgsqlMapper<global::AdoGen.Generator.T
             ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetByte(Pg_ByteEnumOrdinal),
             ShortEnum : (global::AdoGen.Generator.Tests.ShortEnum)reader.GetInt16(Pg_ShortEnumOrdinal),
             IntEnum : (global::AdoGen.Generator.Tests.IntEnum)reader.GetInt32(Pg_IntEnumOrdinal),
-            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(Pg_LongEnumOrdinal)
+            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(Pg_LongEnumOrdinal),
+            CreatedAt : reader.GetFieldValue<DateTimeOffset>(Pg_CreatedAtOrdinal)
         );
     }
 }
@@ -138,6 +141,7 @@ public static class TestTypeNpgsql
     public const string ParameterShortEnum = "ShortEnum";
     public const string ParameterIntEnum = "IntEnum";
     public const string ParameterLongEnum = "LongEnum";
+    public const string ParameterCreatedAt = "CreatedAt";
 
     /// <summary>
     /// Creates an NpgsqlParameter with the configured db type and size/precision/scale.
@@ -441,5 +445,16 @@ public static class TestTypeNpgsql
         ParameterName = propertyName ?? ParameterLongEnum,
         NpgsqlDbType = NpgsqlDbType.Bigint,
         Value = (long)value,
+    };
+    
+    /// <summary>
+    /// Creates an NpgsqlParameter with the configured db type and size/precision/scale.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static NpgsqlParameter CreateParameterCreatedAt(DateTimeOffset value, string? propertyName = null) => new()
+    {
+        ParameterName = propertyName ?? ParameterCreatedAt,
+        NpgsqlDbType = NpgsqlDbType.TimestampTz,
+        Value = value is null ? DBNull.Value : value,
     };
 }

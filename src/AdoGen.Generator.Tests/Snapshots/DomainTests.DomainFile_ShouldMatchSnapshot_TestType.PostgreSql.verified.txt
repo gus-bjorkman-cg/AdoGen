@@ -42,7 +42,8 @@ public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Genera
         "ByteEnum" SMALLINT NOT NULL,
         "ShortEnum" SMALLINT NOT NULL,
         "IntEnum" INTEGER NOT NULL,
-        "LongEnum" BIGINT NOT NULL
+        "LongEnum" BIGINT NOT NULL,
+        "CreatedAt" TIMESTAMPTZ DEFAULT now() NOT NULL
     ,CONSTRAINT "PK_TestTypes" PRIMARY KEY ("Int", "Decimal"));
     """;
     

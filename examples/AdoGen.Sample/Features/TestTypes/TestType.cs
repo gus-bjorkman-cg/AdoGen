@@ -74,7 +74,8 @@ public sealed partial record TestType(
     ByteEnum ByteEnum,
     ShortEnum ShortEnum,
     IntEnum IntEnum,
-    LongEnum LongEnum
+    LongEnum LongEnum,
+    DateTimeOffset CreatedAt
     ) : ISqlBulkModel, INpgsqlBulkModel;
 
 public sealed class TestTypeProfile : SqlProfile<TestType>
@@ -97,6 +98,7 @@ public sealed class TestTypeProfile : SqlProfile<TestType>
         RuleFor(x => x.CharString).Char(10);
         RuleFor(x => x.NCharString).NChar(15);
         RuleFor(x => x.NullableDateTime).Type(SqlDbType.DateTime).Nullable();
+        RuleFor(x => x.CreatedAt).DefaultValue("DEFAULT SYSUTCDATETIME()").ReadOnly();
     }
 }
 
@@ -120,5 +122,6 @@ public sealed class TestTypeNpgsqlProfile : NpgsqlProfile<TestType>
         RuleFor(x => x.CharString).Char(10);
         RuleFor(x => x.NCharString).Char(15);
         RuleFor(x => x.NullableDateTime).Type(NpgsqlDbType.Timestamp).Nullable();
+        RuleFor(x => x.CreatedAt).DefaultValue("DEFAULT now()").ReadOnly();
     }
 }

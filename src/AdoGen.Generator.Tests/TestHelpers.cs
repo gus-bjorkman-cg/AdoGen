@@ -269,7 +269,8 @@ internal sealed class TestTypeSourceHandler : ITestTypeSource
               ByteEnum ByteEnum,
               ShortEnum ShortEnum,
               IntEnum IntEnum,
-              LongEnum LongEnum
+              LongEnum LongEnum,
+              DateTimeOffset CreatedAt
               ) : {{genType.Interface}};
           
           {{Profile(genType)}}
@@ -298,6 +299,7 @@ internal sealed class TestTypeSourceHandler : ITestTypeSource
                       RuleFor(x => x.CharString).Char(10);
                       RuleFor(x => x.NCharString).NChar(15);
                       RuleFor(x => x.NullableDateTime).Type(SqlDbType.DateTime).Nullable();
+                      RuleFor(x => x.CreatedAt).DefaultValue("DEFAULT SYSUTCDATETIME()").ReadOnly();
                   }
               }
               """
@@ -322,6 +324,7 @@ internal sealed class TestTypeSourceHandler : ITestTypeSource
                       RuleFor(x => x.CharString).Char(10);
                       RuleFor(x => x.NCharString).Char(15);
                       RuleFor(x => x.NullableDateTime).Type(NpgsqlDbType.Timestamp).Nullable();
+                      RuleFor(x => x.CreatedAt).DefaultValue("DEFAULT now()").ReadOnly();
                   }
               }
               """;
@@ -382,3 +385,4 @@ internal sealed class AuditEventSourceHandler : ITestTypeSource
               }
               """;
 }
+

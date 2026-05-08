@@ -19,7 +19,7 @@ internal static class ParameterBindingEmitter
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
-        foreach (var col in ctx.Columns)
+        foreach (var col in ctx.Writables)
             sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
         
         return sb.ToString();
@@ -34,7 +34,7 @@ internal static class ParameterBindingEmitter
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
-        foreach (var col in ctx.NonKeyNonIdentities)
+        foreach (var col in ctx.WritableNonKeyNonIdentities)
             sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
         
         foreach (var col in ctx.Keys)
@@ -68,7 +68,7 @@ internal static class ParameterBindingEmitter
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
-        foreach (var col in ctx.NonIdentities)
+        foreach (var col in ctx.Writables)
             sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
         
         foreach (var col in ctx.Keys)
@@ -89,7 +89,7 @@ internal static class ParameterBindingEmitter
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
-        foreach (var col in ctx.NonIdentities)
+        foreach (var col in ctx.Writables)
         {
             sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, $\"@p{{{indexVar}}}\"));");
             sb.AppendLine($"{prefix}{indexVar}++;");

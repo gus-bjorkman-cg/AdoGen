@@ -42,20 +42,20 @@ internal static class PostgreSqlSqlTextBuilder
 
     public static string Insert(EmitContext ctx)
     {
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertParams = BuildJoined(ctx.NonIdentities, col => "@" + col.ParameterName);
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
+        var insertParams = BuildJoined(ctx.Writables, col => "@" + col.ParameterName);
         return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
     }
 
     public static string InsertBatchPrefix(EmitContext ctx)
     {
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
         return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES";
     }
 
     public static string Update(EmitContext ctx)
     {
-        var updateSet = BuildJoined(ctx.NonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
+        var updateSet = BuildJoined(ctx.WritableNonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
         
         return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
     }
@@ -68,7 +68,7 @@ internal static class PostgreSqlSqlTextBuilder
         var nonIdentityKeys = FilterNonIdentityKeys(ctx.Keys);
         var conflictKeys = BuildJoined(nonIdentityKeys, col => col.ColumnNameQuoted);
         
-        var updateSetOnConflict = BuildJoined(ctx.NonKeyNonIdentities,
+        var updateSetOnConflict = BuildJoined(ctx.WritableNonKeyNonIdentities,
             col => $"{col.ColumnNameQuoted} = EXCLUDED.{col.ColumnNameQuoted}");
         
         return $"{insertSql} ON CONFLICT ({conflictKeys}) DO UPDATE SET {updateSetOnConflict};";
@@ -82,9 +82,9 @@ internal static class PostgreSqlSqlTextBuilder
     public static string BulkCreateTempTable(EmitContext ctx, string tempTableName)
     {
         var sbColDefs = new StringBuilder();
-        for (var i = 0; i < ctx.Columns.Length; i++)
+        for (var i = 0; i < ctx.BulkColumns.Length; i++)
         {
-            var col = ctx.Columns[i];
+            var col = ctx.BulkColumns[i];
             var nullability = col.IsNullable ? "NULL" : "NOT NULL";
             sbColDefs.AppendLine($"        \"{col.ParameterName}\" {col.SqlType} {nullability},");
         }
@@ -103,10 +103,10 @@ internal static class PostgreSqlSqlTextBuilder
         var idxCols = $"\"operation\", {keyCols}";
         var idxName = $"ix_{tempTableName}_op_keys";
         var tempTableRef = $"\"{tempTableName}\"";
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertSelect = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
+        var insertSelect = BuildJoined(ctx.Writables, col => $"S.{col.ColumnNameQuoted}");
         
-        var updateSet = string.Join(",\n        ", Enumerable.Select(ctx.NonKeyNonIdentities,
+        var updateSet = string.Join(",\n        ", Enumerable.Select(ctx.WritableNonKeyNonIdentities,
             col => $"        \"{col.ParameterName}\" = S.\"{col.ParameterName}\""));
 
         var sb = new StringBuilder();
@@ -115,7 +115,7 @@ internal static class PostgreSqlSqlTextBuilder
         sb.AppendLine();
 
         sb.AppendLine("    WITH updated AS (");
-        if (ctx.NonKeyNonIdentities.Length > 0)
+        if (ctx.WritableNonKeyNonIdentities.Length > 0)
         {
             sb.AppendLine($"        UPDATE {schemaTable} AS T");
             sb.AppendLine("            SET " + updateSet.TrimStart());
@@ -129,7 +129,7 @@ internal static class PostgreSqlSqlTextBuilder
         }
 
         sb.AppendLine("    inserted AS (");
-        if (ctx.NonIdentities.Length > 0)
+        if (ctx.Writables.Length > 0)
         {
             sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
             sb.AppendLine($"            SELECT {insertSelect}");

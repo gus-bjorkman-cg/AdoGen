@@ -23,7 +23,9 @@ internal sealed record EmitContext(
     ImmutableArray<ColumnInfo> Identities,
     ImmutableArray<ColumnInfo> NonIdentities,
     ImmutableArray<ColumnInfo> NonKeyNonIdentities,
-    ImmutableArray<ColumnInfo> Writables,   // == NonIdentities for now
+    ImmutableArray<ColumnInfo> Writables,              // NonIdentities excluding ReadOnly (for INSERT)
+    ImmutableArray<ColumnInfo> WritableNonKeyNonIdentities, // NonKey+NonIdentity excluding ReadOnly (for UPDATE SET)
+    ImmutableArray<ColumnInfo> BulkColumns,            // Keys + writable non-keys (for bulk temp-table / COPY)
     string WhereByKey,                       // "[a]=@a AND [b]=@b"
     string JoinOn,                           // "S.[k]=T.[k] AND ..."
     IIdentifierQuoter Quoter,

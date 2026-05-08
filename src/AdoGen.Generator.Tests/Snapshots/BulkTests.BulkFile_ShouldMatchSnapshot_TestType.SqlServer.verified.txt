@@ -112,24 +112,24 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
-    protected override int FieldCount => 28;
+     protected override int FieldCount => 28;
 
-    /// <summary>
-    /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
-    /// the items and operations lists.
-    /// </summary>
-    /// <param name="capacity"></param>
-    public TestTypeBulk(int capacity = 0) : base(capacity) { }
+     /// <summary>
+     /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
+     /// the items and operations lists.
+     /// </summary>
+     /// <param name="capacity"></param>
+     public TestTypeBulk(int capacity = 0) : base(capacity) { }
 
-    protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
-    {
-        using var reader = new __BulkReader(this);
-        await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
-    }
-    
-    protected override void ApplyColumnMappings(SqlBulkCopy bulk)
-    {
-        bulk.ColumnMappings.Add("Int", "Int");
+     protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
+     {
+         using var reader = new __BulkReader(this);
+         await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
+     }
+     
+     protected override void ApplyColumnMappings(SqlBulkCopy bulk)
+     {
+         bulk.ColumnMappings.Add("Int", "Int");
         bulk.ColumnMappings.Add("NullableInt", "NullableInt");
         bulk.ColumnMappings.Add("Decimal", "Decimal");
         bulk.ColumnMappings.Add("NullableDecimal", "NullableDecimal");
@@ -156,32 +156,32 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
         bulk.ColumnMappings.Add("ShortEnum", "ShortEnum");
         bulk.ColumnMappings.Add("IntEnum", "IntEnum");
         bulk.ColumnMappings.Add("LongEnum", "LongEnum");
-    }
+     }
 
-    private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
-    {
-        private readonly AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.TestType> _batch;
-        private int _index = -1;
-        private global::AdoGen.Generator.Tests.TestType _item = null!;
-        private char _op;
+     private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
+     {
+         private readonly AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.TestType> _batch;
+         private int _index = -1;
+         private global::AdoGen.Generator.Tests.TestType _item = null!;
+         private char _op;
 
-        public __BulkReader(AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.TestType> batch) => _batch = batch;
+         public __BulkReader(AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.TestType> batch) => _batch = batch;
 
-        public override bool Read() 
-        {
-            ++_index;
-            if (_index >= _batch.Items.Count) return false;
-            
-            _item = _batch.Items[_index];
-            _op = _batch.Operations[_index].Value;
-            return true;
-        }
-         
-        public override int FieldCount => 28;
+         public override bool Read() 
+         {
+             ++_index;
+             if (_index >= _batch.Items.Count) return false;
+             
+             _item = _batch.Items[_index];
+             _op = _batch.Operations[_index].Value;
+             return true;
+         }
+          
+         public override int FieldCount => 28;
 
-        public override object GetValue(int i) => i switch
-        {
-            0 => _item.Int,
+         public override object GetValue(int i) => i switch
+         {
+             0 => _item.Int,
             1 => _item.NullableInt.HasValue ? _item.NullableInt.Value : DBNull.Value,
             2 => _item.Decimal,
             3 => _item.NullableDecimal.HasValue ? _item.NullableDecimal.Value : DBNull.Value,
@@ -208,13 +208,13 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
             24 => _item.ShortEnum,
             25 => _item.IntEnum,
             26 => _item.LongEnum,
-            27 => _op,
-            _ => throw new IndexOutOfRangeException()
-        };
+             27 => _op,
+             _ => throw new IndexOutOfRangeException()
+         };
 
-        public override string GetName(int i) => i switch
-        {
-            0 => "Int",
+         public override string GetName(int i) => i switch
+         {
+             0 => "Int",
             1 => "NullableInt",
             2 => "Decimal",
             3 => "NullableDecimal",
@@ -241,13 +241,13 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
             24 => "ShortEnum",
             25 => "IntEnum",
             26 => "LongEnum",
-            27 => "Operation",
-            _ => throw new IndexOutOfRangeException()
-        };
+             27 => "Operation",
+             _ => throw new IndexOutOfRangeException()
+         };
 
-        public override Type GetFieldType(int i) => i switch
-        {
-            0 => typeof(int),
+         public override Type GetFieldType(int i) => i switch
+         {
+             0 => typeof(int),
             1 => typeof(int),
             2 => typeof(decimal),
             3 => typeof(decimal),
@@ -274,13 +274,13 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
             24 => typeof(ShortEnum),
             25 => typeof(IntEnum),
             26 => typeof(LongEnum),
-            27 => typeof(char),
-            _ => throw new IndexOutOfRangeException()
-        };
+             27 => typeof(char),
+             _ => throw new IndexOutOfRangeException()
+         };
 
-        public override int GetOrdinal(string name) => name switch
-        {
-            "Int" => 0,
+         public override int GetOrdinal(string name) => name switch
+         {
+             "Int" => 0,
             "NullableInt" => 1,
             "Decimal" => 2,
             "NullableDecimal" => 3,
@@ -308,7 +308,7 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
             "IntEnum" => 25,
             "LongEnum" => 26,
             "Operation" => 27,
-            _ => -1
-        };
-    }
-}
+             _ => -1
+         };
+     }
+ }

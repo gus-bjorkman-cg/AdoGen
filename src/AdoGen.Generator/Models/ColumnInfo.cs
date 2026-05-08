@@ -13,6 +13,7 @@ internal readonly record struct ColumnInfo(
     bool IsNullable,
     bool IsIdentity,
     bool IsKey,
+    bool IsReadOnly,
     string? DefaultSqlExpression,
     ColumnRole Role
 );

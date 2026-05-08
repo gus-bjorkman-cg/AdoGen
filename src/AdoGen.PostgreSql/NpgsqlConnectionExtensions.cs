@@ -17,6 +17,11 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Creates the database table.
         /// </summary>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask CreateTableAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
             where T : INpgsqlDomainModel<T>
@@ -25,6 +30,12 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Inserts a database record.
         /// </summary>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> InsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
             where T : INpgsqlDomainModel<T>
@@ -33,6 +44,12 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Inserts multiple database records in one roundtrip.
         /// </summary>
+        /// <param name="models"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> InsertAsync<T>(List<T> models, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
             where T : INpgsqlDomainModel<T>
@@ -41,6 +58,12 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Updates a database record.
         /// </summary>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> UpdateAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
             where T : INpgsqlDomainModel<T>
@@ -49,6 +72,12 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Inserts or updates a database record.
         /// </summary>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> UpsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
             where T : INpgsqlDomainModel<T>
@@ -57,6 +86,12 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Deletes a database record.
         /// </summary>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> DeleteAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
             where T : INpgsqlDomainModel<T>
@@ -65,6 +100,11 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Truncates a database table.
         /// </summary>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> TruncateAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
             where T : INpgsqlDomainModel<T>
@@ -73,6 +113,13 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(
             string sql,
             CancellationToken ct,
@@ -88,6 +135,14 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(
             string sql,
             NpgsqlParameter parameter,
@@ -105,6 +160,14 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<List<T>> QueryAsync<T>(
             string sql,
             IEnumerable<NpgsqlParameter> parameters,
@@ -122,6 +185,13 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(
             string sql,
             CancellationToken ct,
@@ -137,6 +207,14 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(
             string sql,
             NpgsqlParameter parameter,
@@ -154,6 +232,14 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(
             string sql,
             IEnumerable<NpgsqlParameter> parameters,
@@ -171,6 +257,12 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened and executes the reader.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
         public async ValueTask<NpgsqlDataReader> QueryMultiAsync(
             string sql,
             CancellationToken ct,
@@ -185,6 +277,13 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened and executes the reader.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
         public async ValueTask<NpgsqlDataReader> QueryMultiAsync(
             string sql,
             NpgsqlParameter parameter,
@@ -201,6 +300,13 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Opens the connection if not opened and executes the reader.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
         public async ValueTask<NpgsqlDataReader> QueryMultiAsync(
             string sql,
             IEnumerable<NpgsqlParameter> parameters,
@@ -217,6 +323,11 @@ public static class NpgsqlConnectionExtensions
         /// <summary>
         /// Creates an NpgsqlCommand.
         /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
         public NpgsqlCommand CreateCommand(
             string sql,
             CommandType commandType = CommandType.Text,
@@ -231,6 +342,162 @@ public static class NpgsqlConnectionExtensions
             if (commandTimeout != null) command.CommandTimeout = commandTimeout.Value;
 
             return command;
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+                                    
+            foreach (var parameter in parameters)
+            {
+                command.Parameters.Add(parameter);
+            }
+
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+                        
+            foreach (var parameter in parameters)
+            {
+                command.Parameters.Add(parameter);
+            }
+            
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         }
     }
 }

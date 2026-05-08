@@ -27,7 +27,6 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         var constBuilder = new StringBuilder();
         var methodBuilder = new StringBuilder();
         var sep = setUsingConstructor ? ":" : "=";
-        var needsEnumCastHelper = false;
 
         if (setUsingConstructor) read.Append('(').AppendLine();
         else read.AppendLine("{");
@@ -38,10 +37,8 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
             var cfg = profileInfo.ParamsByProperty[p.Name];
             var ordinalField = $"{cfg.ParameterName}Ordinal";
             var isLast = i == profileInfo.DtoProperties.Length - 1;
-            var getterExpr = EmitReaderGet(p, ordinalField, out bool needsEnumCastForThis);
+            var getterExpr = EmitReaderGet(p, ordinalField);
 
-            if (needsEnumCastForThis) needsEnumCastHelper = true;
-            
             ordinals.AppendLine($"    private static int {ordinalField};");
             init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{cfg.ParameterName}\");");
             read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr}{(isLast ? "" : ",")}");
@@ -55,7 +52,6 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var ns = profileInfo.Namespace;
-        var castHelper = needsEnumCastHelper ? EnumHelper : "";
         var isInitField = "IsInitialized";
 
         var src = 
@@ -84,7 +80,7 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
                     }
 
                     return new {{dtoTypeName}}{{read}};
-                }{{castHelper}}
+                }
             }
             
             /// <summary>
@@ -100,19 +96,10 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         spc.AddSource($"{dto.Name}.Mapper.Sql.g.cs", src);
     }
 
-    private const string EnumHelper =
-        """
-         
-             private static TEnum EnumCast<TUnderlying, TEnum>(TUnderlying value)
-                 where TUnderlying : unmanaged
-                 where TEnum : unmanaged
-                 => Unsafe.As<TUnderlying, TEnum>(ref value);
-         """;
 
     private static string EmitReaderGet(
         IPropertySymbol p,
-        string ordinalField,
-        out bool needsEnumCastHelper)
+        string ordinalField)
     {
         var (underlying, isNullableValueType) = p.Type.UnwrapNullable();
         var isNullable = isNullableValueType || p.NullableAnnotation == NullableAnnotation.Annotated;
@@ -121,7 +108,6 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         
         if (underlying.TypeKind == TypeKind.Enum)
         {
-            needsEnumCastHelper = true;
             var enumUnderlying = ((INamedTypeSymbol)underlying).EnumUnderlyingType!;
 
             var (eu, _) = enumUnderlying.UnwrapNullable();
@@ -151,8 +137,6 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
             var fv = $"reader.GetFieldValue<{enumKey}>({ordinalField})";
             return isNullable ? $"reader.IsDBNull({ordinalField}) ? {dbNullValueExpr} : {fv}" : fv;
         }
-        
-        needsEnumCastHelper = false;
         
         if (underlying.SpecialType == SpecialType.System_Char)
         {

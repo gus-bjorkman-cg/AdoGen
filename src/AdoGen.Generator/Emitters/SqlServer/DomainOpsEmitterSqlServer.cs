@@ -23,10 +23,10 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         var updateSql = SqlServerSqlTextBuilder.Update(ctx);
         var deleteSql = SqlServerSqlTextBuilder.Delete(ctx);
         var upsertSql = SqlServerSqlTextBuilder.Upsert(ctx);
-        var nonIdentityPropCount = ctx.NonIdentities.Length;
-
-
+        var nonIdentityPropCount = ctx.Writables.Length;
+        
         var deleteSrc = "";
+        
         if (profileInfo.Keys.Length == 1)
         {
             var keyName = profileInfo.Keys[0];
@@ -197,9 +197,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 }
             }
             """";
-
-        // upsertSql is always non-null here (we validate conflict keys earlier). Remove dead check.
-
+        
         spc.AddSource($"{dto.Name}.Domain.Sql.g.cs", src);
     }
 }

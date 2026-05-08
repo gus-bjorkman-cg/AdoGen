@@ -40,7 +40,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
             var cfg = profileInfo.ParamsByProperty[p.Name];
             var ordinalField = $"{fieldPrefix}{cfg.ParameterName}Ordinal";
             var isLast = i == dtoProps.Length - 1;
-            var getterExpr = EmitReaderGet(p, ordinalField, out _);
+            var getterExpr = EmitReaderGet(p, ordinalField);
             
             ordinals.AppendLine($"    private static int {ordinalField};");
             init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{cfg.ParameterName}\");");
@@ -101,8 +101,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
 
     private static string EmitReaderGet(
         IPropertySymbol p,
-        string ordinalField,
-        out bool needsEnumCastHelper)
+        string ordinalField)
     {
         var (underlying, isNullableValueType) = p.Type.UnwrapNullable();
         var isNullable = isNullableValueType || p.NullableAnnotation == NullableAnnotation.Annotated;
@@ -111,7 +110,6 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
         
         if (underlying.TypeKind == TypeKind.Enum)
         {
-            needsEnumCastHelper = true;
             var enumUnderlying = ((INamedTypeSymbol)underlying).EnumUnderlyingType!;
 
             var (eu, _) = enumUnderlying.UnwrapNullable();
@@ -141,8 +139,6 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
             var fv = $"reader.GetFieldValue<{enumKey}>({ordinalField})";
             return isNullable ? $"reader.IsDBNull({ordinalField}) ? {dbNullValueExpr} : {fv}" : fv;
         }
-        
-        needsEnumCastHelper = false;
         
         if (underlying.SpecialType == SpecialType.System_Char)
         {

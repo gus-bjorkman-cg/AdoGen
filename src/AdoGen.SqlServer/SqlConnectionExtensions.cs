@@ -122,7 +122,7 @@ public static class SqlConnectionExtensions
             where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
-            return await command.QueryAsync<T>(ct);
+            return await command.QueryAsync<T>(ct).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -147,7 +147,7 @@ public static class SqlConnectionExtensions
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
-            return await command.QueryAsync<T>(ct);
+            return await command.QueryAsync<T>(ct).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -175,7 +175,7 @@ public static class SqlConnectionExtensions
             {
                 command.Parameters.Add(parameter);
             }
-            return await command.QueryAsync<T>(ct);
+            return await command.QueryAsync<T>(ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -197,7 +197,7 @@ public static class SqlConnectionExtensions
             where T : ISqlMapper<T>
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
-            return await command.QueryFirstOrDefaultAsync<T>(ct);
+            return await command.QueryFirstOrDefaultAsync<T>(ct).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -222,7 +222,7 @@ public static class SqlConnectionExtensions
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
-            return await command.QueryFirstOrDefaultAsync<T>(ct);
+            return await command.QueryFirstOrDefaultAsync<T>(ct).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -250,7 +250,7 @@ public static class SqlConnectionExtensions
             {
                 command.Parameters.Add(parameter);
             }
-            return await command.QueryFirstOrDefaultAsync<T>(ct);
+            return await command.QueryFirstOrDefaultAsync<T>(ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -270,7 +270,7 @@ public static class SqlConnectionExtensions
             int? commandTimeout = null)
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
-            return await command.QueryMultiAsync(ct);
+            return await command.QueryMultiAsync(ct).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -293,7 +293,7 @@ public static class SqlConnectionExtensions
         {
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
-            return await command.QueryMultiAsync(ct);
+            return await command.QueryMultiAsync(ct).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -319,7 +319,7 @@ public static class SqlConnectionExtensions
             {
                 command.Parameters.Add(parameter);
             }
-            return await command.QueryMultiAsync(ct);
+            return await command.QueryMultiAsync(ct).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -344,6 +344,162 @@ public static class SqlConnectionExtensions
             if (commandTimeout != null) command.CommandTimeout = commandTimeout.Value;
             
             return command;
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            SqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            IEnumerable<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            foreach (var parameter in parameters)
+            {
+                command.Parameters.Add(parameter);
+            }
+            
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            SqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            IEnumerable<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+                        
+            foreach (var parameter in parameters)
+            {
+                command.Parameters.Add(parameter);
+            }
+            
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         }
     }
 }

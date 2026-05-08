@@ -65,83 +65,83 @@ public sealed class UserBulk : BulkBatchSql<global::AdoGen.Generator.Tests.User>
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
-    protected override int FieldCount => 4;
+     protected override int FieldCount => 4;
 
-    /// <summary>
-    /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
-    /// the items and operations lists.
-    /// </summary>
-    /// <param name="capacity"></param>
-    public UserBulk(int capacity = 0) : base(capacity) { }
+     /// <summary>
+     /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
+     /// the items and operations lists.
+     /// </summary>
+     /// <param name="capacity"></param>
+     public UserBulk(int capacity = 0) : base(capacity) { }
 
-    protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
-    {
-        using var reader = new __BulkReader(this);
-        await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
-    }
-    
-    protected override void ApplyColumnMappings(SqlBulkCopy bulk)
-    {
-        bulk.ColumnMappings.Add("Id", "Id");
+     protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
+     {
+         using var reader = new __BulkReader(this);
+         await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
+     }
+     
+     protected override void ApplyColumnMappings(SqlBulkCopy bulk)
+     {
+         bulk.ColumnMappings.Add("Id", "Id");
         bulk.ColumnMappings.Add("Name", "Name");
         bulk.ColumnMappings.Add("Email", "Email");
-    }
+     }
 
-    private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
-    {
-        private readonly AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.User> _batch;
-        private int _index = -1;
-        private global::AdoGen.Generator.Tests.User _item = null!;
-        private char _op;
+     private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
+     {
+         private readonly AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.User> _batch;
+         private int _index = -1;
+         private global::AdoGen.Generator.Tests.User _item = null!;
+         private char _op;
 
-        public __BulkReader(AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.User> batch) => _batch = batch;
+         public __BulkReader(AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.User> batch) => _batch = batch;
 
-        public override bool Read() 
-        {
-            ++_index;
-            if (_index >= _batch.Items.Count) return false;
-            
-            _item = _batch.Items[_index];
-            _op = _batch.Operations[_index].Value;
-            return true;
-        }
-         
-        public override int FieldCount => 4;
+         public override bool Read() 
+         {
+             ++_index;
+             if (_index >= _batch.Items.Count) return false;
+             
+             _item = _batch.Items[_index];
+             _op = _batch.Operations[_index].Value;
+             return true;
+         }
+          
+         public override int FieldCount => 4;
 
-        public override object GetValue(int i) => i switch
-        {
-            0 => _item.Id,
+         public override object GetValue(int i) => i switch
+         {
+             0 => _item.Id,
             1 => _item.Name,
             2 => _item.Email,
-            3 => _op,
-            _ => throw new IndexOutOfRangeException()
-        };
+             3 => _op,
+             _ => throw new IndexOutOfRangeException()
+         };
 
-        public override string GetName(int i) => i switch
-        {
-            0 => "Id",
+         public override string GetName(int i) => i switch
+         {
+             0 => "Id",
             1 => "Name",
             2 => "Email",
-            3 => "Operation",
-            _ => throw new IndexOutOfRangeException()
-        };
+             3 => "Operation",
+             _ => throw new IndexOutOfRangeException()
+         };
 
-        public override Type GetFieldType(int i) => i switch
-        {
-            0 => typeof(Guid),
+         public override Type GetFieldType(int i) => i switch
+         {
+             0 => typeof(Guid),
             1 => typeof(string),
             2 => typeof(string),
-            3 => typeof(char),
-            _ => throw new IndexOutOfRangeException()
-        };
+             3 => typeof(char),
+             _ => throw new IndexOutOfRangeException()
+         };
 
-        public override int GetOrdinal(string name) => name switch
-        {
-            "Id" => 0,
+         public override int GetOrdinal(string name) => name switch
+         {
+             "Id" => 0,
             "Name" => 1,
             "Email" => 2,
             "Operation" => 3,
-            _ => -1
-        };
-    }
-}
+             _ => -1
+         };
+     }
+ }

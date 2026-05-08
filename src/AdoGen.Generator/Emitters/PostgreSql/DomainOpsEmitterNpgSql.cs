@@ -19,7 +19,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
         // SQL strings — produced by PostgreSqlSqlTextBuilder
         var createTableSql = PostgreSqlSqlTextBuilder.CreateTable(ctx);
-        var nonIdentityPropCount = ctx.NonIdentities.Length;
+        var nonIdentityPropCount = ctx.Writables.Length;
         var insertSql = PostgreSqlSqlTextBuilder.Insert(ctx);
         var insertBatchSql = PostgreSqlSqlTextBuilder.InsertBatchPrefix(ctx);
         var updateSql = PostgreSqlSqlTextBuilder.Update(ctx);

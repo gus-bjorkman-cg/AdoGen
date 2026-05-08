@@ -14,4 +14,5 @@ internal sealed class ParamConfig
     public bool? IsNullable { get; set; }
     public string? DefaultSqlExpression { get; set; }
     public string SqlTypeLiteral { get; set; } = "";
+    public bool IsReadOnly { get; set; }
 }

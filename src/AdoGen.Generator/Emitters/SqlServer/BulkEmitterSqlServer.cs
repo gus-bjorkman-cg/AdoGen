@@ -33,11 +33,14 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             return;
         }
 
+        var bulkColumns = ctx.BulkColumns;
+        var bulkFieldCount = bulkColumns.Length;
+
         // SQL strings — produced by SqlServerSqlTextBuilder
         var tempTableSql = SqlServerSqlTextBuilder.BulkCreateTempTable(ctx, tempTableName);
         var applySql = SqlServerSqlTextBuilder.BulkApply(ctx, tempTableName,
-            new BulkApplyOptions(HasInserts: ctx.NonIdentities.Length > 0,
-                HasUpdates: ctx.NonKeyNonIdentities.Length > 0));
+            new BulkApplyOptions(HasInserts: ctx.Writables.Length > 0,
+                HasUpdates: ctx.WritableNonKeyNonIdentities.Length > 0));
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
@@ -75,120 +78,136 @@ internal sealed class BulkEmitterSqlServer : IEmitter
                    protected override string SqlCreateTempTable => _sqlCreateTempTable;
                    protected override string TempTableName => _tempTableName;
                    protected override string SqlApply => _sqlApply;
-                   protected override int FieldCount => {{{dtoProps.Length + 1}}};
+                   protected override int FieldCount => {{{bulkFieldCount + 1}}};
 
-                   /// <summary>
-                   /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
-                   /// the items and operations lists.
-                   /// </summary>
-                   /// <param name="capacity"></param>
-                   public {{{bulkTypeName}}}(int capacity = 0) : base(capacity) { }
+                    /// <summary>
+                    /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
+                    /// the items and operations lists.
+                    /// </summary>
+                    /// <param name="capacity"></param>
+                    public {{{bulkTypeName}}}(int capacity = 0) : base(capacity) { }
 
-                   protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
-                   {
-                       using var reader = new __BulkReader(this);
-                       await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
-                   }
-                   
-                   protected override void ApplyColumnMappings(SqlBulkCopy bulk)
-                   {
+                    protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
+                    {
+                        using var reader = new __BulkReader(this);
+                        await bulk.WriteToServerAsync(reader, ct).ConfigureAwait(false);
+                    }
+                    
+                    protected override void ApplyColumnMappings(SqlBulkCopy bulk)
+                    {
                {{{BulkCopyMappings()}}}
-                   }
+                    }
 
-                   private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
-                   {
-                       private readonly AdoGen.SqlServer.BulkBatchSql<{{{dtoTypeName}}}> _batch;
-                       private int _index = -1;
-                       private {{{dtoTypeName}}} _item = null!;
-                       private char _op;
+                    private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
+                    {
+                        private readonly AdoGen.SqlServer.BulkBatchSql<{{{dtoTypeName}}}> _batch;
+                        private int _index = -1;
+                        private {{{dtoTypeName}}} _item = null!;
+                        private char _op;
 
-                       public __BulkReader(AdoGen.SqlServer.BulkBatchSql<{{{dtoTypeName}}}> batch) => _batch = batch;
+                        public __BulkReader(AdoGen.SqlServer.BulkBatchSql<{{{dtoTypeName}}}> batch) => _batch = batch;
 
-                       public override bool Read() 
-                       {
-                           ++_index;
-                           if (_index >= _batch.Items.Count) return false;
-                           
-                           _item = _batch.Items[_index];
-                           _op = _batch.Operations[_index].Value;
-                           return true;
-                       }
-                        
-                       public override int FieldCount => {{{dtoProps.Length + 1}}};
+                        public override bool Read() 
+                        {
+                            ++_index;
+                            if (_index >= _batch.Items.Count) return false;
+                            
+                            _item = _batch.Items[_index];
+                            _op = _batch.Operations[_index].Value;
+                            return true;
+                        }
+                         
+                        public override int FieldCount => {{{bulkFieldCount + 1}}};
 
-                       public override object GetValue(int i) => i switch
-                       {
+                        public override object GetValue(int i) => i switch
+                        {
                {{{GetValueSwitch()}}}
-                           {{{dtoProps.Length}}} => _op,
-                           _ => throw new IndexOutOfRangeException()
-                       };
+                            {{{bulkFieldCount}}} => _op,
+                            _ => throw new IndexOutOfRangeException()
+                        };
 
-                       public override string GetName(int i) => i switch
-                       {
+                        public override string GetName(int i) => i switch
+                        {
                {{{GetNameSwitch()}}}
-                           {{{dtoProps.Length}}} => "Operation",
-                           _ => throw new IndexOutOfRangeException()
-                       };
+                            {{{bulkFieldCount}}} => "Operation",
+                            _ => throw new IndexOutOfRangeException()
+                        };
 
-                       public override Type GetFieldType(int i) => i switch
-                       {
+                        public override Type GetFieldType(int i) => i switch
+                        {
                {{{GetTypeSwitch()}}}
-                           {{{dtoProps.Length}}} => typeof(char),
-                           _ => throw new IndexOutOfRangeException()
-                       };
+                            {{{bulkFieldCount}}} => typeof(char),
+                            _ => throw new IndexOutOfRangeException()
+                        };
 
-                       public override int GetOrdinal(string name) => name switch
-                       {
+                        public override int GetOrdinal(string name) => name switch
+                        {
                {{{GetOrdinalSwitch()}}}
-                           _ => -1
-                       };
-                   }
-               }
+                            _ => -1
+                        };
+                    }
+                }
                """";
 
         spc.AddSource($"{dto.Name}.Bulk.Sql.g.cs", src);
+        
         return;
 
 
         string BulkCopyMappings()
         {
             var sb = new StringBuilder();
-            foreach (var col in ctx.Columns)
-                sb.AppendLine($"        bulk.ColumnMappings.Add(\"{col.ParameterName}\", \"{col.ParameterName}\");");
+            
+            foreach (var col in bulkColumns)
+                sb.AppendLine($"         bulk.ColumnMappings.Add(\"{col.ParameterName}\", \"{col.ParameterName}\");");
+            
             return sb.ToString().TrimEnd();
         }
 
         string GetNameSwitch()
         {
             var sb = new StringBuilder();
-            for (var i = 0; i < ctx.Columns.Length; i++)
-                sb.AppendLine($"            {i} => \"{ctx.Columns[i].ParameterName}\",");
+            
+            for (var i = 0; i < bulkColumns.Length; i++)
+                sb.AppendLine($"             {i} => \"{bulkColumns[i].ParameterName}\",");
+            
             return sb.ToString().TrimEnd();
         }
 
         string GetTypeSwitch()
         {
             var sb = new StringBuilder();
-            for (var i = 0; i < dtoProps.Length; i++)
+            for (var i = 0; i < bulkColumns.Length; i++)
             {
-                var p = dtoProps[i];
+                IPropertySymbol? p = null;
+                for (var j = 0; j < dtoProps.Length; j++)
+                    if (dtoProps[j].Name == bulkColumns[i].Name) { p = dtoProps[j]; break; }
+                if (p is null) continue;
                 var t = GetUnderlyingTypeSymbol(p.Type);
                 var typeName = t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat).TrimEnd('?');
-                sb.AppendLine($"            {i} => typeof({typeName}),");
+                sb.AppendLine($"             {i} => typeof({typeName}),");
             }
+            
             return sb.ToString().TrimEnd();
         }
 
         string GetValueSwitch()
         {
             var sb = new StringBuilder();
-            for (var i = 0; i < dtoProps.Length; i++)
+            for (var i = 0; i < bulkColumns.Length; i++)
             {
-                var p = dtoProps[i];
-                var col = ctx.Columns[i];
+                var col = bulkColumns[i];
+                IPropertySymbol? p = null;
+                
+                for (var j = 0; j < dtoProps.Length; j++)
+                    if (dtoProps[j].Name == col.Name) { p = dtoProps[j]; break; }
+                
+                if (p is null) continue;
+                
                 var expr = GetValueExpression(p, col.IsNullable);
-                sb.AppendLine($"            {i} => {expr},");
+                sb.AppendLine($"             {i} => {expr},");
             }
+            
             return sb.ToString().TrimEnd();
         }
 
@@ -200,6 +219,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             {
                 return nts.TypeArguments[0];
             }
+            
             return type;
         }
 
@@ -218,9 +238,12 @@ internal sealed class BulkEmitterSqlServer : IEmitter
         string GetOrdinalSwitch()
         {
             var sb = new StringBuilder();
-            for (var i = 0; i < ctx.Columns.Length; i++)
-                sb.AppendLine($"            \"{ctx.Columns[i].ParameterName}\" => {i},");
-            sb.AppendLine($"            \"Operation\" => {ctx.Columns.Length},");
+            
+            for (var i = 0; i < bulkColumns.Length; i++)
+                sb.AppendLine($"             \"{bulkColumns[i].ParameterName}\" => {i},");
+            
+            sb.AppendLine($"             \"Operation\" => {bulkColumns.Length},");
+            
             return sb.ToString().TrimEnd();
         }
     }

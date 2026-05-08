@@ -36,13 +36,16 @@ internal sealed class BulkEmitterNpgSql : IEmitter
             return;
         }
         
+        var bulkColumns = ctx.BulkColumns;
+        var bulkFieldCount = bulkColumns.Length;
+        
         // SQL strings — produced by PostgreSqlSqlTextBuilder
         var tempTableSql = PostgreSqlSqlTextBuilder.BulkCreateTempTable(ctx, tempTableName);
         var applySql = PostgreSqlSqlTextBuilder.BulkApply(ctx, tempTableName, ctx.SchemaTableQuoted);
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
-        var copyColumnsEscaped = BuildJoined(ctx.Columns, col => $"\"{col.ParameterName}\"") + ", \"operation\"";
+        var copyColumnsEscaped = BuildJoined(bulkColumns, col => $"\"{col.ParameterName}\"") + ", \"operation\"";
         var copyCommand = $"""COPY "{tempTableName}" ({copyColumnsEscaped}) FROM STDIN (FORMAT BINARY)""";
 
         var src =
@@ -80,7 +83,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                     protected override string SqlCreateTempTable => _sqlCreateTempTable;
                     protected override string TempTableName => _tempTableName;
                     protected override string SqlApply => _sqlApply;
-                    protected override int FieldCount => {{{{dtoProps.Length + 1}}}};
+                    protected override int FieldCount => {{{{bulkFieldCount + 1}}}};
 
                     public {{{{bulkTypeName}}}}(int capacity = 0) : base(capacity) { }
 
@@ -111,12 +114,23 @@ internal sealed class BulkEmitterNpgSql : IEmitter
         string EmitImporterWrites()
         {
             var sb = new StringBuilder();
-            for (var i = 0; i < dtoProps.Length; i++)
+            
+            for (var i = 0; i < bulkColumns.Length; i++)
             {
-                var p = dtoProps[i];
+                var col = bulkColumns[i];
+                // Find matching dtoProps entry
+                IPropertySymbol? p = null;
+                for (var j = 0; j < dtoProps.Length; j++)
+                {
+                    if (dtoProps[j].Name == col.Name) { p = dtoProps[j]; break; }
+                }
+                
+                if (p is null) continue;
+                
                 var accessor = ResolveNpgsqlBulkWriteAccessor(p);
                 sb.AppendLine($"            importer.Write({accessor});");
             }
+            
             return sb.ToString().TrimEnd();
         }
     }

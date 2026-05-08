@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Text;
 using AdoGen.Generator.Models;
 
@@ -39,20 +40,20 @@ internal static class SqlServerSqlTextBuilder
 
     public static string Insert(EmitContext ctx)
     {
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertParams = BuildJoined(ctx.NonIdentities, col => "@" + col.ParameterName);
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
+        var insertParams = BuildJoined(ctx.Writables, col => "@" + col.ParameterName);
         return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
     }
 
     public static string InsertBatchPrefix(EmitContext ctx)
     {
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
         return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES";
     }
 
     public static string Update(EmitContext ctx)
     {
-        var updateSet = BuildJoined(ctx.NonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
+        var updateSet = BuildJoined(ctx.WritableNonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
         return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
     }
 
@@ -61,9 +62,9 @@ internal static class SqlServerSqlTextBuilder
 
     public static string Upsert(EmitContext ctx)
     {
-        var updateSet = BuildJoined(ctx.NonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertParams = BuildJoined(ctx.NonIdentities, col => "@" + col.ParameterName);
+        var updateSet = BuildJoined(ctx.WritableNonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
+        var insertParams = BuildJoined(ctx.Writables, col => "@" + col.ParameterName);
         
         return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey}; " +
                $"IF @@ROWCOUNT = 0 INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
@@ -78,9 +79,9 @@ internal static class SqlServerSqlTextBuilder
     public static string BulkCreateTempTable(EmitContext ctx, string tempTableName)
     {
         var sbColDefs = new StringBuilder();
-        for (var i = 0; i < ctx.Columns.Length; i++)
+        for (var i = 0; i < ctx.BulkColumns.Length; i++)
         {
-            var col = ctx.Columns[i];
+            var col = ctx.BulkColumns[i];
             var nullability = col.IsNullable ? "NULL" : "NOT NULL";
             sbColDefs.AppendLine($"            {col.ColumnNameQuoted} {col.SqlType} {nullability},");
         }
@@ -99,10 +100,10 @@ internal static class SqlServerSqlTextBuilder
         var joinOn = ctx.JoinOn;
         var idxCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
         var idxClause = $"        CREATE INDEX [IX_AdoGen_{ctx.Profile.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
-        var updateSet = string.Join(",\n        ", System.Linq.Enumerable.Select(ctx.NonKeyNonIdentities,
+        var updateSet = string.Join(",\n        ", Enumerable.Select(ctx.WritableNonKeyNonIdentities,
             col => $"    T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}"));
-        var insertCols = BuildJoined(ctx.NonIdentities, col => col.ColumnNameQuoted);
-        var insertSelect = BuildJoined(ctx.NonIdentities, col => $"S.{col.ColumnNameQuoted}");
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
+        var insertSelect = BuildJoined(ctx.Writables, col => $"S.{col.ColumnNameQuoted}");
 
         var sb = new StringBuilder();
 
@@ -111,7 +112,7 @@ internal static class SqlServerSqlTextBuilder
         sb.AppendLine(idxClause);
         sb.AppendLine();
 
-        if (options.HasUpdates && ctx.NonKeyNonIdentities.Length > 0)
+        if (options.HasUpdates && ctx.WritableNonKeyNonIdentities.Length > 0)
         {
             sb.AppendLine("        UPDATE T");
             sb.AppendLine("        SET");
@@ -123,7 +124,7 @@ internal static class SqlServerSqlTextBuilder
             sb.AppendLine();
         }
 
-        if (options.HasInserts && ctx.NonIdentities.Length > 0)
+        if (options.HasInserts && ctx.Writables.Length > 0)
         {
             sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
             sb.AppendLine($"        SELECT {insertSelect}");

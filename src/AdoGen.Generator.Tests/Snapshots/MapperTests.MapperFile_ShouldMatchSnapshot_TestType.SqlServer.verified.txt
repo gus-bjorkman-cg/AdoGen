@@ -39,6 +39,7 @@ public sealed partial record TestType : ISqlMapper<global::AdoGen.Generator.Test
     private static int ShortEnumOrdinal;
     private static int IntEnumOrdinal;
     private static int LongEnumOrdinal;
+    private static int CreatedAtOrdinal;
 
     public static global::AdoGen.Generator.Tests.TestType Map(SqlDataReader reader)
     {
@@ -71,6 +72,7 @@ public sealed partial record TestType : ISqlMapper<global::AdoGen.Generator.Test
             ShortEnumOrdinal = reader.GetOrdinal("ShortEnum");
             IntEnumOrdinal = reader.GetOrdinal("IntEnum");
             LongEnumOrdinal = reader.GetOrdinal("LongEnum");
+            CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
 
             Volatile.Write(ref IsInitialized, true);
         }
@@ -102,13 +104,10 @@ public sealed partial record TestType : ISqlMapper<global::AdoGen.Generator.Test
             ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetByte(ByteEnumOrdinal),
             ShortEnum : (global::AdoGen.Generator.Tests.ShortEnum)reader.GetInt16(ShortEnumOrdinal),
             IntEnum : (global::AdoGen.Generator.Tests.IntEnum)reader.GetInt32(IntEnumOrdinal),
-            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(LongEnumOrdinal)
+            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(LongEnumOrdinal),
+            CreatedAt : reader.GetFieldValue<DateTimeOffset>(CreatedAtOrdinal)
         );
     }
-    private static TEnum EnumCast<TUnderlying, TEnum>(TUnderlying value)
-        where TUnderlying : unmanaged
-        where TEnum : unmanaged
-        => Unsafe.As<TUnderlying, TEnum>(ref value);
 }
 
 /// <summary>
@@ -143,6 +142,7 @@ public static class TestTypeSql
     public const string ParameterShortEnum = "ShortEnum";
     public const string ParameterIntEnum = "IntEnum";
     public const string ParameterLongEnum = "LongEnum";
+    public const string ParameterCreatedAt = "CreatedAt";
 
     /// <summary>
     /// Creates a SqlParameter with the configured db type and size/precision/scale.
@@ -453,5 +453,16 @@ public static class TestTypeSql
         ParameterName = propertyName ?? ParameterLongEnum,
         SqlDbType = SqlDbType.BigInt,
         Value = value,
+    };
+    
+    /// <summary>
+    /// Creates a SqlParameter with the configured db type and size/precision/scale.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SqlParameter CreateParameterCreatedAt(DateTimeOffset value, string? propertyName = null) => new()
+    {
+        ParameterName = propertyName ?? ParameterCreatedAt,
+        SqlDbType = SqlDbType.DateTimeOffset,
+        Value = value is null ? DBNull.Value : value,
     };
 }

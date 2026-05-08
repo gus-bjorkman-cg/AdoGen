@@ -22,6 +22,7 @@ internal static class ConfigureChainParser
         NullableChainHandler.Instance,
         NotNullChainHandler.Instance,
         DefaultValueChainHandler.Instance,
+        ReadOnlyChainHandler.Instance,
         // SQL Server
         TypeChainHandlerSqlServer.Instance,
         NVarCharChainHandlerSqlServer.Instance,

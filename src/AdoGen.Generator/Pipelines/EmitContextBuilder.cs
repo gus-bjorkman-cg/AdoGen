@@ -45,6 +45,7 @@ internal static class EmitContextBuilder
             var isIdentity = profile.IdentityKeys.Contains(p.Name);
             var isNullable = p.IsNullableProperty(cfg);
             var defaultSql = p.ResolveDefaultSql(cfg, provider);
+            var isReadOnly = cfg.IsReadOnly;
             var role = isIdentity ? ColumnRole.Identity : isKey ? ColumnRole.Key : ColumnRole.Plain;
 
             columnsBuilder.Add(new ColumnInfo(
@@ -56,6 +57,7 @@ internal static class EmitContextBuilder
                 IsNullable: isNullable,
                 IsIdentity: isIdentity,
                 IsKey: isKey,
+                IsReadOnly: isReadOnly,
                 DefaultSqlExpression: defaultSql,
                 Role: role
             ));
@@ -68,6 +70,9 @@ internal static class EmitContextBuilder
         var identitiesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
         var nonIdentitiesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
         var nonKeyNonIdentitiesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
+        var writablesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
+        var writableNonKeyNonIdentitiesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
+        var bulkColumnsBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
 
         for (var i = 0; i < columns.Length; i++)
         {
@@ -76,12 +81,19 @@ internal static class EmitContextBuilder
             if (col.IsIdentity) identitiesBuilder.Add(col);
             if (!col.IsIdentity) nonIdentitiesBuilder.Add(col);
             if (!col.IsKey && !col.IsIdentity) nonKeyNonIdentitiesBuilder.Add(col);
+            if (!col.IsIdentity && !col.IsReadOnly) writablesBuilder.Add(col);
+            if (!col.IsKey && !col.IsIdentity && !col.IsReadOnly) writableNonKeyNonIdentitiesBuilder.Add(col);
+            // BulkColumns: keys always (for JOIN matching) + writable non-keys
+            if (col.IsKey || !col.IsReadOnly) bulkColumnsBuilder.Add(col);
         }
 
         var keys = keysBuilder.ToImmutable();
         var identities = identitiesBuilder.ToImmutable();
         var nonIdentities = nonIdentitiesBuilder.ToImmutable();
         var nonKeyNonIdentities = nonKeyNonIdentitiesBuilder.ToImmutable();
+        var writables = writablesBuilder.ToImmutable();
+        var writableNonKeyNonIdentities = writableNonKeyNonIdentitiesBuilder.ToImmutable();
+        var bulkColumns = bulkColumnsBuilder.ToImmutable();
 
         // WhereByKey: "[a] = @a AND [b] = @b" (spaces around = for readability)
         var whereByKey = BuildJoinedPredicate(keys, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
@@ -105,7 +117,9 @@ internal static class EmitContextBuilder
             Identities: identities,
             NonIdentities: nonIdentities,
             NonKeyNonIdentities: nonKeyNonIdentities,
-            Writables: nonIdentities,
+            Writables: writables,
+            WritableNonKeyNonIdentities: writableNonKeyNonIdentities,
+            BulkColumns: bulkColumns,
             WhereByKey: whereByKey,
             JoinOn: joinOn,
             Quoter: quoter,

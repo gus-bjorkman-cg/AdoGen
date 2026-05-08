@@ -49,6 +49,7 @@ public sealed class TestTypeTests(TestContext testContext) : TestBase(testContex
         .RuleFor(x => x.ShortEnum, f => f.PickRandom<ShortEnum>())
         .RuleFor(x => x.IntEnum, f => f.PickRandom<IntEnum>())
         .RuleFor(x => x.LongEnum, f => f.PickRandom<LongEnum>())
+        .RuleFor(x => x.CreatedAt, _ => default)
         .WithDefaultConstructor();
 
     private List<TestType> _toInsert = [];
@@ -82,6 +83,116 @@ public sealed class TestTypeTests(TestContext testContext) : TestBase(testContex
         await Connection.QueryAsync<TestType>("""SELECT * FROM "public"."TestTypes" """, CancellationToken);
 
     [Fact]
+    public async Task InsertReadOnlyField_ShouldNotBeWritten()
+    {
+        // Arrange
+        var item = _toInsert.First();
+
+        // Act
+        await Connection.InsertAsync(item, CancellationToken);
+
+        // Assert
+        var actual = await Connection.QueryFirstOrDefaultAsync<TestType>(
+            """SELECT * FROM "public"."TestTypes" WHERE "Int" = @Int LIMIT 1""",
+            TestTypeNpgsql.CreateParameterInt(item.Int), CancellationToken);
+
+        actual!.CreatedAt.UtcDateTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task UpdateReadOnlyField_ShouldNotBeOverwritten()
+    {
+        // Arrange
+        var item = _toUpdate.First();
+
+        // Act
+        await Connection.UpdateAsync(item, CancellationToken);
+
+        // Assert
+        var actual = await Connection.QueryFirstOrDefaultAsync<TestType>(
+            """SELECT * FROM "public"."TestTypes" WHERE "Int" = @Int LIMIT 1""",
+            TestTypeNpgsql.CreateParameterInt(item.Int), CancellationToken);
+
+        actual!.CreatedAt.UtcDateTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task UpsertReadOnlyField_ShouldNotBeWritten_WhenInsert()
+    {
+        // Arrange
+        var item = _toInsert.First();
+
+        // Act
+        await Connection.UpsertAsync(item, CancellationToken);
+
+        // Assert
+        var actual = await Connection.QueryFirstOrDefaultAsync<TestType>(
+            """SELECT * FROM "public"."TestTypes" WHERE "Int" = @Int LIMIT 1""",
+            TestTypeNpgsql.CreateParameterInt(item.Int), CancellationToken);
+
+        actual!.CreatedAt.UtcDateTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task UpsertReadOnlyField_ShouldNotBeWritten_WhenUpdate()
+    {
+        // Arrange
+        var item = _toUpdate.First();
+        var timestamp = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        await Connection.ExecuteAsync("""UPDATE "public"."TestTypes" SET "CreatedAt" = '2000-01-01T00:00:00Z'""", CancellationToken);
+
+        // Act
+        await Connection.UpsertAsync(item, CancellationToken);
+
+        // Assert
+        var afterUpdate = await Connection.QueryFirstOrDefaultAsync<TestType>(
+            """SELECT * FROM "public"."TestTypes" WHERE "Int" = @Int LIMIT 1""",
+            TestTypeNpgsql.CreateParameterInt(item.Int), CancellationToken);
+        
+        afterUpdate!.CreatedAt.Should().Be(timestamp);
+    }
+
+    [Fact]
+    public async Task BulkInsertReadOnlyField_ShouldNotBeWritten()
+    {
+        // Arrange
+        var bulk = new TestTypeNpgsqlBulk(10);
+        bulk.AddRange(_toInsert);
+        await using var transaction = await Connection.BeginTransactionAsync(CancellationToken);
+
+        // Act
+        await bulk.SaveChangesAsync(Connection, transaction, CancellationToken);
+        await transaction.CommitAsync(CancellationToken);
+
+        // Assert
+        var inserted = await GetAll();
+        
+        inserted.Should().AllSatisfy(x =>
+            x.CreatedAt.UtcDateTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public async Task BulkUpdateReadOnlyField_ShouldNotBeOverwritten()
+    {
+        // Arrange
+        var existing = await GetAll();
+        var timestamp = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        await Connection.ExecuteAsync("""UPDATE "public"."TestTypes" SET "CreatedAt" = '2000-01-01T00:00:00Z'""", CancellationToken);
+
+        var bulk = new TestTypeNpgsqlBulk(existing.Count);
+        bulk.UpdateRange(existing);
+        await using var transaction = await Connection.BeginTransactionAsync(CancellationToken);
+
+        // Act
+        await bulk.SaveChangesAsync(Connection, transaction, CancellationToken);
+        await transaction.CommitAsync(CancellationToken);
+
+        // Assert
+        var afterUpdate = await GetAll();
+        afterUpdate.Should().AllSatisfy(x => x.CreatedAt.Should().Be(timestamp));
+    }
+
+    [Fact]
     public async Task BulkMixed_ShouldPerformAllOperations()
     {
         // Arrange
@@ -96,7 +207,7 @@ public sealed class TestTypeTests(TestContext testContext) : TestBase(testContex
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        (await GetAll()).Should().BeEquivalentTo(_toInsert.Concat(_toUpdate));
+        (await GetAll()).Should().BeEquivalentTo(_toInsert.Concat(_toUpdate),
+            options => options.Excluding(x => x.CreatedAt));
     }
 }
-

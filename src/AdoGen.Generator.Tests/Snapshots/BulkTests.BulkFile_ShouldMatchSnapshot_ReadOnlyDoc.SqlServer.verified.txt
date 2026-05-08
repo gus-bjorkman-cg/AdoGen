@@ -10,19 +10,17 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record AuditEvent : ISqlBulkModel<global::AdoGen.Generator.Tests.AuditEvent>;
+public sealed partial record ReadOnlyDoc : ISqlBulkModel<global::AdoGen.Generator.Tests.ReadOnlyDoc>;
 
-public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests.AuditEvent>
+public sealed class ReadOnlyDocBulk : BulkBatchSql<global::AdoGen.Generator.Tests.ReadOnlyDoc>
 {
-    private const string _tempTableName = "#AdoGen_AuditEvent";
+    private const string _tempTableName = "#AdoGen_ReadOnlyDoc";
 
     private const string _sqlCreateTempTable =
         """
-        CREATE TABLE #AdoGen_AuditEvent(
-            [EventId] BIGINT NOT NULL,
-            [CreatedAt] DATETIMEOFFSET NOT NULL,
-            [Type] NVARCHAR(50) NOT NULL,
-            [JsonPayload] VARBINARY(8000) NOT NULL,
+        CREATE TABLE #AdoGen_ReadOnlyDoc(
+            [Id] UNIQUEIDENTIFIER NOT NULL,
+            [Title] VARCHAR(200) NOT NULL,
             [Operation] CHAR(1) NOT NULL);
         """;
 
@@ -30,27 +28,25 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
         """
         BEGIN TRY
         DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
-        CREATE INDEX [IX_AdoGen_Audits_Op_Key] ON #AdoGen_AuditEvent ([Operation], [EventId]);
+        CREATE INDEX [IX_AdoGen_ReadOnlyDocs_Op_Key] ON #AdoGen_ReadOnlyDoc ([Operation], [Id]);
 
         UPDATE T
         SET
-            T.[CreatedAt] = S.[CreatedAt],
-            T.[Type] = S.[Type],
-            T.[JsonPayload] = S.[JsonPayload]
-        FROM [log].[Audits] AS T
-            JOIN #AdoGen_AuditEvent AS S ON S.[EventId] = T.[EventId]
+            T.[Title] = S.[Title]
+        FROM [dbo].[ReadOnlyDocs] AS T
+            JOIN #AdoGen_ReadOnlyDoc AS S ON S.[Id] = T.[Id]
         WHERE S.[Operation] = 'U';
         SET @updated = @@ROWCOUNT;
 
-        INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload])
-        SELECT S.[CreatedAt], S.[Type], S.[JsonPayload]
-        FROM #AdoGen_AuditEvent AS S
+        INSERT INTO [dbo].[ReadOnlyDocs] ([Id], [Title])
+        SELECT S.[Id], S.[Title]
+        FROM #AdoGen_ReadOnlyDoc AS S
         WHERE S.[Operation] = 'I';
         SET @inserted = @@ROWCOUNT;
 
         DELETE T
-        FROM [log].[Audits] AS T
-            JOIN #AdoGen_AuditEvent AS S ON S.[EventId] = T.[EventId]
+        FROM [dbo].[ReadOnlyDocs] AS T
+            JOIN #AdoGen_ReadOnlyDoc AS S ON S.[Id] = T.[Id]
         WHERE S.[Operation] = 'D';
         SET @deleted = @@ROWCOUNT;
 
@@ -58,23 +54,23 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
 
         END TRY
         BEGIN CATCH
-            IF OBJECT_ID('tempdb..#AdoGen_AuditEvent') IS NOT NULL DROP TABLE #AdoGen_AuditEvent;
+            IF OBJECT_ID('tempdb..#AdoGen_ReadOnlyDoc') IS NOT NULL DROP TABLE #AdoGen_ReadOnlyDoc;
             THROW;
         END CATCH;
-        IF OBJECT_ID('tempdb..#AdoGen_AuditEvent') IS NOT NULL DROP TABLE #AdoGen_AuditEvent;
+        IF OBJECT_ID('tempdb..#AdoGen_ReadOnlyDoc') IS NOT NULL DROP TABLE #AdoGen_ReadOnlyDoc;
         """;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
-     protected override int FieldCount => 5;
+     protected override int FieldCount => 3;
 
      /// <summary>
      /// Initializes a new instance of the BulkBatch class with an optional initial capacity for
      /// the items and operations lists.
      /// </summary>
      /// <param name="capacity"></param>
-     public AuditEventBulk(int capacity = 0) : base(capacity) { }
+     public ReadOnlyDocBulk(int capacity = 0) : base(capacity) { }
 
      protected override async ValueTask WriteItemsToServerAsync(SqlBulkCopy bulk, CancellationToken ct)
      {
@@ -84,20 +80,18 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
      
      protected override void ApplyColumnMappings(SqlBulkCopy bulk)
      {
-         bulk.ColumnMappings.Add("EventId", "EventId");
-        bulk.ColumnMappings.Add("CreatedAt", "CreatedAt");
-        bulk.ColumnMappings.Add("Type", "Type");
-        bulk.ColumnMappings.Add("JsonPayload", "JsonPayload");
+         bulk.ColumnMappings.Add("Id", "Id");
+        bulk.ColumnMappings.Add("Title", "Title");
      }
 
      private sealed class __BulkReader : AdoGen.SqlServer.BulkDataReaderBase
      {
-         private readonly AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.AuditEvent> _batch;
+         private readonly AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.ReadOnlyDoc> _batch;
          private int _index = -1;
-         private global::AdoGen.Generator.Tests.AuditEvent _item = null!;
+         private global::AdoGen.Generator.Tests.ReadOnlyDoc _item = null!;
          private char _op;
 
-         public __BulkReader(AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.AuditEvent> batch) => _batch = batch;
+         public __BulkReader(AdoGen.SqlServer.BulkBatchSql<global::AdoGen.Generator.Tests.ReadOnlyDoc> batch) => _batch = batch;
 
          public override bool Read() 
          {
@@ -109,45 +103,37 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
              return true;
          }
           
-         public override int FieldCount => 5;
+         public override int FieldCount => 3;
 
          public override object GetValue(int i) => i switch
          {
-             0 => _item.EventId,
-            1 => _item.CreatedAt,
-            2 => _item.EventType,
-            3 => _item.JsonPayload,
-             4 => _op,
+             0 => _item.Id,
+            1 => _item.Title,
+             2 => _op,
              _ => throw new IndexOutOfRangeException()
          };
 
          public override string GetName(int i) => i switch
          {
-             0 => "EventId",
-            1 => "CreatedAt",
-            2 => "Type",
-            3 => "JsonPayload",
-             4 => "Operation",
+             0 => "Id",
+            1 => "Title",
+             2 => "Operation",
              _ => throw new IndexOutOfRangeException()
          };
 
          public override Type GetFieldType(int i) => i switch
          {
-             0 => typeof(long),
-            1 => typeof(DateTimeOffset),
-            2 => typeof(string),
-            3 => typeof(byte[]),
-             4 => typeof(char),
+             0 => typeof(Guid),
+            1 => typeof(string),
+             2 => typeof(char),
              _ => throw new IndexOutOfRangeException()
          };
 
          public override int GetOrdinal(string name) => name switch
          {
-             "EventId" => 0,
-            "CreatedAt" => 1,
-            "Type" => 2,
-            "JsonPayload" => 3,
-            "Operation" => 4,
+             "Id" => 0,
+            "Title" => 1,
+            "Operation" => 2,
              _ => -1
          };
      }
