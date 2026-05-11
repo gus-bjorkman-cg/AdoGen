@@ -81,24 +81,6 @@ internal static class ParameterBindingEmitter
     }
 
     /// <summary>
-    /// Produces batched cmd.Parameters.Add calls with an incrementing index variable.
-    /// Each column emits: CreateParameterX(model.X, $"@p{index}") followed by index++[suffix].
-    /// </summary>
-    public static string BindBatchFlat(EmitContext ctx, string modelVar, string indexVar, int indent, bool trimEnd = false)
-    {
-        var prefix = new string(' ', indent);
-        var sb = new StringBuilder();
-        
-        foreach (var col in ctx.Writables)
-        {
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, $\"@p{{{indexVar}}}\"));");
-            sb.AppendLine($"{prefix}{indexVar}++;");
-        }
-        
-        return trimEnd ? sb.ToString().TrimEnd() : sb.ToString();
-    }
-
-    /// <summary>
     /// Produces the inner body of a one-pass composite-key batch-delete loop.
     /// Each key column emits an sb.Append for the param name (with comma separator between keys)
     /// AND a cmd.Parameters.Add — both in the same loop iteration, eliminating the second pass.
@@ -109,16 +91,53 @@ internal static class ParameterBindingEmitter
     {
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
+        var last = ctx.Keys.Length - 1;
 
         for (var k = 0; k < ctx.Keys.Length; k++)
         {
             var col = ctx.Keys[k];
-            if (k > 0) sb.AppendLine($"{prefix}{sbVar}.Append(',');");
-            sb.AppendLine($"{prefix}{sbVar}.Append($\"@p{{{indexVar}}}\");");
+            var open = k == 0 ? "(" : ",";
+            var close = k == last ? ")" : "";
+            sb.AppendLine($"{prefix}{sbVar}.Append($\"{open}@p{{{indexVar}}}{close}\");");
             sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, $\"@p{{{indexVar}}}\"));");
             sb.AppendLine($"{prefix}{indexVar}++;");
         }
 
         return sb.ToString().TrimEnd();
     }
+
+    /// <summary>
+    /// Produces the inner body of a one-pass batch-insert loop.
+    /// Each writable column emits sb.Append for the comma separator + param name
+    /// AND a cmd.Parameters.Add — both inline, eliminating the inner columnIndex loop.
+    /// Must be placed inside a <c>for (var modelIndex = 0; ...)</c> loop after
+    /// <c>sb.Append('(')</c> and before <c>sb.Append(')')</c>.
+    /// </summary>
+    public static string BindWritablesInlineLoop(EmitContext ctx, string modelVar, string indexVar, string sbVar, int indent)
+    {
+        var prefix = new string(' ', indent);
+        var sb = new StringBuilder();
+        var last = ctx.Writables.Length - 1;
+
+        for (var k = 0; k < ctx.Writables.Length; k++)
+        {
+            var col = ctx.Writables[k];
+            var open = k == 0 ? "(" : ",";
+            var close = k == last ? ")" : "";
+            sb.AppendLine($"{prefix}{sbVar}.Append($\"{open}@p{{{indexVar}}}{close}\");");
+            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, $\"@p{{{indexVar}}}\"));");
+            sb.AppendLine($"{prefix}{indexVar}++;");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Returns the estimated per-row character count for a batch insert value tuple,
+    /// e.g. "(@p0,@p1,@p2)" — used to pre-size the StringBuilder.
+    /// Formula: each param slot is ~5 chars (@p + up to 3 digits), plus 2 for the parens,
+    /// minus 1 because the first column has no leading comma.
+    /// </summary>
+    public static int BatchInsertPerRowEstimate(EmitContext ctx)
+        => ctx.Writables.Length * 5 + 2;
 }

@@ -33,15 +33,12 @@ public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Gen
         for (var i = 0; i < models.Count; i++)
         {
             if (i > 0) sb.Append(',');
-            sb.Append('(');
-            sb.Append($"@p{paramIndex}");
+            sb.Append($"(@p{paramIndex}");
             cmd.Parameters.Add(TestTypeSql.CreateParameterInt(models[i].Int, $"@p{paramIndex}"));
             paramIndex++;
-            sb.Append(',');
-            sb.Append($"@p{paramIndex}");
+            sb.Append($",@p{paramIndex})");
             cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(models[i].Decimal, $"@p{paramIndex}"));
             paramIndex++;
-            sb.Append(')');
         }
         sb.Append(SqlDeleteBatchSuffix);
         cmd.CommandText = sb.ToString();
@@ -91,8 +88,6 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
     private const string SqlDelete = "DELETE FROM [dbo].[TestTypes] WHERE [Int] = @Int AND [Decimal] = @Decimal;";
     private const string SqlUpsert = "UPDATE [dbo].[TestTypes] SET [NullableInt] = @NullableInt, [NullableDecimal] = @NullableDecimal, [NullableGuid] = @NullableGuid, [NullableStringVarchar] = @NullableStringVarchar, [NullableStringNVarchar] = @NullableStringNVarchar, [StringVarcharRuledNull] = @StringVarcharRuledNull, [CharString] = @CharString, [NCharString] = @NCharString, [Float] = @Float, [NullableFloat] = @NullableFloat, [DateTime] = @DateTime, [NullableDateTime] = @NullableDateTime, [Double] = @Double, [NullableDouble] = @NullableDouble, [Char] = @Char, [NChar] = @NChar, [NullableChar] = @NullableChar, [NullableBytes] = @NullableBytes, [Bytes] = @Bytes, [Fruits] = @Fruits, [Flags] = @Flags, [ByteEnum] = @ByteEnum, [ShortEnum] = @ShortEnum, [IntEnum] = @IntEnum, [LongEnum] = @LongEnum WHERE [Int] = @Int AND [Decimal] = @Decimal; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);";
     private const string SqlTruncate = "TRUNCATE TABLE [dbo].[TestTypes];";
-
-    private const int NonIdentityPropertyCount = 27;
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -153,88 +148,103 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
     {
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
-        
-        var sb = new StringBuilder(SqlInsertBatchTemplate);
+
+        await using var cmd = new SqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        cmd.EnableOptimizedParameterBinding = (models.Count * 27) > 24;
+
+        var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * 137);
+        sb.Append(SqlInsertBatchTemplate);
+
         var paramIndex = 0;
-    
+
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
             if (modelIndex > 0) sb.Append(',');
-    
-            sb.Append('(');
-    
-            for (var columnIndex = 0; columnIndex < NonIdentityPropertyCount; columnIndex++)
-            {
-                if (columnIndex > 0) sb.Append(',');
-                sb.Append($"@p{paramIndex + columnIndex}");
-            }
-    
-            sb.Append(')');
-            paramIndex += NonIdentityPropertyCount;
-        }
-    
-        await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-        cmd.EnableOptimizedParameterBinding = (models.Count * NonIdentityPropertyCount) > 24;
-        paramIndex = 0;
-    
-        foreach (var model in models)
-        {
-            cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int, $"@p{paramIndex}"));
+            sb.Append($"(@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterInt(models[modelIndex].Int, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(models[modelIndex].NullableInt, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(models[modelIndex].Decimal, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(models[modelIndex].NullableDecimal, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(models[modelIndex].NullableGuid, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(model.NullableStringVarchar, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(models[modelIndex].NullableStringVarchar, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(models[modelIndex].NullableStringNVarchar, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(models[modelIndex].StringVarcharRuledNull, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterCharString(model.CharString, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterCharString(models[modelIndex].CharString, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(model.NCharString, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(models[modelIndex].NCharString, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterFloat(model.Float, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterFloat(models[modelIndex].Float, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(model.NullableFloat, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(models[modelIndex].NullableFloat, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(model.DateTime, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(models[modelIndex].DateTime, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(model.NullableDateTime, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(models[modelIndex].NullableDateTime, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterDouble(model.Double, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterDouble(models[modelIndex].Double, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(model.NullableDouble, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(models[modelIndex].NullableDouble, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterChar(model.Char, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterChar(models[modelIndex].Char, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNChar(model.NChar, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNChar(models[modelIndex].NChar, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(model.NullableChar, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(models[modelIndex].NullableChar, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(model.NullableBytes, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(models[modelIndex].NullableBytes, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterBytes(model.Bytes, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterBytes(models[modelIndex].Bytes, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterFruits(model.Fruits, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterFruits(models[modelIndex].Fruits, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterFlags(model.Flags, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterFlags(models[modelIndex].Flags, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(model.ByteEnum, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(models[modelIndex].ByteEnum, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(model.ShortEnum, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(models[modelIndex].ShortEnum, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(model.IntEnum, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(models[modelIndex].IntEnum, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex})");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(models[modelIndex].LongEnum, $"@p{paramIndex}"));
             paramIndex++;
         }
 
+        cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

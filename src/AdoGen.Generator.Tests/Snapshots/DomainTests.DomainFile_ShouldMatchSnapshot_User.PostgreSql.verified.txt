@@ -54,8 +54,6 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
     private const string Pg_SqlDelete = """DELETE FROM "public"."Users" WHERE "Id" = @Id;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "public"."Users";""";
     private const string Pg_SqlUpsert = """INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email) ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Email" = EXCLUDED."Email";""";
-    
-    private const int Pg_NonIdentityPropertyCount = 3;
 
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -80,36 +78,28 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate);
+        await using var cmd = new NpgsqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 17);
+        sb.Append(Pg_SqlInsertBatchTemplate);
         var paramIndex = 0;
 
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
             if (modelIndex > 0) sb.Append(',');
-            sb.Append('(');
-            for (var columnIndex = 0; columnIndex < Pg_NonIdentityPropertyCount; columnIndex++)
-            {
-                if (columnIndex > 0) sb.Append(',');
-                sb.Append($"@p{paramIndex + columnIndex}");
-            }
-            sb.Append(')');
-            paramIndex += Pg_NonIdentityPropertyCount;
+            sb.Append($"(@p{paramIndex}");
+            cmd.Parameters.Add(UserNpgsql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(UserNpgsql.CreateParameterName(models[modelIndex].Name, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append($",@p{paramIndex})");
+            cmd.Parameters.Add(UserNpgsql.CreateParameterEmail(models[modelIndex].Email, $"@p{paramIndex}"));
+            paramIndex++;
         }
 
-        await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-        paramIndex = 0;
-
-        foreach (var model in models)
-        {
-            cmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id, $"@p{paramIndex}"));
-            paramIndex++;
-            cmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name, $"@p{paramIndex}"));
-            paramIndex++;
-            cmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email, $"@p{paramIndex}"));
-            paramIndex++;
-        
-        }
-
+        cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

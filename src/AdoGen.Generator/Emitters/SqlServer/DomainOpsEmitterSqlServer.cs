@@ -102,9 +102,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           for (var i = 0; i < models.Count; i++)
                           {
                               if (i > 0) sb.Append(',');
-                              sb.Append('(');
                   {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 12)}}
-                              sb.Append(')');
                           }
                           sb.Append(SqlDeleteBatchSuffix);
                           cmd.CommandText = sb.ToString();
@@ -146,8 +144,6 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 private const string SqlDelete = "{{deleteSql}}";
                 private const string SqlUpsert = "{{upsertSql}}";
                 private const string SqlTruncate = "{{truncateSql}}";
-            
-                private const int NonIdentityPropertyCount = {{nonIdentityPropCount}};
 
                 public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
@@ -181,35 +177,23 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 {
                     if (models is null || models.Count == 0) return 0;
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
-                    
-                    var sb = new StringBuilder(SqlInsertBatchTemplate);
+
+                    await using var cmd = new SqlCommand("", connection, transaction);
+                    if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                    cmd.EnableOptimizedParameterBinding = (models.Count * {{nonIdentityPropCount}}) > 24;
+
+                    var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * {{ParameterBindingEmitter.BatchInsertPerRowEstimate(ctx)}});
+                    sb.Append(SqlInsertBatchTemplate);
+
                     var paramIndex = 0;
-                
+
                     for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
                     {
                         if (modelIndex > 0) sb.Append(',');
-                
-                        sb.Append('(');
-                
-                        for (var columnIndex = 0; columnIndex < NonIdentityPropertyCount; columnIndex++)
-                        {
-                            if (columnIndex > 0) sb.Append(',');
-                            sb.Append($"@p{paramIndex + columnIndex}");
-                        }
-                
-                        sb.Append(')');
-                        paramIndex += NonIdentityPropertyCount;
+            {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", 12)}}
                     }
-                
-                    await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-                    cmd.EnableOptimizedParameterBinding = (models.Count * NonIdentityPropertyCount) > 24;
-                    paramIndex = 0;
-                
-                    foreach (var model in models)
-                    {
-            {{ParameterBindingEmitter.BindBatchFlat(ctx, "model", "paramIndex", 12, trimEnd: true)}}
-                    }
-            
+
+                    cmd.CommandText = sb.ToString();
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 

@@ -55,8 +55,6 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
     private const string Pg_SqlDelete = """DELETE FROM "log"."Audits" WHERE "EventId" = @EventId;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "log"."Audits";""";
     private const string Pg_SqlUpsert = """INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload) ON CONFLICT () DO UPDATE SET "CreatedAt" = EXCLUDED."CreatedAt", "Type" = EXCLUDED."Type", "JsonPayload" = EXCLUDED."JsonPayload";""";
-    
-    private const int Pg_NonIdentityPropertyCount = 3;
 
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -81,36 +79,28 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate);
+        await using var cmd = new NpgsqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 17);
+        sb.Append(Pg_SqlInsertBatchTemplate);
         var paramIndex = 0;
 
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
             if (modelIndex > 0) sb.Append(',');
-            sb.Append('(');
-            for (var columnIndex = 0; columnIndex < Pg_NonIdentityPropertyCount; columnIndex++)
-            {
-                if (columnIndex > 0) sb.Append(',');
-                sb.Append($"@p{paramIndex + columnIndex}");
-            }
-            sb.Append(')');
-            paramIndex += Pg_NonIdentityPropertyCount;
+            sb.Append($"(@p{paramIndex}");
+            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(models[modelIndex].EventType, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append($",@p{paramIndex})");
+            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, $"@p{paramIndex}"));
+            paramIndex++;
         }
 
-        await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-        paramIndex = 0;
-
-        foreach (var model in models)
-        {
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt, $"@p{paramIndex}"));
-            paramIndex++;
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType, $"@p{paramIndex}"));
-            paramIndex++;
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload, $"@p{paramIndex}"));
-            paramIndex++;
-        
-        }
-
+        cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

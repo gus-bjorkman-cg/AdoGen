@@ -58,8 +58,6 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     private const string SqlUpsert = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId; IF @@ROWCOUNT = 0 INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES (@CreatedAt, @Type, @JsonPayload);";
     private const string SqlTruncate = "TRUNCATE TABLE [log].[Audits];";
 
-    private const int NonIdentityPropertyCount = 3;
-
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -95,40 +93,31 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     {
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
-        
-        var sb = new StringBuilder(SqlInsertBatchTemplate);
+
+        await using var cmd = new SqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        cmd.EnableOptimizedParameterBinding = (models.Count * 3) > 24;
+
+        var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * 17);
+        sb.Append(SqlInsertBatchTemplate);
+
         var paramIndex = 0;
-    
+
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
             if (modelIndex > 0) sb.Append(',');
-    
-            sb.Append('(');
-    
-            for (var columnIndex = 0; columnIndex < NonIdentityPropertyCount; columnIndex++)
-            {
-                if (columnIndex > 0) sb.Append(',');
-                sb.Append($"@p{paramIndex + columnIndex}");
-            }
-    
-            sb.Append(')');
-            paramIndex += NonIdentityPropertyCount;
-        }
-    
-        await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-        cmd.EnableOptimizedParameterBinding = (models.Count * NonIdentityPropertyCount) > 24;
-        paramIndex = 0;
-    
-        foreach (var model in models)
-        {
-            cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt, $"@p{paramIndex}"));
+            sb.Append($"(@p{paramIndex}");
+            cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex}");
+            cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(models[modelIndex].EventType, $"@p{paramIndex}"));
             paramIndex++;
-            cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload, $"@p{paramIndex}"));
+            sb.Append($",@p{paramIndex})");
+            cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, $"@p{paramIndex}"));
             paramIndex++;
         }
 
+        cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

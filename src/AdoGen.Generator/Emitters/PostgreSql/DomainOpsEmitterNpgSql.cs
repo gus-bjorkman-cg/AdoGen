@@ -92,9 +92,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                           for (var i = 0; i < models.Count; i++)
                           {
                               if (i > 0) sb.Append(',');
-                              sb.Append('(');
                   {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 12)}}
-                              sb.Append(')');
                           }
                           sb.Append(Pg_SqlDeleteBatchSuffix);
                           cmd.CommandText = sb.ToString();
@@ -134,8 +132,6 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   private const string Pg_SqlDelete = """{{deleteSql}}""";
                   private const string Pg_SqlTruncate = """{{truncateSql}}""";
                   private const string Pg_SqlUpsert = """{{upsertSql}}""";
-                  
-                  private const int Pg_NonIdentityPropertyCount = {{nonIdentityPropCount}};
 
                   public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
@@ -157,30 +153,20 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                       if (models is null || models.Count == 0) return 0;
                       if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-                      var sb = new StringBuilder(Pg_SqlInsertBatchTemplate);
+                      await using var cmd = new NpgsqlCommand("", connection, transaction);
+                      if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+                      var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * {{ParameterBindingEmitter.BatchInsertPerRowEstimate(ctx)}});
+                      sb.Append(Pg_SqlInsertBatchTemplate);
                       var paramIndex = 0;
 
                       for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
                       {
                           if (modelIndex > 0) sb.Append(',');
-                          sb.Append('(');
-                          for (var columnIndex = 0; columnIndex < Pg_NonIdentityPropertyCount; columnIndex++)
-                          {
-                              if (columnIndex > 0) sb.Append(',');
-                              sb.Append($"@p{paramIndex + columnIndex}");
-                          }
-                          sb.Append(')');
-                          paramIndex += Pg_NonIdentityPropertyCount;
+              {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", 12)}}
                       }
 
-                      await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-                      paramIndex = 0;
-
-                      foreach (var model in models)
-                      {
-              {{ParameterBindingEmitter.BindBatchFlat(ctx, "model", "paramIndex", 12)}}        
-                      }
-
+                      cmd.CommandText = sb.ToString();
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                   }
 
