@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -56,5 +57,125 @@ public static class SqlConnectionSingleIdExtensions
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, TKey>
+        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Deletes the records with the given ids.
+    /// The generated code will create a SQL statement with an IN clause to delete all the records in one roundtrip.
+    /// </summary>
+    /// <param name="connection"></param>
+    /// <param name="ids"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <typeparam name="TModel"></typeparam>
+    /// <returns></returns>
+    public static async ValueTask<int> DeleteAsync<TModel>(
+        this SqlConnection connection,
+        List<Guid> ids,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, Guid>
+        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Deletes the records with the given ids.
+    /// The generated code will create a SQL statement with an IN clause to delete all the records in one roundtrip.
+    /// </summary>
+    /// <param name="connection"></param>
+    /// <param name="ids"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <typeparam name="TModel"></typeparam>
+    /// <returns></returns>
+    public static async ValueTask<int> DeleteAsync<TModel>(
+        this SqlConnection connection,
+        List<long> ids,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, long>
+        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Deletes the records with the given ids.
+    /// The generated code will create a SQL statement with an IN clause to delete all the records in one roundtrip.
+    /// </summary>
+    /// <param name="connection"></param>
+    /// <param name="ids"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <typeparam name="TModel"></typeparam>
+    /// <returns></returns>
+    public static async ValueTask<int> DeleteAsync<TModel>(
+        this SqlConnection connection,
+        List<int> ids,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, int>
+        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Deletes the records with the given ids.
+    /// The generated code will create a SQL statement with an IN clause to delete all the records in one roundtrip.
+    /// </summary>
+    /// <param name="connection"></param>
+    /// <param name="ids"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <typeparam name="TModel"></typeparam>
+    /// <returns></returns>
+    public static async ValueTask<int> DeleteAsync<TModel>(
+        this SqlConnection connection,
+        List<short> ids,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, short>
+        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Deletes the records with the given ids.
+    /// The generated code will create a SQL statement with an IN clause to delete all the records in one roundtrip.
+    /// </summary>
+    /// <param name="connection"></param>
+    /// <param name="ids"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <typeparam name="TModel"></typeparam>
+    /// <returns></returns>
+    public static async ValueTask<int> DeleteAsync<TModel>(
+        this SqlConnection connection,
+        List<decimal> ids,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, decimal>
+        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Deletes the records with the given ids.
+    /// The generated code will create a SQL statement with an IN clause to delete all the records in one roundtrip.
+    /// </summary>
+    /// <param name="connection"></param>
+    /// <param name="ids"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <typeparam name="TModel"></typeparam>
+    /// <returns></returns>
+    public static async ValueTask<int> DeleteAsync<TModel>(
+        this SqlConnection connection,
+        List<string> ids,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, string>
         => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
 }

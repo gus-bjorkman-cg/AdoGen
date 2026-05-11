@@ -35,7 +35,7 @@ public class PgBulkDelete : PgTestBase
     public void IterationCleanup() => _transaction.Rollback("s");
 
     [Benchmark]
-    public async Task AdoGen() => await Connection.DeleteAsync<User, Guid>(_ids, CancellationToken, _transaction);
+    public async Task AdoGen() => await Connection.DeleteAsync<User>(_ids, CancellationToken, _transaction);
 
     [Benchmark]
     public async Task AdoGenBulk()

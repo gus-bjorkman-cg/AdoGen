@@ -13,7 +13,7 @@ public class DeleteListTests : TestBase
     public async Task User_ShouldBeDeleted()
     {
         // Act
-        await Connection.DeleteAsync<User, Guid>(_ids, CancellationToken);
+        await Connection.DeleteAsync<User>(_ids, CancellationToken);
 
         // Assert
         (await GetAllUsers()).Should().BeEmpty();
@@ -27,7 +27,7 @@ public class DeleteListTests : TestBase
         await cts.CancelAsync();
         
         // Act
-        var act = async () => await Connection.DeleteAsync<User, Guid>(_ids, cts.Token);
+        var act = async () => await Connection.DeleteAsync<User>(_ids, cts.Token);
         
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
@@ -43,7 +43,7 @@ public class DeleteListTests : TestBase
         var act = async () =>
         {
             await using var connectionB = new SqlConnection(ConnectionString);
-            await connectionB.DeleteAsync<User, Guid>(_ids, CancellationToken, commandTimeout: 1);
+            await connectionB.DeleteAsync<User>(_ids, CancellationToken, commandTimeout: 1);
         };
 
         // Assert
@@ -58,7 +58,7 @@ public class DeleteListTests : TestBase
         await using var transaction = Connection.BeginTransaction();
         
         // Act
-        await Connection.DeleteAsync<User, Guid>(_ids, CancellationToken, transaction);
+        await Connection.DeleteAsync<User>(_ids, CancellationToken, transaction);
         await transaction.RollbackAsync(CancellationToken);
 
         // Assert
