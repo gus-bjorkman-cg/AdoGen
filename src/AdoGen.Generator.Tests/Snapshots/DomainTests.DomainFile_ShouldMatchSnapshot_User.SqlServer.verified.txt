@@ -14,27 +14,27 @@ namespace AdoGen.Generator.Tests;
 
 public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.Tests.User, Guid>
 {
-    private const string SqlDeleteBatchTemplate = "DELETE FROM [dbo].[Users] WHERE [Id] IN (";
+    private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[Users] AS t JOIN (VALUES ";
+    private const string SqlDeleteBatchSuffix = ") AS ids([Id]) ON ids.[Id]=t.[Id]";
 
     public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<Guid> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
-        var sb = new StringBuilder(SqlDeleteBatchTemplate);
+        await using var cmd = new SqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        cmd.EnableOptimizedParameterBinding = ids.Count > 24;
+        
+        var sb = new StringBuilder(SqlDeleteBatchPrefix);
         for (var i = 0; i < ids.Count; i++)
         {
             if (i > 0) sb.Append(',');
-            sb.Append($"@p{i}");
-        }
-        sb.Append(')');
-        
-        await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-        
-        for (var i = 0; i < ids.Count; i++)
-        {
+            sb.Append($"(@p{i})");
             cmd.Parameters.Add(UserSql.CreateParameterId(ids[i], $"@p{i}"));
         }
+        sb.Append(SqlDeleteBatchSuffix);
+        cmd.CommandText = sb.ToString();
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }

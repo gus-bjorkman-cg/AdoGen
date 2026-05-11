@@ -84,6 +84,29 @@ public sealed class PostgreSqlSqlTextBuilderTests
         actual.Should().Be("""DELETE FROM "public"."Users" WHERE "Id" IN (""");
     }
 
+    // ── DeleteBatchJoinValues ─────────────────────────────────────────────────
+
+    [Fact]
+    public void DeleteBatchJoinValuesPrefix_ShouldProduceDeleteUsingPrefix()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesPrefix(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be("""DELETE FROM "public"."Users" AS t USING (VALUES """);
+    }
+
+    [Fact]
+    public void DeleteBatchJoinValuesSuffix_SingleKey_ShouldProduceAliasAndWhereClause()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesSuffix(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be(") AS ids(\"Id\") WHERE ids.\"Id\"=t.\"Id\"");
+    }
+
+    [Fact]
+    public void DeleteBatchJoinValuesSuffix_CompositeKey_ShouldProduceMultiColumnWhereClause()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesSuffix(EmitContextFixtures.PostgreSqlCompositeKey());
+        actual.Should().Be(") AS ids(\"OrderId\", \"ProductId\") WHERE ids.\"OrderId\"=t.\"OrderId\" AND ids.\"ProductId\"=t.\"ProductId\"");
+    }
+
     // ── Upsert (ON CONFLICT) ──────────────────────────────────────────────────
 
     [Fact]

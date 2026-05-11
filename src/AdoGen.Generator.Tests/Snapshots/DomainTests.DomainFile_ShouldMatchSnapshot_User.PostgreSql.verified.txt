@@ -20,20 +20,18 @@ public sealed partial record User : INpgsqlSingleIdModel<global::AdoGen.Generato
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
+        await using var cmd = new NpgsqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
         var sb = new StringBuilder(Pg_SqlDeleteBatchTemplate);
         for (var i = 0; i < ids.Count; i++)
         {
             if (i > 0) sb.Append(',');
             sb.Append($"@p{i}");
-        }
-        sb.Append(')');
-
-        await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-
-        for (var i = 0; i < ids.Count; i++)
-        {
             cmd.Parameters.Add(UserNpgsql.CreateParameterId(ids[i], $"@p{i}"));
         }
+        sb.Append(')');
+        cmd.CommandText = sb.ToString();
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }

@@ -1,7 +1,6 @@
 using AdoGen.Sample.Features.Orders;
 using AdoGen.Sample.Features.Users;
 using Bogus;
-using Bogus.Extensions;
 
 namespace AdoGen.PostgreSql.Tests;
 
@@ -16,11 +15,7 @@ public abstract class TestBase : IAsyncLifetime
 
     protected static CancellationToken CancellationToken => TestContext.CancellationToken;
 
-    protected static readonly Faker<User> UserFaker = new Faker<User>()
-        .RuleFor(x => x.Id, Guid.CreateVersion7)
-        .RuleFor(x => x.Name, y => y.Person.FullName.ClampLength(1, 20))
-        .RuleFor(x => x.Email, y => y.Person.Email.ClampLength(1, 50))
-        .WithDefaultConstructor();
+    protected static readonly Faker<User> UserFaker = Fakers.UserFaker;
 
     protected TestBase(TestContext testContext)
     {

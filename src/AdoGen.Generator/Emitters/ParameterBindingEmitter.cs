@@ -97,4 +97,28 @@ internal static class ParameterBindingEmitter
         
         return trimEnd ? sb.ToString().TrimEnd() : sb.ToString();
     }
+
+    /// <summary>
+    /// Produces the inner body of a one-pass composite-key batch-delete loop.
+    /// Each key column emits an sb.Append for the param name (with comma separator between keys)
+    /// AND a cmd.Parameters.Add — both in the same loop iteration, eliminating the second pass.
+    /// Must be placed inside a <c>for (var i = 0; i &lt; models.Count; i++)</c> loop after
+    /// <c>sb.Append('(')</c> and before <c>sb.Append(')')</c>.
+    /// </summary>
+    public static string BindKeysInlineLoop(EmitContext ctx, string modelVar, string indexVar, string sbVar, int indent)
+    {
+        var prefix = new string(' ', indent);
+        var sb = new StringBuilder();
+
+        for (var k = 0; k < ctx.Keys.Length; k++)
+        {
+            var col = ctx.Keys[k];
+            if (k > 0) sb.AppendLine($"{prefix}{sbVar}.Append(',');");
+            sb.AppendLine($"{prefix}{sbVar}.Append($\"@p{{{indexVar}}}\");");
+            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, $\"@p{{{indexVar}}}\"));");
+            sb.AppendLine($"{prefix}{indexVar}++;");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 }

@@ -1,24 +1,12 @@
-using System.Text;
 using AdoGen.Sample.Features.Audit;
 using AwesomeAssertions.Execution;
 using Bogus;
-using Bogus.Extensions;
 
 namespace AdoGen.SqlServer.Tests.Features.Audits;
 
 public sealed class AuditTests(TestContext testContext) : TestBase(testContext)
 {
-    private static readonly Faker<AuditEvent> Faker = new Faker<AuditEvent>()
-        .StrictMode(true)
-        .RuleFor(x => x.EventId, _ => 0)
-        .RuleFor(x => x.CreatedAt, f => f.Date.RecentOffset())
-        .RuleFor(x => x.EventType, f => f.Lorem.Word().ClampLength(1, 50))
-        .RuleFor(x => x.JsonPayload, f =>
-        {
-            var json = $"{{ \"data\": \"{f.Random.String2(1, 1500)}\" }}";
-            return Encoding.UTF8.GetBytes(json);
-        })
-        .WithDefaultConstructor();
+    private static readonly Faker<AuditEvent> Faker = Fakers.AuditEventFaker;
     
     private readonly List<AuditEvent> _toInsert = [];
     private readonly List<AuditEvent> _toUpdate = [];

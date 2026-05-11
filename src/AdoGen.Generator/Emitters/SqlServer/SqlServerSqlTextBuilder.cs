@@ -73,8 +73,25 @@ internal static class SqlServerSqlTextBuilder
     public static string Truncate(EmitContext ctx)
         => $"TRUNCATE TABLE {ctx.SchemaTableQuoted};";
 
-    public static string DeleteBatchTemplate(EmitContext ctx, string keyName)
-        => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE [{keyName}] IN (";
+    /// <summary>
+    /// Returns the static prefix of the DELETE…JOIN(VALUES…) statement.
+    /// The caller appends "(…), (…)" rows and the ON clause dynamically.
+    /// Example for single key:    "DELETE t FROM [dbo].[T] AS t JOIN (VALUES "
+    /// Example for composite key: same prefix — column aliases and ON clause are appended by generated code.
+    /// </summary>
+    public static string DeleteBatchJoinValuesPrefix(EmitContext ctx)
+        => $"DELETE t FROM {ctx.SchemaTableQuoted} AS t JOIN (VALUES ";
+    
+    /// <summary>
+    /// Returns the closing " AS ids(...) ON ..." fragment that is appended once after all value rows.
+    /// e.g. " AS ids([TenantId],[Id]) ON ids.[TenantId]=t.[TenantId] AND ids.[Id]=t.[Id]"
+    /// </summary>
+    public static string DeleteBatchJoinValuesSuffix(EmitContext ctx)
+    {
+        var aliasCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
+        var onClauses = BuildJoined(ctx.Keys, col => $"ids.{col.ColumnNameQuoted}=t.{col.ColumnNameQuoted}", " AND ");
+        return $") AS ids({aliasCols}) ON {onClauses}";
+    }
 
     public static string BulkCreateTempTable(EmitContext ctx, string tempTableName)
     {

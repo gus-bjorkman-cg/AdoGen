@@ -12,6 +12,44 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
+public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Generator.Tests.TestType>
+{
+    private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[TestTypes] AS t JOIN (VALUES ";
+    private const string SqlDeleteBatchSuffix = ") AS ids([Int], [Decimal]) ON ids.[Int]=t.[Int] AND ids.[Decimal]=t.[Decimal]";
+    private const int KeyPropertyCount = 2;
+
+    public static async ValueTask<int> DeleteAsync(List<global::AdoGen.Generator.Tests.TestType> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (models is null || models.Count == 0) return 0;
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
+        await using var cmd = new SqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        cmd.EnableOptimizedParameterBinding = models.Count * KeyPropertyCount > 24;
+        
+        var sb = new StringBuilder(SqlDeleteBatchPrefix);
+        var paramIndex = 0;
+        
+        for (var i = 0; i < models.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append('(');
+            sb.Append($"@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterInt(models[i].Int, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append(',');
+            sb.Append($"@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(models[i].Decimal, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append(')');
+        }
+        sb.Append(SqlDeleteBatchSuffix);
+        cmd.CommandText = sb.ToString();
+        
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+}
+
 public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.TestType>
 {
     private const string SqlCreateTable = 

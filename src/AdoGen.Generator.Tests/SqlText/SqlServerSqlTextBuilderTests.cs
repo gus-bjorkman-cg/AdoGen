@@ -86,13 +86,27 @@ public sealed class SqlServerSqlTextBuilderTests
         actual.Should().Be("TRUNCATE TABLE [dbo].[Users];");
     }
 
-    // ── DeleteBatchTemplate ───────────────────────────────────────────────────
+    // ── DeleteBatchJoinValues ─────────────────────────────────────────────────
 
     [Fact]
-    public void DeleteBatchTemplate_ShouldProduceDeleteWithInClauseOpener()
+    public void DeleteBatchJoinValuesPrefix_ShouldProduceDeleteJoinPrefix()
     {
-        var actual = SqlServerSqlTextBuilder.DeleteBatchTemplate(EmitContextFixtures.SqlServerUser(), "Id");
-        actual.Should().Be("DELETE FROM [dbo].[Users] WHERE [Id] IN (");
+        var actual = SqlServerSqlTextBuilder.DeleteBatchJoinValuesPrefix(EmitContextFixtures.SqlServerUser());
+        actual.Should().Be("DELETE t FROM [dbo].[Users] AS t JOIN (VALUES ");
+    }
+
+    [Fact]
+    public void DeleteBatchJoinValuesSuffix_SingleKey_ShouldProduceAliasAndOnClause()
+    {
+        var actual = SqlServerSqlTextBuilder.DeleteBatchJoinValuesSuffix(EmitContextFixtures.SqlServerUser());
+        actual.Should().Be(") AS ids([Id]) ON ids.[Id]=t.[Id]");
+    }
+
+    [Fact]
+    public void DeleteBatchJoinValuesSuffix_CompositeKey_ShouldProduceMultiColumnOnClause()
+    {
+        var actual = SqlServerSqlTextBuilder.DeleteBatchJoinValuesSuffix(EmitContextFixtures.SqlServerCompositeKey());
+        actual.Should().Be(") AS ids([OrderId], [ProductId]) ON ids.[OrderId]=t.[OrderId] AND ids.[ProductId]=t.[ProductId]");
     }
 
     // ── Upsert (MERGE) ────────────────────────────────────────────────────────

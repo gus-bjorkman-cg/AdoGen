@@ -79,6 +79,24 @@ internal static class PostgreSqlSqlTextBuilder
     public static string DeleteBatchTemplate(EmitContext ctx, string keyName)
         => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE \"{keyName}\" IN (";
 
+    /// <summary>
+    /// Returns the static prefix of the DELETE…USING(VALUES…) statement for single-key batch delete.
+    /// e.g. "DELETE FROM "public"."Users" AS t USING (VALUES "
+    /// </summary>
+    public static string DeleteBatchJoinValuesPrefix(EmitContext ctx)
+        => $"DELETE FROM {ctx.SchemaTableQuoted} AS t USING (VALUES ";
+
+    /// <summary>
+    /// Returns the closing " AS ids(...) WHERE ..." fragment appended after all value rows.
+    /// Works for both single and composite keys.
+    /// </summary>
+    public static string DeleteBatchJoinValuesSuffix(EmitContext ctx)
+    {
+        var aliasCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
+        var whereClauses = BuildJoined(ctx.Keys, col => $"ids.{col.ColumnNameQuoted}=t.{col.ColumnNameQuoted}", " AND ");
+        return $") AS ids({aliasCols}) WHERE {whereClauses}";
+    }
+
     public static string BulkCreateTempTable(EmitContext ctx, string tempTableName)
     {
         var sbColDefs = new StringBuilder();
@@ -165,7 +183,7 @@ internal static class PostgreSqlSqlTextBuilder
         return builder.ToImmutable();
     }
 
-    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector)
+    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector, string separator = ", ")
     {
         if (columns.Length == 0) return string.Empty;
         if (columns.Length == 1) return selector(columns[0]);
@@ -174,7 +192,7 @@ internal static class PostgreSqlSqlTextBuilder
         
         for (var i = 0; i < columns.Length; i++)
         {
-            if (i > 0) sb.Append(", ");
+            if (i > 0) sb.Append(separator);
             sb.Append(selector(columns[i]));
         }
         

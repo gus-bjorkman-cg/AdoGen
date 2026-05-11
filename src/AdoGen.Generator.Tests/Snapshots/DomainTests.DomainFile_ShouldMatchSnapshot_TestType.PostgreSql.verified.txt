@@ -11,6 +11,42 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
+public sealed partial record TestType : INpgsqlCompositeKeyModel<global::AdoGen.Generator.Tests.TestType>
+{
+    private const string Pg_SqlDeleteBatchPrefix = "DELETE FROM \"public\".\"TestTypes\" AS t USING (VALUES ";
+    private const string Pg_SqlDeleteBatchSuffix = ") AS ids(\"Int\", \"Decimal\") WHERE ids.\"Int\"=t.\"Int\" AND ids.\"Decimal\"=t.\"Decimal\"";
+
+    public static async ValueTask<int> DeleteAsync(List<global::AdoGen.Generator.Tests.TestType> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (models is null || models.Count == 0) return 0;
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+
+        await using var cmd = new NpgsqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+        var sb = new StringBuilder(Pg_SqlDeleteBatchPrefix);
+        var paramIndex = 0;
+
+        for (var i = 0; i < models.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append('(');
+            sb.Append($"@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(models[i].Int, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append(',');
+            sb.Append($"@p{paramIndex}");
+            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(models[i].Decimal, $"@p{paramIndex}"));
+            paramIndex++;
+            sb.Append(')');
+        }
+        sb.Append(Pg_SqlDeleteBatchSuffix);
+        cmd.CommandText = sb.ToString();
+
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+}
+
 public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tests.TestType>
 {
     private const string Pg_SqlCreateTable = 

@@ -37,29 +37,67 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             deleteBatchSrc =
                 $$""""
 
-                  {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
-                  {
-                      private const string Pg_SqlDeleteBatchTemplate = """{{deleteBatchSql}}""";
+                   {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
+                   {
+                       private const string Pg_SqlDeleteBatchTemplate = """{{deleteBatchSql}}""";
+                   
+                       public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+                       {
+                           if (ids is null || ids.Count == 0) return 0;
+                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                   
+                           await using var cmd = new NpgsqlCommand("", connection, transaction);
+                           if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                   
+                           var sb = new StringBuilder(Pg_SqlDeleteBatchTemplate);
+                           for (var i = 0; i < ids.Count; i++)
+                           {
+                               if (i > 0) sb.Append(',');
+                               sb.Append($"@p{i}");
+                               cmd.Parameters.Add({{dto.Name}}Npgsql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
+                           }
+                           sb.Append(')');
+                           cmd.CommandText = sb.ToString();
+                   
+                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                       }
+                   }
 
-                      public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+                   """";
+        }
+        else
+        {
+            var deleteBatchPrefix = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesPrefix(ctx);
+            var deleteBatchSuffix = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesSuffix(ctx);
+
+            deleteBatchSrc =
+                $$""""
+
+                  {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlCompositeKeyModel<{{ctx.DtoTypeName}}>
+                  {
+                      private const string Pg_SqlDeleteBatchPrefix = "{{deleteBatchPrefix.Replace("\"", "\\\"")}}";
+                      private const string Pg_SqlDeleteBatchSuffix = "{{deleteBatchSuffix.Replace("\"", "\\\"")}}";
+
+                      public static async ValueTask<int> DeleteAsync(List<{{ctx.DtoTypeName}}> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                       {
-                          if (ids is null || ids.Count == 0) return 0;
+                          if (models is null || models.Count == 0) return 0;
                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-                          var sb = new StringBuilder(Pg_SqlDeleteBatchTemplate);
-                          for (var i = 0; i < ids.Count; i++)
+                          await using var cmd = new NpgsqlCommand("", connection, transaction);
+                          if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+                          var sb = new StringBuilder(Pg_SqlDeleteBatchPrefix);
+                          var paramIndex = 0;
+
+                          for (var i = 0; i < models.Count; i++)
                           {
                               if (i > 0) sb.Append(',');
-                              sb.Append($"@p{i}");
+                              sb.Append('(');
+                  {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 12)}}
+                              sb.Append(')');
                           }
-                          sb.Append(')');
-
-                          await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-
-                          for (var i = 0; i < ids.Count; i++)
-                          {
-                              cmd.Parameters.Add({{dto.Name}}Npgsql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
-                          }
+                          sb.Append(Pg_SqlDeleteBatchSuffix);
+                          cmd.CommandText = sb.ToString();
 
                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                       }

@@ -29,37 +29,85 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         
         if (profileInfo.Keys.Length == 1)
         {
+            // Single-key: implement ISqlSingleIdModel<TModel, TKey>
+            // Caller uses: connection.DeleteAsync<User>(ids, ct)  — no model object needed
             var keyName = profileInfo.Keys[0];
             var keyType = profileInfo.ParamsByProperty[keyName].PropertyType
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var deleteBatchSql = SqlServerSqlTextBuilder.DeleteBatchTemplate(ctx, keyName);
+            var deleteBatchPrefix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesPrefix(ctx);
+            var deleteBatchSuffix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesSuffix(ctx);
             
             deleteSrc =
                 $$""""
                   
                   {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
                   {
-                      private const string SqlDeleteBatchTemplate = "{{deleteBatchSql}}";
+                      private const string SqlDeleteBatchPrefix = "{{deleteBatchPrefix}}";
+                      private const string SqlDeleteBatchSuffix = "{{deleteBatchSuffix}}";
                   
                       public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                       {
                           if (ids is null || ids.Count == 0) return 0;
                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                           
-                          var sb = new StringBuilder(SqlDeleteBatchTemplate);
+                          await using var cmd = new SqlCommand("", connection, transaction);
+                          if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                          cmd.EnableOptimizedParameterBinding = ids.Count > 24;
+                          
+                          var sb = new StringBuilder(SqlDeleteBatchPrefix);
                           for (var i = 0; i < ids.Count; i++)
                           {
                               if (i > 0) sb.Append(',');
-                              sb.Append($"@p{i}");
-                          }
-                          sb.Append(')');
-                          
-                          await using var cmd = connection.CreateCommand(sb.ToString(), CommandType.Text, transaction, commandTimeout);
-                          
-                          for (var i = 0; i < ids.Count; i++)
-                          {
+                              sb.Append($"(@p{i})");
                               cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
                           }
+                          sb.Append(SqlDeleteBatchSuffix);
+                          cmd.CommandText = sb.ToString();
+                          
+                          return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                      }
+                  }
+                  
+                  """";
+        }
+        else if (profileInfo.Keys.Length > 1)
+        {
+            // Composite-key: implement ISqlCompositeKeyModel<TModel>
+            // Caller uses: connection.DeleteAsync(models, ct)
+            var keyCount = ctx.Keys.Length;
+            var deleteBatchPrefix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesPrefix(ctx);
+            var deleteBatchSuffix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesSuffix(ctx);
+            
+            deleteSrc =
+                $$""""
+                  
+                  {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlCompositeKeyModel<{{ctx.DtoTypeName}}>
+                  {
+                      private const string SqlDeleteBatchPrefix = "{{deleteBatchPrefix}}";
+                      private const string SqlDeleteBatchSuffix = "{{deleteBatchSuffix}}";
+                      private const int KeyPropertyCount = {{keyCount}};
+                  
+                      public static async ValueTask<int> DeleteAsync(List<{{ctx.DtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                      {
+                          if (models is null || models.Count == 0) return 0;
+                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          
+                          await using var cmd = new SqlCommand("", connection, transaction);
+                          if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                          cmd.EnableOptimizedParameterBinding = models.Count * KeyPropertyCount > 24;
+                          
+                          var sb = new StringBuilder(SqlDeleteBatchPrefix);
+                          var paramIndex = 0;
+                          
+                          for (var i = 0; i < models.Count; i++)
+                          {
+                              if (i > 0) sb.Append(',');
+                              sb.Append('(');
+                  {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 12)}}
+                              sb.Append(')');
+                          }
+                          sb.Append(SqlDeleteBatchSuffix);
+                          cmd.CommandText = sb.ToString();
                           
                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                       }

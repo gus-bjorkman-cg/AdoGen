@@ -65,6 +65,15 @@ internal static class EmitContextFixtures
             new ColumnInfo("ProductName", "\"ProductName\"", "ProductName", "varchar(100)", "global::System.String", false, false, false, false, null, ColumnRole.Plain)
         ]);
 
+    /// <summary>Composite key: two non-identity key columns plus one plain value column.</summary>
+    public static EmitContext PostgreSqlCompositeKey() => Build(
+        SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "public", "OrderLines",
+        [
+            new ColumnInfo("OrderId", "\"OrderId\"", "OrderId", "UUID", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
+            new ColumnInfo("ProductId", "\"ProductId\"", "ProductId", "UUID", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
+            new ColumnInfo("Quantity", "\"Quantity\"", "Quantity", "INT", "global::System.Int32", false, false, false, false, null, ColumnRole.Plain)
+        ]);
+
     /// <summary>AuditEvent: identity key (bigint EventId), schema-qualified, plus three plain columns.</summary>
     public static EmitContext PostgreSqlAuditEvent() => Build(
         SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "log", "Audits",
