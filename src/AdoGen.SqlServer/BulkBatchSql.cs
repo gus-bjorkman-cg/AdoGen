@@ -161,25 +161,31 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         else if (operation == BulkOp.Update) HasUpdates = true;
         else if (operation == BulkOp.Delete) HasDeletes = true;
     }
-    
+
     /// <summary>
     /// Applies the batch of operations to the database.
     /// </summary>
     /// <param name="connection"></param>
     /// <param name="transaction"></param>
-    /// /// <param name="ct"></param>
-    /// <param name="commandTimeout"></param>
+    /// <param name="ct"></param>
+    /// <param name="commandTimeout">Timeout per call</param>
+    /// <param name="sqlBulkCopyOptions"></param>
+    /// <param name="enableStreaming">For large datasets like nvarchar(MAX)</param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
     public async ValueTask<BulkApplyResult> SaveChangesAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         CancellationToken ct,
-        int? commandTimeout = null)
+        int? commandTimeout = null,
+        SqlBulkCopyOptions sqlBulkCopyOptions = SqlBulkCopyOptions.KeepNulls | SqlBulkCopyOptions.TableLock,
+        bool enableStreaming = false)
     {
         if (Items.Count == 0) return BulkApplyResult.Empty;
         if (transaction is null) throw new ArgumentNullException(nameof(transaction));
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
+        var timeout = commandTimeout ?? DefaultTimeoutSeconds;
 
         if (HasInserts && !HasUpdates && !HasDeletes)
         {
@@ -187,21 +193,25 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
             
             if (parameterCount < 2100)
             {
-                var inserted = await T.InsertAsync(Items, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
+                var inserted = await T.InsertAsync(Items, connection, ct, transaction, timeout).ConfigureAwait(false);
                 return new BulkApplyResult(inserted, 0, 0);
             }
         }
         
-        await using (var create = connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, commandTimeout))
+        await using (var create = connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, timeout))
         {
             await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        using (var bulk = new SqlBulkCopy(connection, SqlBulkCopyOptions.KeepNulls, transaction))
+        using (var bulk = new SqlBulkCopy(
+                   connection, 
+                   sqlBulkCopyOptions, 
+                   transaction))
         {
             bulk.DestinationTableName = TempTableName;
             bulk.BatchSize = BulkCopyBatchSize;
-            bulk.BulkCopyTimeout = commandTimeout ?? DefaultTimeoutSeconds;
+            bulk.BulkCopyTimeout = timeout;
+            bulk.EnableStreaming = enableStreaming;
 
             ApplyColumnMappings(bulk);
             bulk.ColumnMappings.Add("Operation", "Operation");
@@ -209,7 +219,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
             await WriteItemsToServerAsync(bulk, ct).ConfigureAwait(false);
         }
 
-        await using var cmd = connection.CreateCommand(SqlApply, CommandType.Text, transaction, commandTimeout);
+        await using var cmd = connection.CreateCommand(SqlApply, CommandType.Text, transaction, timeout);
         await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
         if (!await resultReader.ReadAsync(ct).ConfigureAwait(false)) return BulkApplyResult.Empty;

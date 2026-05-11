@@ -26,10 +26,11 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     public List<BulkOp> Operations { get; }
 
     /// <summary>
-    /// The batch size for the COPY write operation.
+    /// Max number of parameters allowed for insert operations before falling back to the COPY approach.
+    /// Only applicable for insert only operation in batch.
     /// </summary>
-    public int BulkCopyBatchSize { get; set; } = 5000;
-
+    public int ParameterThreshold { get; set; } = 3_000;
+    
     /// <summary>
     /// The default timeout in seconds for the bulk copy and apply commands.
     /// Can also be overridden by passing a commandTimeout to SaveChangesAsync.
@@ -89,9 +90,8 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     /// Writes the items to the server. Implemented by generated code.
     /// </summary>
     /// <param name="connection"></param>
-    /// <param name="transaction"></param>
     /// <param name="ct"></param>
-    protected abstract ValueTask WriteItemsToServerAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken ct);
+    protected abstract ValueTask WriteItemsToServerAsync(NpgsqlConnection connection, CancellationToken ct);
 
     /// <summary>
     /// Adds the item to the batch with insert operation.
@@ -170,14 +170,12 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
         if (Items.Count == 0) return BulkApplyResult.Empty;
         if (transaction is null) throw new ArgumentNullException(nameof(transaction));
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
-
-        // Fast-path: if we're only inserting and can fit it in a single statement, generated InsertAsync(List<T>) can handle it.
+        
         if (HasInserts && !HasUpdates && !HasDeletes)
         {
-            // PostgreSQL doesn't have the 2100 parameter limit, but very large parameter sets are still costly.
-            // We keep this heuristic as a safety valve.
             var parameterCount = Items.Count * FieldCount;
-            if (parameterCount < 10_000)
+            
+            if (parameterCount < ParameterThreshold)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
                 return new BulkApplyResult(inserted, 0, 0);
@@ -189,7 +187,7 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
             await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        await WriteItemsToServerAsync(connection, transaction, ct).ConfigureAwait(false);
+        await WriteItemsToServerAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlApply, CommandType.Text, transaction, commandTimeout);
         await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);

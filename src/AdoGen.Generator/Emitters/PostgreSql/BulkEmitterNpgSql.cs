@@ -87,7 +87,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
 
                     public {{{{bulkTypeName}}}}(int capacity = 0) : base(capacity) { }
 
-                    protected override async ValueTask WriteItemsToServerAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken ct)
+                    protected override async ValueTask WriteItemsToServerAsync(NpgsqlConnection connection, CancellationToken ct)
                     {
                         await using var importer = connection.BeginBinaryImport(_copyCommand);
 

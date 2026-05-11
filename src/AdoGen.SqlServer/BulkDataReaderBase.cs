@@ -54,7 +54,7 @@ public abstract class BulkDataReaderBase : IDataReader
     /// </summary>
     /// <param name="i"></param>
     /// <returns></returns>
-    public bool IsDBNull(int i) => GetValue(i) is DBNull;
+    public bool IsDBNull(int i) => GetValue(i) is null or DBNull;
 
     /// <summary>
     /// Gets all the values of the current record in the provided array. Returns the number of values read.
