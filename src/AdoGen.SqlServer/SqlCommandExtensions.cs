@@ -55,6 +55,56 @@ public static class SqlCommandExtensions
         }
 
         /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column using SQL Server's native type mapping.
+        /// Handles DBNull by returning default(T) for that row.
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(CancellationToken ct)
+        {
+            if (command.Connection.State != ConnectionState.Open)
+                await command.Connection.OpenAsync(ct).ConfigureAwait(false);
+
+            await using var reader = await command
+                .ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                .ConfigureAwait(false);
+
+            if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return [];
+
+            var items = new List<T?>();
+            do
+            {
+                items.Add(reader.IsDBNull(0) ? default : reader.GetFieldValue<T>(0));
+            }
+            while (await reader.ReadAsync(ct).ConfigureAwait(false));
+
+            return items;
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Handles DBNull by returning default(T).
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(CancellationToken ct)
+        {
+            if (command.Connection.State != ConnectionState.Open)
+                await command.Connection.OpenAsync(ct).ConfigureAwait(false);
+
+            await using var reader = await command
+                .ExecuteReaderAsync(
+                    CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
+                .ConfigureAwait(false);
+
+            if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return default;
+
+            return reader.IsDBNull(0) ? default : reader.GetFieldValue<T>(0);
+        }
+
+        /// <summary>
         /// Opens the connection if not opened and executes the reader.
         /// </summary>
         /// <param name="ct"></param>

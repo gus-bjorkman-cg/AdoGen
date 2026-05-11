@@ -500,5 +500,103 @@ public static class SqlConnectionExtensions
             
             return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         }
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.QueryScalarAsync<T>(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            SqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            return await command.QueryScalarAsync<T>(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            IEnumerable<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            return await command.QueryScalarAsync<T>(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            SqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            IEnumerable<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct).ConfigureAwait(false);
+        }
     }
 }

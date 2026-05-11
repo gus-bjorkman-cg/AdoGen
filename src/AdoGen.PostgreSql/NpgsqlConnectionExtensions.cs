@@ -507,6 +507,104 @@ public static class NpgsqlConnectionExtensions
             
             return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         }
+        
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.QueryScalarAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            return await command.QueryScalarAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            return await command.QueryScalarAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct);
+        }
     }
 }
 
