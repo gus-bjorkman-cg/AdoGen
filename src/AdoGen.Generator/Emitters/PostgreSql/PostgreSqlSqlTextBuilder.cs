@@ -107,6 +107,26 @@ internal static class PostgreSqlSqlTextBuilder
         => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE \"{keyName}\" IN (";
 
     /// <summary>
+    /// Returns a DELETE … WHERE "keyCol" = ANY(@ids) statement for single-key batch delete.
+    /// Passes all ids as a single typed array parameter — no per-row dynamic SQL building.
+    /// </summary>
+    public static string DeleteBatchAny(EmitContext ctx, string keyName)
+        => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE \"{keyName}\" = ANY(@ids);";
+
+    /// <summary>
+    /// Returns a DELETE … USING unnest(@k1s, @k2s) AS k(k1, k2) WHERE k.k1 = t.k1 AND k.k2 = t.k2 statement
+    /// for composite-key batch delete. Uses a lateral join so the planner can apply index lookups per row.
+    /// Each key gets its own array parameter named @{ParameterName}s.
+    /// </summary>
+    public static string DeleteBatchUnnest(EmitContext ctx)
+    {
+        var unnestArgs = BuildJoined(ctx.Keys, col => $"@{col.ParameterName}s");
+        var aliasCols = BuildJoined(ctx.Keys, col => $"\"{col.ParameterName}\"");
+        var whereClauses = BuildJoined(ctx.Keys, col => $"k.\"{col.ParameterName}\" = t.{col.ColumnNameQuoted}", " AND ");
+        return $"DELETE FROM {ctx.SchemaTableQuoted} AS t USING unnest({unnestArgs}) AS k({aliasCols}) WHERE {whereClauses};";
+    }
+
+    /// <summary>
     /// Returns the static prefix of the DELETE…USING(VALUES…) statement for single-key batch delete.
     /// e.g. "DELETE FROM "public"."Users" AS t USING (VALUES "
     /// </summary>

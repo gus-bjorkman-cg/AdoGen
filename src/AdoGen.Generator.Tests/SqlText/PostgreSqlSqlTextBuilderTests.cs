@@ -75,7 +75,7 @@ public sealed class PostgreSqlSqlTextBuilderTests
         actual.Should().Be("""TRUNCATE TABLE "public"."Users";""");
     }
 
-    // ── DeleteBatchTemplate ───────────────────────────────────────────────────
+    // ── DeleteBatchTemplate (legacy, kept for reference) ─────────────────────
 
     [Fact]
     public void DeleteBatchTemplate_ShouldProduceDeleteWithInClauseOpener()
@@ -84,7 +84,25 @@ public sealed class PostgreSqlSqlTextBuilderTests
         actual.Should().Be("""DELETE FROM "public"."Users" WHERE "Id" IN (""");
     }
 
-    // ── DeleteBatchJoinValues ─────────────────────────────────────────────────
+    // ── DeleteBatchAny ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void DeleteBatchAny_ShouldProduceDeleteWithAnyArrayParam()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchAny(EmitContextFixtures.PostgreSqlUser(), "Id");
+        actual.Should().Be("""DELETE FROM "public"."Users" WHERE "Id" = ANY(@ids);""");
+    }
+
+    // ── DeleteBatchUnnest ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void DeleteBatchUnnest_ShouldProduceDeleteWithUnnestForCompositeKey()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchUnnest(EmitContextFixtures.PostgreSqlCompositeKey());
+        actual.Should().Be("""DELETE FROM "public"."OrderLines" AS t USING unnest(@OrderIds, @ProductIds) AS k("OrderId", "ProductId") WHERE k."OrderId" = t."OrderId" AND k."ProductId" = t."ProductId";""");
+    }
+
+    // ── DeleteBatchJoinValues (legacy) ────────────────────────────────────────
 
     [Fact]
     public void DeleteBatchJoinValuesPrefix_ShouldProduceDeleteUsingPrefix()

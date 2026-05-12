@@ -156,6 +156,32 @@ internal static class ParameterBindingEmitter
     }
 
     /// <summary>
+    /// Produces cmd.Parameters.Add calls for composite-key batch delete via unnest.
+    /// Each key column gets a single array parameter (@{col}s) containing all values extracted from the list.
+    /// e.g.: cmd.Parameters.Add(new NpgsqlParameter { ParameterName = "Ids", NpgsqlDbType = Array | Uuid, Value = models.Select(m => m.Id).ToArray() });
+    /// </summary>
+    public static string BindKeyArraysNpgsql(EmitContext ctx, string listVar, int indent)
+    {
+        var prefix = new string(' ', indent);
+        var sb = new StringBuilder();
+
+        foreach (var col in ctx.Keys)
+        {
+            var npgsqlDbType = col.SqlType; // not what we want — use DbType from profile
+            // NpgsqlDbType enum member is stored per column in ctx.Profile.ParamsByProperty
+            var dbTypeMember = ctx.Profile.ParamsByProperty[col.Name].DbType!.Value.EnumMember;
+            sb.AppendLine($"{prefix}cmd.Parameters.Add(new global::Npgsql.NpgsqlParameter");
+            sb.AppendLine($"{prefix}{{");
+            sb.AppendLine($"{prefix}    ParameterName = \"{col.ParameterName}s\",");
+            sb.AppendLine($"{prefix}    NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.{dbTypeMember},");
+            sb.AppendLine($"{prefix}    Value = {listVar}.Select(static m => m.{col.Name}).ToArray(),");
+            sb.AppendLine($"{prefix}}});");
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
     /// Returns the estimated per-row character count for a batch insert value tuple,
     /// e.g. "(@p0,@p1,@p2)" — used to pre-size the StringBuilder.
     /// Formula: each param slot is ~5 chars (@p + up to 3 digits), plus 2 for the parens,

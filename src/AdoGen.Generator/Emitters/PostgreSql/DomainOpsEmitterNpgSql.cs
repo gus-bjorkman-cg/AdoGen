@@ -51,15 +51,17 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         if (profileInfo.Keys.Length == 1)
         {
             var keyName = profileInfo.Keys[0];
-            var keyType = profileInfo.ParamsByProperty[keyName].PropertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var deleteBatchSql = PostgreSqlSqlTextBuilder.DeleteBatchTemplate(ctx, keyName);
+            var keyCfg = profileInfo.ParamsByProperty[keyName];
+            var keyType = keyCfg.PropertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var keyDbType = keyCfg.DbType!.Value.EnumMember;
+            var deleteBatchSql = PostgreSqlSqlTextBuilder.DeleteBatchAny(ctx, keyName);
 
             idBasedSrc =
                 $$""""
 
                    {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
                    {
-                       private const string Pg_SqlDeleteBatchTemplate = """{{deleteBatchSql}}""";
+                       private const string Pg_SqlDeleteBatchAny = """{{deleteBatchSql}}""";
                        private const string Pg_SqlExists = """{{existsSql}}""";
                    
                        public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
@@ -67,19 +69,13 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                            if (ids is null || ids.Count == 0) return 0;
                            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                    
-                           await using var cmd = new NpgsqlCommand("", connection, transaction);
-                           if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-                   
-                           var sb = new StringBuilder(Pg_SqlDeleteBatchTemplate);
-                           for (var i = 0; i < ids.Count; i++)
+                           await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchAny, CommandType.Text, transaction, commandTimeout);
+                           cmd.Parameters.Add(new NpgsqlParameter
                            {
-                               if (i > 0) sb.Append(',');
-                               sb.Append($"@p{i}");
-                               cmd.Parameters.Add({{dto.Name}}Npgsql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
-                           }
-                           sb.Append(')');
-                           cmd.CommandText = sb.ToString();
-                   
+                               ParameterName = "ids",
+                               NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.{{keyDbType}},
+                               Value = ids.ToArray(),
+                           });
                            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                        }
                    
@@ -97,16 +93,15 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         }
         else
         {
-            var deleteBatchPrefix = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesPrefix(ctx);
-            var deleteBatchSuffix = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesSuffix(ctx);
+            var deleteBatchUnnestSql = PostgreSqlSqlTextBuilder.DeleteBatchUnnest(ctx);
+            var compositeKeyArrayBindings = ParameterBindingEmitter.BindKeyArraysNpgsql(ctx, "models", 12);
 
             idBasedSrc =
                 $$""""
 
                   {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlCompositeKeyModel<{{ctx.DtoTypeName}}>, INpgsqlCompositeKeyExistsModel<{{ctx.DtoTypeName}}>
                   {
-                      private const string Pg_SqlDeleteBatchPrefix = "{{deleteBatchPrefix.Replace("\"", "\\\"")}}";
-                      private const string Pg_SqlDeleteBatchSuffix = "{{deleteBatchSuffix.Replace("\"", "\\\"")}}";
+                      private const string Pg_SqlDeleteBatchUnnest = """{{deleteBatchUnnestSql}}""";
                       private const string Pg_SqlExists = """{{existsSql}}""";
 
                       public static async ValueTask<int> DeleteAsync(List<{{ctx.DtoTypeName}}> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
@@ -114,20 +109,8 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                           if (models is null || models.Count == 0) return 0;
                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-                          await using var cmd = new NpgsqlCommand("", connection, transaction);
-                          if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-
-                          var sb = new StringBuilder(Pg_SqlDeleteBatchPrefix);
-                          var paramIndex = 0;
-
-                          for (var i = 0; i < models.Count; i++)
-                          {
-                              if (i > 0) sb.Append(',');
-                  {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 12)}}
-                          }
-                          sb.Append(Pg_SqlDeleteBatchSuffix);
-                          cmd.CommandText = sb.ToString();
-
+                          await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchUnnest, CommandType.Text, transaction, commandTimeout);
+                  {{compositeKeyArrayBindings}}
                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                       }
 
@@ -154,7 +137,9 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               using System.Collections.Generic;
               using System.Threading;
               using System.Threading.Tasks;
+              using System.Linq;
               using Npgsql;
+              using NpgsqlTypes;
               using AdoGen.PostgreSql;
 
               namespace {{ctx.Namespace}};

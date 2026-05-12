@@ -6,14 +6,16 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 using Npgsql;
+using NpgsqlTypes;
 using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
 public sealed partial record VersionedOrderGuid : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.VersionedOrderGuid, Guid>
 {
-    private const string Pg_SqlDeleteBatchTemplate = """DELETE FROM "public"."VersionedOrderGuids" WHERE "Id" IN (""";
+    private const string Pg_SqlDeleteBatchAny = """DELETE FROM "public"."VersionedOrderGuids" WHERE "Id" = ANY(@ids);""";
     private const string Pg_SqlExists = """SELECT 1 FROM "public"."VersionedOrderGuids" WHERE "Id" = @Id LIMIT 1;""";
 
     public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<Guid> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
@@ -21,19 +23,13 @@ public sealed partial record VersionedOrderGuid : INpgsqlSingleIdModel<global::A
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-        await using var cmd = new NpgsqlCommand("", connection, transaction);
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-
-        var sb = new StringBuilder(Pg_SqlDeleteBatchTemplate);
-        for (var i = 0; i < ids.Count; i++)
+        await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchAny, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(new NpgsqlParameter
         {
-            if (i > 0) sb.Append(',');
-            sb.Append($"@p{i}");
-            cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterId(ids[i], $"@p{i}"));
-        }
-        sb.Append(')');
-        cmd.CommandText = sb.ToString();
-
+            ParameterName = "ids",
+            NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid,
+            Value = ids.ToArray(),
+        });
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
