@@ -19,9 +19,9 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
         // SQL strings — produced by PostgreSqlSqlTextBuilder
         var createTableSql = PostgreSqlSqlTextBuilder.CreateTable(ctx);
-        var nonIdentityPropCount = ctx.Writables.Length;
         var insertSql = PostgreSqlSqlTextBuilder.Insert(ctx);
         var insertBatchSql = PostgreSqlSqlTextBuilder.InsertBatchPrefix(ctx);
+        var insertAndReturnSql = PostgreSqlSqlTextBuilder.InsertAndReturn(ctx);
         var updateSql = PostgreSqlSqlTextBuilder.Update(ctx);
         var deleteSql = PostgreSqlSqlTextBuilder.Delete(ctx);
         var upsertSql = PostgreSqlSqlTextBuilder.Upsert(ctx);
@@ -168,6 +168,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   
                   private const string Pg_SqlInsert = """{{insertSql}}""";
                   private const string Pg_SqlInsertBatchTemplate = """{{insertBatchSql}}""";
+                  private const string Pg_SqlInsertAndReturn = """{{insertAndReturnSql}}""";
                   private const string Pg_SqlUpdate = """{{updateSql}}""";
                   private const string Pg_SqlDelete = """{{deleteSql}}""";
                   private const string Pg_SqlTruncate = """{{truncateSql}}""";
@@ -208,6 +209,16 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                       cmd.CommandText = sb.ToString();
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                  }
+
+                  public static async ValueTask<{{ctx.DtoTypeName}}> InsertAndReturnAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+                  {
+                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+              {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}
+                      await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+                      if (await reader.ReadAsync(ct).ConfigureAwait(false)) return {{dto.Name}}.Map(reader);
+                      throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
                   }
 
                   public static async ValueTask<int> UpdateAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)

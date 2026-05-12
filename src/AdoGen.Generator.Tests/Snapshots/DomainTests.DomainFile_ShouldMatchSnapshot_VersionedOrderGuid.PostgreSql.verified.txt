@@ -60,6 +60,7 @@ public sealed partial record VersionedOrderGuid : INpgsqlDomainModel<global::Ado
     
     private const string Pg_SqlInsert = """INSERT INTO "public"."VersionedOrderGuids" ("Id", "ProductName", "RowVersion") VALUES (@Id, @ProductName, @RowVersion);""";
     private const string Pg_SqlInsertBatchTemplate = """INSERT INTO "public"."VersionedOrderGuids" ("Id", "ProductName", "RowVersion") VALUES""";
+    private const string Pg_SqlInsertAndReturn = """INSERT INTO "public"."VersionedOrderGuids" ("Id", "ProductName", "RowVersion") VALUES (@Id, @ProductName, @RowVersion) RETURNING *;""";
     private const string Pg_SqlUpdate = """UPDATE "public"."VersionedOrderGuids" SET "ProductName" = @ProductName, "RowVersion" = gen_random_uuid() WHERE "Id" = @Id AND "RowVersion" = @RowVersion;""";
     private const string Pg_SqlDelete = """DELETE FROM "public"."VersionedOrderGuids" WHERE "Id" = @Id AND "RowVersion" = @RowVersion;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "public"."VersionedOrderGuids";""";
@@ -111,6 +112,19 @@ public sealed partial record VersionedOrderGuid : INpgsqlDomainModel<global::Ado
 
         cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<global::AdoGen.Generator.Tests.VersionedOrderGuid> InsertAndReturnAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterProductName(model.ProductName));
+        cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterRowVersion(model.RowVersion));
+
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        if (await reader.ReadAsync(ct).ConfigureAwait(false)) return VersionedOrderGuid.Map(reader);
+        throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)

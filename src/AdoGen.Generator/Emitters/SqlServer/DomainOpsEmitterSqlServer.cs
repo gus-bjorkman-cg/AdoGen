@@ -20,6 +20,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         var createTableSql = SqlServerSqlTextBuilder.CreateTable(ctx);
         var insertSql = SqlServerSqlTextBuilder.Insert(ctx);
         var insertBatchSql = SqlServerSqlTextBuilder.InsertBatchPrefix(ctx);
+        var insertAndReturnSql = SqlServerSqlTextBuilder.InsertAndReturn(ctx);
         var updateSql = SqlServerSqlTextBuilder.Update(ctx);
         var deleteSql = SqlServerSqlTextBuilder.Delete(ctx);
         var upsertSql = SqlServerSqlTextBuilder.Upsert(ctx);
@@ -179,6 +180,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     """;
                 private const string SqlInsert = "{{insertSql}}";
                 private const string SqlInsertBatchTemplate = "{{insertBatchSql}}";
+                private const string SqlInsertAndReturn = "{{insertAndReturnSql}}";
                 private const string SqlUpdate = "{{updateSql}}";
                 private const string SqlDelete = "{{deleteSql}}";
                 private const string SqlUpsert = "{{upsertSql}}";
@@ -242,6 +244,16 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
             {{ParameterBindingEmitter.BindForUpdate(ctx, "model", 8)}}
             {{updateBody}}
+                }
+
+                public static async ValueTask<{{ctx.DtoTypeName}}> InsertAndReturnAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                {
+                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+            {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}
+                    await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+                    if (await reader.ReadAsync(ct).ConfigureAwait(false)) return {{dto.Name}}.Map(reader);
+                    throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
                 }
 
                 public static async ValueTask<int> DeleteAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)

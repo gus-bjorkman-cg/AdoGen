@@ -61,6 +61,7 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
     
     private const string Pg_SqlInsert = """INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload);""";
     private const string Pg_SqlInsertBatchTemplate = """INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES""";
+    private const string Pg_SqlInsertAndReturn = """INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload) RETURNING *;""";
     private const string Pg_SqlUpdate = """UPDATE "log"."Audits" SET "CreatedAt" = @CreatedAt, "Type" = @Type, "JsonPayload" = @JsonPayload WHERE "EventId" = @EventId;""";
     private const string Pg_SqlDelete = """DELETE FROM "log"."Audits" WHERE "EventId" = @EventId;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "log"."Audits";""";
@@ -112,6 +113,19 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
 
         cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<global::AdoGen.Generator.Tests.AuditEvent> InsertAndReturnAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        if (await reader.ReadAsync(ct).ConfigureAwait(false)) return AuditEvent.Map(reader);
+        throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)

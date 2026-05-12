@@ -60,6 +60,7 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
     
     private const string Pg_SqlInsert = """INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email);""";
     private const string Pg_SqlInsertBatchTemplate = """INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES""";
+    private const string Pg_SqlInsertAndReturn = """INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email) RETURNING *;""";
     private const string Pg_SqlUpdate = """UPDATE "public"."Users" SET "Name" = @Name, "Email" = @Email WHERE "Id" = @Id;""";
     private const string Pg_SqlDelete = """DELETE FROM "public"."Users" WHERE "Id" = @Id;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "public"."Users";""";
@@ -111,6 +112,19 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
 
         cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<global::AdoGen.Generator.Tests.User> InsertAndReturnAsync(global::AdoGen.Generator.Tests.User model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name));
+        cmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email));
+
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        if (await reader.ReadAsync(ct).ConfigureAwait(false)) return User.Map(reader);
+        throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.User model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)

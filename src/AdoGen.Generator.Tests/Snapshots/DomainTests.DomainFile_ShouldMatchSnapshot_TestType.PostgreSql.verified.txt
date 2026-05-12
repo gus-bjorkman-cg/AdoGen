@@ -94,6 +94,7 @@ public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Genera
     
     private const string Pg_SqlInsert = """INSERT INTO "public"."TestTypes" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum") VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);""";
     private const string Pg_SqlInsertBatchTemplate = """INSERT INTO "public"."TestTypes" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum") VALUES""";
+    private const string Pg_SqlInsertAndReturn = """INSERT INTO "public"."TestTypes" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum") VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum) RETURNING *;""";
     private const string Pg_SqlUpdate = """UPDATE "public"."TestTypes" SET "NullableInt" = @NullableInt, "NullableDecimal" = @NullableDecimal, "NullableGuid" = @NullableGuid, "NullableStringVarchar" = @NullableStringVarchar, "NullableStringNVarchar" = @NullableStringNVarchar, "StringVarcharRuledNull" = @StringVarcharRuledNull, "CharString" = @CharString, "NCharString" = @NCharString, "Float" = @Float, "NullableFloat" = @NullableFloat, "DateTime" = @DateTime, "NullableDateTime" = @NullableDateTime, "Double" = @Double, "NullableDouble" = @NullableDouble, "Char" = @Char, "NChar" = @NChar, "NullableChar" = @NullableChar, "NullableBytes" = @NullableBytes, "Bytes" = @Bytes, "Fruits" = @Fruits, "Flags" = @Flags, "ByteEnum" = @ByteEnum, "ShortEnum" = @ShortEnum, "IntEnum" = @IntEnum, "LongEnum" = @LongEnum WHERE "Int" = @Int AND "Decimal" = @Decimal;""";
     private const string Pg_SqlDelete = """DELETE FROM "public"."TestTypes" WHERE "Int" = @Int AND "Decimal" = @Decimal;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "public"."TestTypes";""";
@@ -241,6 +242,43 @@ public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Genera
 
         cmd.CommandText = sb.ToString();
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<global::AdoGen.Generator.Tests.TestType> InsertAndReturnAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(model.NullableInt));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(model.NullableDecimal));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(model.NullableGuid));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(model.CharString));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(model.NCharString));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(model.Float));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(model.NullableFloat));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(model.DateTime));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(model.NullableDateTime));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(model.Double));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(model.NullableDouble));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(model.Char));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(model.NChar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(model.NullableChar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(model.NullableBytes));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(model.Bytes));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(model.Fruits));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(model.Flags));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(model.ByteEnum));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(model.ShortEnum));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(model.IntEnum));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(model.LongEnum));
+
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        if (await reader.ReadAsync(ct).ConfigureAwait(false)) return TestType.Map(reader);
+        throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)

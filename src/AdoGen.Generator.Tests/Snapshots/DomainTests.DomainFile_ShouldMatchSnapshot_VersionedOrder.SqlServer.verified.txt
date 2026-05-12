@@ -62,6 +62,7 @@ public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Gen
         """;
     private const string SqlInsert = "INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version]) VALUES (@Id, @ProductName, @Version);";
     private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version]) VALUES";
+    private const string SqlInsertAndReturn = "INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version]) OUTPUT INSERTED.* VALUES (@Id, @ProductName, @Version);";
     private const string SqlUpdate = "UPDATE [dbo].[VersionedOrders] SET [ProductName] = @ProductName, [Version] = @Version + 1 WHERE [Id] = @Id AND [Version] = @Version;";
     private const string SqlDelete = "DELETE FROM [dbo].[VersionedOrders] WHERE [Id] = @Id AND [Version] = @Version;";
     private const string SqlUpsert = "UPDATE [dbo].[VersionedOrders] SET [ProductName] = @ProductName WHERE [Id] = @Id; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version]) VALUES (@Id, @ProductName, @Version);";
@@ -141,6 +142,19 @@ public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Gen
         var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrders");
                 return affected;
+    }
+
+    public static async ValueTask<global::AdoGen.Generator.Tests.VersionedOrder> InsertAndReturnAsync(global::AdoGen.Generator.Tests.VersionedOrder model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(VersionedOrderSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(model.ProductName));
+        cmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(model.Version));
+
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        if (await reader.ReadAsync(ct).ConfigureAwait(false)) return VersionedOrder.Map(reader);
+        throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.VersionedOrder model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)

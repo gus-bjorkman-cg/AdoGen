@@ -96,6 +96,7 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         """;
     private const string SqlInsert = "INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);";
     private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) VALUES";
+    private const string SqlInsertAndReturn = "INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) OUTPUT INSERTED.* VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);";
     private const string SqlUpdate = "UPDATE [dbo].[TestTypes] SET [NullableInt] = @NullableInt, [NullableDecimal] = @NullableDecimal, [NullableGuid] = @NullableGuid, [NullableStringVarchar] = @NullableStringVarchar, [NullableStringNVarchar] = @NullableStringNVarchar, [StringVarcharRuledNull] = @StringVarcharRuledNull, [CharString] = @CharString, [NCharString] = @NCharString, [Float] = @Float, [NullableFloat] = @NullableFloat, [DateTime] = @DateTime, [NullableDateTime] = @NullableDateTime, [Double] = @Double, [NullableDouble] = @NullableDouble, [Char] = @Char, [NChar] = @NChar, [NullableChar] = @NullableChar, [NullableBytes] = @NullableBytes, [Bytes] = @Bytes, [Fruits] = @Fruits, [Flags] = @Flags, [ByteEnum] = @ByteEnum, [ShortEnum] = @ShortEnum, [IntEnum] = @IntEnum, [LongEnum] = @LongEnum WHERE [Int] = @Int AND [Decimal] = @Decimal;";
     private const string SqlDelete = "DELETE FROM [dbo].[TestTypes] WHERE [Int] = @Int AND [Decimal] = @Decimal;";
     private const string SqlUpsert = "UPDATE [dbo].[TestTypes] SET [NullableInt] = @NullableInt, [NullableDecimal] = @NullableDecimal, [NullableGuid] = @NullableGuid, [NullableStringVarchar] = @NullableStringVarchar, [NullableStringNVarchar] = @NullableStringNVarchar, [StringVarcharRuledNull] = @StringVarcharRuledNull, [CharString] = @CharString, [NCharString] = @NCharString, [Float] = @Float, [NullableFloat] = @NullableFloat, [DateTime] = @DateTime, [NullableDateTime] = @NullableDateTime, [Double] = @Double, [NullableDouble] = @NullableDouble, [Char] = @Char, [NChar] = @NChar, [NullableChar] = @NullableChar, [NullableBytes] = @NullableBytes, [Bytes] = @Bytes, [Fruits] = @Fruits, [Flags] = @Flags, [ByteEnum] = @ByteEnum, [ShortEnum] = @ShortEnum, [IntEnum] = @IntEnum, [LongEnum] = @LongEnum WHERE [Int] = @Int AND [Decimal] = @Decimal; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);";
@@ -293,6 +294,43 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
 
             return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<global::AdoGen.Generator.Tests.TestType> InsertAndReturnAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterCharString(model.CharString));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(model.NCharString));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterFloat(model.Float));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(model.NullableFloat));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(model.DateTime));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(model.NullableDateTime));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDouble(model.Double));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(model.NullableDouble));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterChar(model.Char));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNChar(model.NChar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(model.NullableChar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(model.NullableBytes));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterBytes(model.Bytes));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterFruits(model.Fruits));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterFlags(model.Flags));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(model.ByteEnum));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(model.ShortEnum));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(model.IntEnum));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum));
+
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        if (await reader.ReadAsync(ct).ConfigureAwait(false)) return TestType.Map(reader);
+        throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)

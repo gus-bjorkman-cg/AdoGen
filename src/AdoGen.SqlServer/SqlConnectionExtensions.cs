@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Runtime.CompilerServices;
@@ -115,6 +116,20 @@ public static class SqlConnectionExtensions
         public ValueTask<int> TruncateAsync<T>(CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
             where T : ISqlDomainModel<T>
             => T.TruncateAsync(connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Inserts a database record and returns the inserted row with server-generated values populated.
+        /// SQL Server uses OUTPUT INSERTED.* to retrieve the row after insertion.
+        /// </summary>
+        /// <remarks>
+        /// Single-row only. For bulk inserts see bulk copy operations.
+        /// Note: SQL Server OUTPUT INSERTED.* fails if the target table has certain triggers.
+        /// </remarks>
+        /// <exception cref="InvalidOperationException"> Thrown when affected rows are 0. </exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<T> InsertAndReturnAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : ISqlDomainModel<T>
+            => T.InsertAndReturnAsync(model, connection, ct, transaction, commandTimeout);
 
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.

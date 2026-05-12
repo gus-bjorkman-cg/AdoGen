@@ -45,6 +45,17 @@ internal static class SqlServerSqlTextBuilder
         return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
     }
 
+    /// <summary>
+    /// Returns INSERT … OUTPUT INSERTED.* VALUES (…) — populates all columns including server-generated ones.
+    /// Note: fails in the presence of certain triggers. Document this in InsertAndReturnAsync XML docs.
+    /// </summary>
+    public static string InsertAndReturn(EmitContext ctx)
+    {
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
+        var insertParams = BuildJoined(ctx.Writables, col => "@" + col.ParameterName);
+        return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) OUTPUT INSERTED.* VALUES ({insertParams});";
+    }
+
     public static string InsertBatchPrefix(EmitContext ctx)
     {
         var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);

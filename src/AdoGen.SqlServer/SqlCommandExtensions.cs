@@ -47,7 +47,9 @@ public static class SqlCommandExtensions
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 
             await using var reader = await command
-                .ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+                .ExecuteReaderAsync(
+                    CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
+                .ConfigureAwait(false);
         
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return default;
         

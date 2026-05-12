@@ -63,6 +63,7 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         """;
     private const string SqlInsert = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES (@CreatedAt, @Type, @JsonPayload);";
     private const string SqlInsertBatchTemplate = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES";
+    private const string SqlInsertAndReturn = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) OUTPUT INSERTED.* VALUES (@CreatedAt, @Type, @JsonPayload);";
     private const string SqlUpdate = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId;";
     private const string SqlDelete = "DELETE FROM [log].[Audits] WHERE [EventId] = @EventId;";
     private const string SqlUpsert = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId; IF @@ROWCOUNT = 0 INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES (@CreatedAt, @Type, @JsonPayload);";
@@ -141,6 +142,19 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
 
             return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<global::AdoGen.Generator.Tests.AuditEvent> InsertAndReturnAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
+        cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
+        cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
+
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        if (await reader.ReadAsync(ct).ConfigureAwait(false)) return AuditEvent.Map(reader);
+        throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)

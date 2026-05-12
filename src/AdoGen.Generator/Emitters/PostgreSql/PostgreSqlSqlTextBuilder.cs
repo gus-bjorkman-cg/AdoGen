@@ -47,6 +47,16 @@ internal static class PostgreSqlSqlTextBuilder
         return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
     }
 
+    /// <summary>
+    /// Returns INSERT … VALUES (…) RETURNING * — populates all columns including server-generated ones.
+    /// </summary>
+    public static string InsertAndReturn(EmitContext ctx)
+    {
+        var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
+        var insertParams = BuildJoined(ctx.Writables, col => "@" + col.ParameterName);
+        return $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams}) RETURNING *;";
+    }
+
     public static string InsertBatchPrefix(EmitContext ctx)
     {
         var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);

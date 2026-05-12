@@ -183,6 +183,8 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - **Test method naming follows `Subject_ShouldVerb_WhenCondition`.** e.g. `Exists_ShouldReturnTrue_WhenUserExists`. Never use `_Returns`, `_Respects`, or free-form names — always `_Should_When_`.
 - **AAA comments are mandatory when a test has more than one logical step.** Single-action tests (`Act` + `Assert` only) may omit `// Arrange`. Multi-step tests (`Arrange`, `Act`, `Assert`) must have all three comments.
 - **`SELECT EXISTS`-style queries must use `TOP(1)` (SQL Server) or `LIMIT 1` (PostgreSQL)** to stop the engine from scanning past the first matching row.
+- **`InsertAndReturnAsync` uses `Map(reader)` on the DTO partial class, not on the `*Sql`/`*Npgsql` static helper class.** The generated `Map` method lives on the DTO itself (from `ISqlMapper<T>`), so call `DtoName.Map(reader)` not `DtoNameSql.Map(reader)`.
+- **Test naming convention note: existing tests in this codebase mix free-form names (e.g. `InsertUser_ShouldInsertUser`) and `Subject_ShouldVerb_WhenCondition`.** Both patterns exist in the codebase; follow whichever style is already used in the surrounding file.
 
 ---
 

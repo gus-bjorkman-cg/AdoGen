@@ -107,6 +107,23 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="commandTimeout"></param>
     /// <returns>Number of affected rows</returns>
     static abstract ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Inserts a database record and returns the inserted row with server-generated values
+    /// (identity columns, database defaults, computed columns) populated via OUTPUT INSERTED.*.
+    /// </summary>
+    /// <remarks>
+    /// Single-row only. For bulk inserts see bulk copy operations.
+    /// Note: SQL Server OUTPUT INSERTED.* fails if the target table has certain triggers.
+    /// In that case, use InsertAsync + a subsequent query instead.
+    /// </remarks>
+    /// <param name="model"></param>
+    /// <param name="connection"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <returns>The inserted row with all server-populated columns filled in.</returns>
+    static abstract ValueTask<T> InsertAndReturnAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
 }
 
 /// <summary>

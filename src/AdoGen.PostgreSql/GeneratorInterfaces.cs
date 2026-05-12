@@ -65,6 +65,21 @@ public interface INpgsqlDomainModel<T> where T : INpgsqlDomainModel<T>
     /// Truncates a database table.
     /// </summary>
     static abstract ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Inserts a database record and returns the inserted row with server-generated values
+    /// (identity columns, database defaults, computed columns) populated via RETURNING *.
+    /// </summary>
+    /// <remarks>
+    /// Single-row only. For bulk inserts see bulk copy operations.
+    /// </remarks>
+    /// <param name="model"></param>
+    /// <param name="connection"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <returns>The inserted row with all server-populated columns filled in.</returns>
+    static abstract ValueTask<T> InsertAndReturnAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
 }
 
 /// <summary>
