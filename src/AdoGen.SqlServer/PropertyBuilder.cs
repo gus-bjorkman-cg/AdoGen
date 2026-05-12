@@ -154,6 +154,18 @@ public sealed class PropertyBuilder<TProp>
     /// that have a DEFAULT expression set via <see cref="DefaultValue"/>.
     /// </summary>
     public PropertyBuilder<TProp> ReadOnly() => this;
+
+    /// <summary>
+    /// Marks this column as the concurrency token for optimistic concurrency control.
+    /// Only one column per profile may be marked as the concurrency token.
+    /// Supported types: <c>int</c>, <c>long</c>, <c>Guid</c>.
+    /// Generated UPDATE and DELETE SQL will include <c>AND [Column] = @Column</c> in the WHERE clause.
+    /// For <c>int</c>/<c>long</c> tokens the UPDATE SET list also includes <c>[Column] = @Column + 1</c>
+    /// so the token is bumped automatically. For <c>Guid</c> tokens the caller is responsible
+    /// for setting a new value on the model before calling <c>UpdateAsync</c>.
+    /// When 0 rows are affected an <c>AdoGenConcurrencyException</c> is thrown.
+    /// </summary>
+    public PropertyBuilder<TProp> ConcurrencyToken() => this;
     
     /// <summary>
     /// Sets default value.

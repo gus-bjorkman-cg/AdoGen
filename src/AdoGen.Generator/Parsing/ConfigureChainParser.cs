@@ -23,6 +23,7 @@ internal static class ConfigureChainParser
         NotNullChainHandler.Instance,
         DefaultValueChainHandler.Instance,
         ReadOnlyChainHandler.Instance,
+        ConcurrencyTokenChainHandler.Instance,
         // SQL Server
         TypeChainHandlerSqlServer.Instance,
         NVarCharChainHandlerSqlServer.Instance,

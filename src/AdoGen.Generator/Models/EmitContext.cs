@@ -29,7 +29,8 @@ internal sealed record EmitContext(
     string WhereByKey,                       // "[a]=@a AND [b]=@b"
     string JoinOn,                           // "S.[k]=T.[k] AND ..."
     IIdentifierQuoter Quoter,
-    ProfileInfo Profile                      // back-reference for edge cases
+    ProfileInfo Profile,                     // back-reference for edge cases
+    ColumnInfo? ConcurrencyToken             // null if no concurrency token configured
 )
 {
     public bool IsIdentity(string columnName) => Profile.IdentityKeys.Contains(columnName);

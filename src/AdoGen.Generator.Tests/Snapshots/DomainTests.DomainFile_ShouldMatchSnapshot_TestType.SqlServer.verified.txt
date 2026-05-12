@@ -280,7 +280,7 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
 
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -290,7 +290,7 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
 
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)

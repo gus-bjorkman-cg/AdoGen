@@ -46,6 +46,7 @@ internal static class EmitContextBuilder
             var isNullable = p.IsNullableProperty(cfg);
             var defaultSql = p.ResolveDefaultSql(cfg, provider);
             var isReadOnly = cfg.IsReadOnly;
+            var isConcurrencyToken = cfg.IsConcurrencyToken;
             var role = isIdentity ? ColumnRole.Identity : isKey ? ColumnRole.Key : ColumnRole.Plain;
 
             columnsBuilder.Add(new ColumnInfo(
@@ -58,6 +59,7 @@ internal static class EmitContextBuilder
                 IsIdentity: isIdentity,
                 IsKey: isKey,
                 IsReadOnly: isReadOnly,
+                IsConcurrencyToken: isConcurrencyToken,
                 DefaultSqlExpression: defaultSql,
                 Role: role
             ));
@@ -73,6 +75,7 @@ internal static class EmitContextBuilder
         var writablesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
         var writableNonKeyNonIdentitiesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
         var bulkColumnsBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
+        ColumnInfo? concurrencyToken = null;
 
         for (var i = 0; i < columns.Length; i++)
         {
@@ -82,9 +85,9 @@ internal static class EmitContextBuilder
             if (!col.IsIdentity) nonIdentitiesBuilder.Add(col);
             if (!col.IsKey && !col.IsIdentity) nonKeyNonIdentitiesBuilder.Add(col);
             if (!col.IsIdentity && !col.IsReadOnly) writablesBuilder.Add(col);
-            if (!col.IsKey && !col.IsIdentity && !col.IsReadOnly) writableNonKeyNonIdentitiesBuilder.Add(col);
-            // BulkColumns: keys always (for JOIN matching) + writable non-keys
+            if (!col.IsKey && !col.IsIdentity && !col.IsReadOnly && !col.IsConcurrencyToken) writableNonKeyNonIdentitiesBuilder.Add(col);
             if (col.IsKey || !col.IsReadOnly) bulkColumnsBuilder.Add(col);
+            if (col.IsConcurrencyToken) concurrencyToken = col;
         }
 
         var keys = keysBuilder.ToImmutable();
@@ -100,7 +103,7 @@ internal static class EmitContextBuilder
 
         // JoinOn: "S.[k]=T.[k] AND ..."
         var joinOn = BuildJoinedPredicate(keys, col => $"S.{col.ColumnNameQuoted} = T.{col.ColumnNameQuoted}");
-
+        
         return new EmitContext(
             Provider: provider,
             DtoTypeName: dtoTypeName,
@@ -123,7 +126,8 @@ internal static class EmitContextBuilder
             WhereByKey: whereByKey,
             JoinOn: joinOn,
             Quoter: quoter,
-            Profile: profile
+            Profile: profile,
+            ConcurrencyToken: concurrencyToken
         );
     }
 

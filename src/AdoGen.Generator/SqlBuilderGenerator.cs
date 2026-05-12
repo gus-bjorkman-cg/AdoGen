@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis;
 namespace AdoGen.Generator;
 
 [Generator]
-public sealed class SqlBuilderGenerator : IIncrementalGenerator
+internal sealed class SqlBuilderGenerator : IIncrementalGenerator
 {
     private static readonly List<IEmitter> Emitters =
     [

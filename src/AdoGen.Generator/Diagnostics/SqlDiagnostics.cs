@@ -89,4 +89,18 @@ internal static class SqlDiagnostics
         messageFormat: "Type '{0}' has invalid visibility. Only public and internal types are supported for SQL source generation.",
         category: "Design",
         DiagnosticSeverity.Error, true);
+
+    public static readonly DiagnosticDescriptor ConcurrencyTokenInvalidType = new(
+        id: "AG012",
+        title: "ConcurrencyToken unsupported type",
+        messageFormat: "Type '{0}' has property '{1}' marked .ConcurrencyToken() but type '{2}' is not supported. Use int, long, or Guid.",
+        category: "Design",
+        DiagnosticSeverity.Error, true);
+
+    public static readonly DiagnosticDescriptor MultipleConcurrencyTokens = new(
+        id: "AG013",
+        title: "Multiple concurrency tokens",
+        messageFormat: "Type '{0}' has more than one property marked .ConcurrencyToken(). Only one is allowed.",
+        category: "Design",
+        DiagnosticSeverity.Error, true);
 }

@@ -56,21 +56,31 @@ internal static class PostgreSqlSqlTextBuilder
     public static string Update(EmitContext ctx)
     {
         var updateSet = BuildJoined(ctx.WritableNonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
-        
+        if (ctx.ConcurrencyToken is { } token)
+        {
+            var tokenBump = IsIntOrLong(token.PropertyType)
+                ? $"{token.ColumnNameQuoted} = @{token.ParameterName} + 1"
+                : $"{token.ColumnNameQuoted} = gen_random_uuid()";
+            return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet}, {tokenBump} WHERE {ctx.WhereByKey} AND {token.ColumnNameQuoted} = @{token.ParameterName};";
+        }
         return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
     }
 
-    public static string Delete(EmitContext ctx) => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey};";
+    public static string Delete(EmitContext ctx)
+    {
+        var tokenClause = ctx.ConcurrencyToken is { } token
+            ? $" AND {token.ColumnNameQuoted} = @{token.ParameterName}"
+            : "";
+        return $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey}{tokenClause};";
+    }
 
     public static string Upsert(EmitContext ctx)
     {
         var insertSql = Insert(ctx).TrimEnd(';');
         var nonIdentityKeys = FilterNonIdentityKeys(ctx.Keys);
         var conflictKeys = BuildJoined(nonIdentityKeys, col => col.ColumnNameQuoted);
-        
         var updateSetOnConflict = BuildJoined(ctx.WritableNonKeyNonIdentities,
             col => $"{col.ColumnNameQuoted} = EXCLUDED.{col.ColumnNameQuoted}");
-        
         return $"{insertSql} ON CONFLICT ({conflictKeys}) DO UPDATE SET {updateSetOnConflict};";
     }
 
@@ -173,6 +183,9 @@ internal static class PostgreSqlSqlTextBuilder
 
         return sb.ToString().TrimEnd();
     }
+
+    private static bool IsIntOrLong(string propertyType)
+        => propertyType is "int" or "long" or "global::System.Int32" or "global::System.Int64";
 
     private static ImmutableArray<ColumnInfo> FilterNonIdentityKeys(ImmutableArray<ColumnInfo> keys)
     {

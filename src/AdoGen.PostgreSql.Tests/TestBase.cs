@@ -24,7 +24,7 @@ public abstract class TestBase : IAsyncLifetime
 
         DefaultUsers = UserFaker.Generate(10);
         DefaultOrders = new Faker<Order>()
-            .CustomInstantiator(x => new Order(Guid.CreateVersion7(), x.Commerce.Product(), x.PickRandom(DefaultUsers).Id))
+            .CustomInstantiator(x => new Order(Guid.CreateVersion7(), x.Commerce.Product(), x.PickRandom(DefaultUsers).Id, 0))
             .Generate(20);
     }
 

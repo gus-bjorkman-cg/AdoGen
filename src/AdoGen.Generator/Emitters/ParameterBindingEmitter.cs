@@ -26,7 +26,8 @@ internal static class ParameterBindingEmitter
     }
 
     /// <summary>
-    /// Produces cmd.Parameters.Add calls for update: non-key-non-identity columns first, then keys.
+    /// Produces cmd.Parameters.Add calls for update: non-key-non-identity columns first, then keys,
+    /// then the concurrency token (if any).
     /// The returned string ends with a newline.
     /// </summary>
     public static string BindForUpdate(EmitContext ctx, string modelVar, int indent)
@@ -39,12 +40,15 @@ internal static class ParameterBindingEmitter
         
         foreach (var col in ctx.Keys)
             sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+
+        if (ctx.ConcurrencyToken is { } token)
+            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}({modelVar}.{token.Name}));");
         
         return sb.ToString();
     }
 
     /// <summary>
-    /// Produces cmd.Parameters.Add calls for delete: key columns only.
+    /// Produces cmd.Parameters.Add calls for delete: key columns only, plus concurrency token if any.
     /// The returned string ends with a newline.
     /// </summary>
     public static string BindForDelete(EmitContext ctx, string modelVar, int indent)
@@ -54,6 +58,9 @@ internal static class ParameterBindingEmitter
         
         foreach (var col in ctx.Keys)
             sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+
+        if (ctx.ConcurrencyToken is { } token)
+            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}({modelVar}.{token.Name}));");
         
         return sb.ToString();
     }

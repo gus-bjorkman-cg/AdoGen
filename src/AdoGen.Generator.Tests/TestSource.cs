@@ -6,7 +6,9 @@ internal static class TestSource
     [
         UserSourceHandler.Instance,
         TestTypeSourceHandler.Instance,
-        AuditEventSourceHandler.Instance
+        AuditEventSourceHandler.Instance,
+        VersionedOrderSourceHandler.Instance,
+        VersionedOrderGuidSourceHandler.Instance
     ];
     
     extension(AdoGenType genType)

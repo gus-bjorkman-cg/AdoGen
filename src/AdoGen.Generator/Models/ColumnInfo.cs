@@ -14,6 +14,7 @@ internal readonly record struct ColumnInfo(
     bool IsIdentity,
     bool IsKey,
     bool IsReadOnly,
+    bool IsConcurrencyToken,
     string? DefaultSqlExpression,
     ColumnRole Role
 );

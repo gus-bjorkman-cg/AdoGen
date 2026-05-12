@@ -130,7 +130,7 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
         cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
 
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -139,7 +139,7 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
         cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
 
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)

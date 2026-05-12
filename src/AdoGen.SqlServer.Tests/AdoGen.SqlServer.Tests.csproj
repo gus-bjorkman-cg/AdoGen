@@ -36,8 +36,4 @@
                           ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Features\Orders\" />
-    </ItemGroup>
-
 </Project>

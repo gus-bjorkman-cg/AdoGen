@@ -54,18 +54,30 @@ internal static class SqlServerSqlTextBuilder
     public static string Update(EmitContext ctx)
     {
         var updateSet = BuildJoined(ctx.WritableNonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
+        if (ctx.ConcurrencyToken is { } token)
+        {
+            var tokenBump = IsIntOrLong(token.PropertyType)
+                ? $"{token.ColumnNameQuoted} = @{token.ParameterName} + 1"
+                : $"{token.ColumnNameQuoted} = NEWID()";
+            return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet}, {tokenBump} WHERE {ctx.WhereByKey} AND {token.ColumnNameQuoted} = @{token.ParameterName};";
+        }
         return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
     }
 
     public static string Delete(EmitContext ctx)
-        => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey};";
+    {
+        var tokenClause = ctx.ConcurrencyToken is { } token
+            ? $" AND {token.ColumnNameQuoted} = @{token.ParameterName}"
+            : "";
+        return $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey}{tokenClause};";
+    }
 
     public static string Upsert(EmitContext ctx)
     {
         var updateSet = BuildJoined(ctx.WritableNonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
         var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
         var insertParams = BuildJoined(ctx.Writables, col => "@" + col.ParameterName);
-        
+
         return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey}; " +
                $"IF @@ROWCOUNT = 0 INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
     }
@@ -171,6 +183,9 @@ internal static class SqlServerSqlTextBuilder
 
     private static string DropGuard(string name)
         => $"        IF OBJECT_ID('tempdb..{name}') IS NOT NULL DROP TABLE {name};";
+
+    private static bool IsIntOrLong(string propertyType)
+        => propertyType is "int" or "long" or "global::System.Int32" or "global::System.Int64";
     
     private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector, string separator = ", ")
     {
@@ -187,4 +202,4 @@ internal static class SqlServerSqlTextBuilder
 }
 
 /// <summary>Options controlling which DML operations to include in the BulkApply SQL.</summary>
-public readonly record struct BulkApplyOptions(bool HasInserts, bool HasUpdates);
+internal readonly record struct BulkApplyOptions(bool HasInserts, bool HasUpdates);

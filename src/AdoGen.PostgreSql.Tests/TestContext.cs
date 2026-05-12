@@ -36,6 +36,7 @@ public sealed class TestContext : IAsyncLifetime
 
         await connection.CreateTableAsync<User>(CancellationToken);
         await connection.CreateTableAsync<Order>(CancellationToken);
+        await connection.CreateTableAsync<Order2>(CancellationToken);
         await connection.CreateTableAsync<TestType>(CancellationToken);
         await connection.CreateTableAsync<AuditEvent>(CancellationToken);
     }

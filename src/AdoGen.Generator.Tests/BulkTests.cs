@@ -7,10 +7,14 @@ public sealed class BulkTests
         { AdoGenType.SqlBulkModel, TestTypes.User },
         { AdoGenType.SqlBulkModel, TestTypes.AuditEvent },
         { AdoGenType.SqlBulkModel, TestTypes.TestType },
+        { AdoGenType.SqlBulkModel, TestTypes.VersionedOrder },
+        { AdoGenType.SqlBulkModel, TestTypes.VersionedOrderGuid },
 
         { AdoGenType.NpgsqlBulkModel, TestTypes.User },
         { AdoGenType.NpgsqlBulkModel, TestTypes.AuditEvent },
         { AdoGenType.NpgsqlBulkModel, TestTypes.TestType },
+        { AdoGenType.NpgsqlBulkModel, TestTypes.VersionedOrder },
+        { AdoGenType.NpgsqlBulkModel, TestTypes.VersionedOrderGuid },
     };
 
     [Theory]

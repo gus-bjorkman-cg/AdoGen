@@ -159,117 +159,27 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 
 ## Agent Working Rules
 
-These rules apply to any AI agent working in this codebase:
-
-- **When you make a mistake, document it here immediately.** Add a note under "Lessons Learned" below so the same error is not repeated in a future session.
-- After any generator emitter change: build → generator tests → snapshot review → integration tests (in that order). Snapshot approval alone is not validation.
-- Never use `new StringBuilder(string)` and `new StringBuilder(int)` interchangeably — `(string)` sets the initial content, `(int)` sets only capacity.
-- `async ValueTask` wrappers that do nothing but `await` a single call are wasteful — return the inner `ValueTask`/`ValueTask<T>` directly.
-- Instance fields on `readonly record struct` are per-instance only. If a field is meant to be a shared registry (e.g. for xUnit deserialization), it must be `static`.
+- After any generator emitter change: `dotnet build` → generator tests → snapshot review → integration tests. Snapshot approval alone is not validation.
+- Always `dotnet build src/AdoGen.Generator.Tests/` before `dotnet test` after any generator change. "Catastrophic failure: ArgumentNullException" during test discovery = serialisation bug in `TestHelpers.cs`, not a stale cache.
+- When updating snapshots: run tests → inspect `*.received.txt` → `mv *.received.txt → *.verified.txt` → re-run tests → run integration tests.
+- Before writing a new test method, check whether one already exists — `replace_string_in_file` can duplicate a method if context overlaps with both old and new content.
+- When testing a conditional code path, verify the fixture actually satisfies the condition before writing the assertion.
+- Document mistakes here immediately in the format: **RULE: one actionable sentence.** No narrative.
 
 ---
 
 ## Lessons Learned
 
-### 2026-04-29 — StringBuilder overload confusion
-`new StringBuilder(Pg_SqlInsertBatchTemplate)` (sets initial content) was changed to
-`new StringBuilder(Pg_SqlInsertBatchTemplate.Length + ...)` (sets capacity only), silently
-producing empty SQL that caused `syntax error at or near "$1"` at runtime.
-**Fix:** use `new StringBuilder(capacity); sb.Append(template);` explicitly.
-**Impact:** all integration tests failed; caught by running `dotnet test src/AdoGen.PostgreSql.Tests/`.
-
-### 2026-04-29 — Generator test "Catastrophic failure" on cold run
-`TestTypes._items` was declared as an instance field (`private readonly List<TestTypes> _items = []`).
-On cold run xUnit constructs a default struct instance to deserialise into, which has an empty
-`_items`, causing `ArgumentNullException` in `Deserialize`.
-**Fix:** make `_items` `static`.
-**Rule:** always run `dotnet build src/AdoGen.Generator.Tests/` before `dotnet test` after any
-generator change. If the test runner crashes with "Catastrophic failure: ArgumentNullException"
-during discovery, it is a serialisation bug in `TestHelpers.cs`, not a stale cache.
-
-### 2026-04-29 — Step 1 (`EmitContext`) completed; Steps 2–6 pending
-`EmitContext`, `ColumnInfo`, `ColumnRole`, `IIdentifierQuoter`, `SqlServerIdentifierQuoter`,
-`PostgreSqlIdentifierQuoter`, and `EmitContextBuilder` were added. All 6 emitters now receive
-`EmitContext ctx` via the updated `IEmitter.Handle` signature. All duplicated LINQ subset chains
-(`dtoProps.Where(p => !profileInfo.IdentityKeys.Contains(...))`) are eliminated from emitters.
-**72/72 generator tests pass. Zero snapshot diffs.**
-`ProfileInfo.IdentityKeys` remains `ImmutableHashSet<string>` — deferred to Step 5 per plan.
-`ParamAdd`/`ParamAddForUpdate`/`ParamAddForDelete`/`ParamAddBatchFlat` closure helpers remain in
-Domain emitters — they belong to Step 3 (`ParameterBindingEmitter`), not Step 1.
-Steps 2–6 of `docs/handover-claude-sonnet-generator-refactor.md` are **not yet started**.
-
-### 2026-04-29 — MERGE ON clause and upsert conflict keys must exclude identity keys
-The SQL Server MERGE `ON (...)` predicate and PostgreSQL `ON CONFLICT (...)` target must only
-include non-identity key columns. `EmitContext.JoinOn` uses ALL keys (correct for JOIN predicates
-in bulk ops). For MERGE/ON CONFLICT, filter with `ctx.Keys.Where(col => !col.IsIdentity)`.
-**Fix:** `DomainOpsEmitterSqlServer` and `DomainOpsEmitterNpgSql` now compute `nonIdentityKeys`
-separately for the upsert ON expression.
-
-### 2026-04-29 — Raw string literal indentation changes SQL whitespace in generated constants
-When `BuildApplySql` was rewritten from `sb.AppendLine("        UPDATE T")` chains to `$"""..."""`
-raw string literals, the indentation of the raw-string opener changed the effective leading
-spaces inside the stored constant, causing snapshot diffs.
-**Fix:** `BuildApplySql` in both bulk emitters keeps `sb.AppendLine` chains — the output is
-dynamic SQL built per-DTO, not a static template. Raw string literals are appropriate only for
-the *outer* generated C# source structure, not for dynamically-assembled SQL content.
-
-### 2026-04-29 — `BuildJoined` separator must be parameterised; `AND` vs `, ` are not the same
-A shared `BuildJoined` helper defaulted to `", "`. The MERGE `ON` clause needs `" AND "`.
-**Fix:** added a `separator` parameter with default `", "` to `BuildJoined` in
-`DomainOpsEmitterSqlServer`; callers that need `" AND "` pass it explicitly.
-
-### 2026-05-04 — Step 3 (`ParameterBindingEmitter`) completed
-`ParameterBindingEmitter` added with `BindAll`, `BindForUpdate`, `BindForDelete`, `BindForUpsertSqlServer`,
-and `BindBatchFlat` static string-returning methods. All local closure helpers (`ParamAdd`,
-`ParamAddForUpdate`, `ParamAddForDelete`, `ParamAddBatchFlat`) removed from `DomainOpsEmitterSqlServer`
-and `DomainOpsEmitterNpgSql`. Bulk emitters had no param-binding closures.
-The NpgSql `ParamAddBatchFlat` previously emitted a trailing space on the `++;` line — this quirk
-was cleaned up (no trailing space) and the three affected NpgSql domain snapshots updated accordingly.
-**110/110 generator tests pass.**
-Steps 4–6 of `docs/handover-claude-sonnet-generator-refactor.md` are **not yet started**.
-
-### 2026-04-30 — Step 2 (`SqlTextBuilder`) completed
-`SqlServerSqlTextBuilder` and `PostgreSqlSqlTextBuilder` added. All SQL strings extracted from
-`DomainOpsEmitterSqlServer`, `BulkEmitterSqlServer`, `DomainOpsEmitterNpgSql`, and
-`BulkEmitterNpgSql` — zero inline SQL keywords remain in those emitters.
-`SqlText/` unit test folder added with `SqlServerSqlTextBuilderTests`, `PostgreSqlSqlTextBuilderTests`,
-and `EmitContextFixtures` (covers `User`, `Order`, `AuditEvent`, composite-key for both providers).
-**110/110 generator tests pass. Zero snapshot diffs.**
-
-### 2026-04-30 — `[ModuleInitializer]` conflicts with PolySharp polyfill in test project
-The generator project uses PolySharp which polyfills `ModuleInitializerAttribute` for `netstandard2.0`.
-When the test project references the generator assembly, the PolySharp-defined
-`ModuleInitializerAttribute` (a `class`, not an `Attribute`) leaks into scope, causing
-`CS0616: 'ModuleInitializer' is not an attribute class` in `ModuleInitializer.cs`.
-**Fix:** replace `[ModuleInitializer]` + `public static void Initialize()` with a `static` constructor.
-Static constructors on `static` classes run exactly once before first use — same semantics, no attribute needed.
-The `DerivePathInfo` (Verify) call and reference-list setup both work correctly in a `static` constructor.
-
-### 2026-04-30 — Test fixture must match test assertion; AuditEvent has non-key plain columns
-`PostgreSqlAuditEvent` fixture has `EventId` (Identity+Key) + 3 Plain columns, so
-`NonKeyNonIdentities.Length > 0` and the update block is always generated.
-Asserting `SELECT 1 WHERE false` against this fixture always fails.
-**Fix:** added `PostgreSqlIdentityOnlyKey` fixture (single identity key, no other columns) and
-used it in the test that checks for the empty-update-block path.
-**Rule:** when testing a conditional code path (e.g. "no updatable columns"), verify the fixture
-actually satisfies the condition before writing the assertion.
-
-### 2026-05-05 — Milestone 1 (`ReadOnly`) integration tests completed
-`DateTimeOffset CreatedAt` added to `TestType` in the sample project with `.DefaultValue("DEFAULT SYSUTCDATETIME()").ReadOnly()` (SQL Server) and `.DefaultValue("DEFAULT now()").ReadOnly()` (PostgreSQL).
-Both `TestTypeTests` (SS + PG) updated: Faker gained `.RuleFor(x => x.CreatedAt, _ => default)` (StrictMode requires every property). Existing `BulkMixed_ShouldPerformAllOperations` assertion updated to `.Excluding(x => x.CreatedAt)`. Two new tests added to each: `Insert_ReadOnly_ShouldNotBeWritten` (sentinel value, DB must override) and `Update_ReadOnly_ShouldNotBeOverwritten` (capture DB value post-insert, update with sentinel, assert DB value unchanged).
-**Avoid duplicate methods when replacing test bodies** — check for existing test method before adding; the replace_string_in_file tool copies context and can duplicate a method if the context block includes the original and the replacement target is just the inner assertion.
-
-
-`.ReadOnly()` added to both `PropertyBuilder<TProp>` types (SQL Server + PostgreSQL).
-`ParamConfig.IsReadOnly` and `ColumnInfo.IsReadOnly` added. `EmitContext` gains `Writables`
-(NonIdentities excluding ReadOnly, used for INSERT/batch INSERT/Upsert) and
-`WritableNonKeyNonIdentities` (used for UPDATE SET / Upsert UPDATE part).
-`ParameterBindingEmitter` updated to use `Writables`/`WritableNonKeyNonIdentities`.
-Both SQL text builders (`SqlServerSqlTextBuilder`, `PostgreSqlSqlTextBuilder`) updated accordingly.
-Bulk emitters exclude read-only non-key columns from temp table, column mappings, and
-`WriteItemsToServerAsync` — keys are always kept for JOIN matching.
-`TestType` in generator tests gained a `DateTimeOffset CreatedAt` field with `.DefaultValue(...).ReadOnly()`.
-**110/110 generator tests pass.**
+- **`new StringBuilder(string)` sets content; `new StringBuilder(int)` sets capacity only.** Use `new StringBuilder(capacity); sb.Append(template);` when pre-sizing. Mixing these silently produces empty output.
+- **xUnit deserialization fields on `readonly record struct` must be `static`.** An instance field `_items` causes `ArgumentNullException` on cold test discovery when xUnit constructs a default struct.
+- **`[ModuleInitializer]` conflicts with PolySharp in test projects.** PolySharp polyfills `ModuleInitializerAttribute` as a `class` (not `Attribute`), causing `CS0616`. Use a `static` constructor on a `static` class instead — same once-only semantics.
+- **MERGE `ON (...)` / `ON CONFLICT (...)` must exclude identity keys.** `EmitContext.JoinOn` covers all keys (correct for bulk JOIN). Filter with `ctx.Keys.Where(col => !col.IsIdentity)` for upsert conflict targets.
+- **Raw string literals in emitters embed their indentation into the generated string.** Use `sb.AppendLine(...)` chains for dynamically-assembled SQL; raw string literals only for static outer C# structure.
+- **`BuildJoined`-style helpers need an explicit separator parameter.** `", "` and `" AND "` are not interchangeable; always pass the separator explicitly at the call site.
+- **`async ValueTask` wrappers that only `await` one call are wasteful.** Return the inner `ValueTask`/`ValueTask<T>` directly.
+- **Bogus `StrictMode` requires every property to have a rule.** When adding a new property to a DTO used in Faker-based tests, add a corresponding `.RuleFor(x => x.NewProp, ...)` or tests will throw at runtime.
+- **Concurrency token (int/long): same parameter used in both SET and WHERE.** `[Token] = @Token + 1` (SET) and `AND [Token] = @Token` (WHERE) share one parameter. For Guid tokens, only WHERE is augmented; the value is set by the caller as a normal writable column.
+- **`AdoGenConcurrencyException` thrown with fully-qualified `global::` prefix** to avoid ambiguity in projects referencing both `AdoGen.SqlServer` and `AdoGen.PostgreSql`.
 
 ---
 

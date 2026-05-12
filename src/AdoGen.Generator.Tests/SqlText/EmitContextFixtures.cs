@@ -14,36 +14,36 @@ internal static class EmitContextFixtures
     public static EmitContext SqlServerUser() => Build(
         SqlProviderKind.SqlServer, SqlServerIdentifierQuoter.Instance, "dbo", "Users",
         [
-            new ColumnInfo("Id", "[Id]", "Id", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, "DEFAULT NEWID()", ColumnRole.Key),
-            new ColumnInfo("Name", "[Name]", "Name", "VARCHAR(20)", "global::System.String", false, false, false, false, null, ColumnRole.Plain),
-            new ColumnInfo("Email", "[Email]", "Email", "VARCHAR(50)", "global::System.String", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("Id", "[Id]", "Id", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, false, "DEFAULT NEWID()", ColumnRole.Key),
+            new ColumnInfo("Name", "[Name]", "Name", "VARCHAR(20)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("Email", "[Email]", "Email", "VARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     /// <summary>AuditEvent: identity key (long EventId), schema="log", renamed column (Type).</summary>
     public static EmitContext SqlServerAuditEvent() => Build(
         SqlProviderKind.SqlServer, SqlServerIdentifierQuoter.Instance, "log", "Audits",
         [
-            new ColumnInfo("EventId", "[EventId]", "EventId", "BIGINT", "global::System.Int64", false, true, true, false, null, ColumnRole.Identity),
-            new ColumnInfo("CreatedAt", "[CreatedAt]", "CreatedAt", "DATETIMEOFFSET", "global::System.DateTimeOffset", false, false, false, false, null, ColumnRole.Plain),
-            new ColumnInfo("EventType", "[Type]", "Type", "NVARCHAR(50)", "global::System.String", false, false, false, false, null, ColumnRole.Plain),
-            new ColumnInfo("JsonPayload", "[JsonPayload]", "JsonPayload", "VARBINARY(8000)", "global::System.Byte[]", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("EventId", "[EventId]", "EventId", "BIGINT", "global::System.Int64", false, true, true, false, false, null, ColumnRole.Identity),
+            new ColumnInfo("CreatedAt", "[CreatedAt]", "CreatedAt", "DATETIMEOFFSET", "global::System.DateTimeOffset", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("EventType", "[Type]", "Type", "NVARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("JsonPayload", "[JsonPayload]", "JsonPayload", "VARBINARY(8000)", "global::System.Byte[]", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     /// <summary>Order: single non-identity key (Guid Id), one plain string column — no identity column.</summary>
     public static EmitContext SqlServerOrder() => Build(
         SqlProviderKind.SqlServer, SqlServerIdentifierQuoter.Instance, "dbo", "Orders",
         [
-            new ColumnInfo("Id", "[Id]", "Id", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
-            new ColumnInfo("ProductName", "[ProductName]", "ProductName", "VARCHAR(100)", "global::System.String", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("Id", "[Id]", "Id", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("ProductName", "[ProductName]", "ProductName", "VARCHAR(100)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     /// <summary>Composite key: two non-identity key columns plus one plain value column.</summary>
     public static EmitContext SqlServerCompositeKey() => Build(
         SqlProviderKind.SqlServer, SqlServerIdentifierQuoter.Instance, "dbo", "OrderLines",
         [
-            new ColumnInfo("OrderId", "[OrderId]", "OrderId", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
-            new ColumnInfo("ProductId", "[ProductId]", "ProductId", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
-            new ColumnInfo("Quantity", "[Quantity]", "Quantity", "INT", "global::System.Int32", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("OrderId", "[OrderId]", "OrderId", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("ProductId", "[ProductId]", "ProductId", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("Quantity", "[Quantity]", "Quantity", "INT", "global::System.Int32", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     // ── PostgreSQL ────────────────────────────────────────────────────────────
@@ -52,43 +52,43 @@ internal static class EmitContextFixtures
     public static EmitContext PostgreSqlUser() => Build(
         SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "public", "Users",
         [
-            new ColumnInfo("Id", "\"Id\"", "Id", "UUID", "global::System.Guid", false, false, true, false, "DEFAULT gen_random_uuid()", ColumnRole.Key),
-            new ColumnInfo("Name", "\"Name\"", "Name", "VARCHAR(20)", "global::System.String", false, false, false, false, null, ColumnRole.Plain),
-            new ColumnInfo("Email", "\"Email\"", "Email", "VARCHAR(50)", "global::System.String", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("Id", "\"Id\"", "Id", "UUID", "global::System.Guid", false, false, true, false, false, "DEFAULT gen_random_uuid()", ColumnRole.Key),
+            new ColumnInfo("Name", "\"Name\"", "Name", "VARCHAR(20)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("Email", "\"Email\"", "Email", "VARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     /// <summary>Order: single non-identity key (Guid Id), one plain string column — no identity column.</summary>
     public static EmitContext PostgreSqlOrder() => Build(
         SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "public", "Orders",
         [
-            new ColumnInfo("Id", "\"Id\"", "Id", "uuid", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
-            new ColumnInfo("ProductName", "\"ProductName\"", "ProductName", "varchar(100)", "global::System.String", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("Id", "\"Id\"", "Id", "uuid", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("ProductName", "\"ProductName\"", "ProductName", "varchar(100)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     /// <summary>Composite key: two non-identity key columns plus one plain value column.</summary>
     public static EmitContext PostgreSqlCompositeKey() => Build(
         SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "public", "OrderLines",
         [
-            new ColumnInfo("OrderId", "\"OrderId\"", "OrderId", "UUID", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
-            new ColumnInfo("ProductId", "\"ProductId\"", "ProductId", "UUID", "global::System.Guid", false, false, true, false, null, ColumnRole.Key),
-            new ColumnInfo("Quantity", "\"Quantity\"", "Quantity", "INT", "global::System.Int32", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("OrderId", "\"OrderId\"", "OrderId", "UUID", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("ProductId", "\"ProductId\"", "ProductId", "UUID", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("Quantity", "\"Quantity\"", "Quantity", "INT", "global::System.Int32", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     /// <summary>AuditEvent: identity key (bigint EventId), schema-qualified, plus three plain columns.</summary>
     public static EmitContext PostgreSqlAuditEvent() => Build(
         SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "log", "Audits",
         [
-            new ColumnInfo("EventId", "\"EventId\"", "EventId", "BIGINT", "global::System.Int64", false, true, true, false, null, ColumnRole.Identity),
-            new ColumnInfo("CreatedAt", "\"CreatedAt\"", "CreatedAt", "TIMESTAMPTZ", "global::System.DateTimeOffset", false, false, false, false, null, ColumnRole.Plain),
-            new ColumnInfo("EventType", "\"Type\"", "Type", "VARCHAR(50)", "global::System.String", false, false, false, false, null, ColumnRole.Plain),
-            new ColumnInfo("JsonPayload", "\"JsonPayload\"", "JsonPayload", "BYTEA", "global::System.Byte[]", false, false, false, false, null, ColumnRole.Plain)
+            new ColumnInfo("EventId", "\"EventId\"", "EventId", "BIGINT", "global::System.Int64", false, true, true, false, false, null, ColumnRole.Identity),
+            new ColumnInfo("CreatedAt", "\"CreatedAt\"", "CreatedAt", "TIMESTAMPTZ", "global::System.DateTimeOffset", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("EventType", "\"Type\"", "Type", "VARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("JsonPayload", "\"JsonPayload\"", "JsonPayload", "BYTEA", "global::System.Byte[]", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
     /// <summary>IdentityOnlyKey: identity key only, no other columns — NonKeyNonIdentities is empty.</summary>
     public static EmitContext PostgreSqlIdentityOnlyKey() => Build(
         SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "dbo", "Counters",
         [
-            new ColumnInfo("CounterId", "\"CounterId\"", "CounterId", "BIGINT", "global::System.Int64", false, true, true, false, null, ColumnRole.Identity)
+            new ColumnInfo("CounterId", "\"CounterId\"", "CounterId", "BIGINT", "global::System.Int64", false, true, true, false, false, null, ColumnRole.Identity)
         ]);
 
     // ── Builder ───────────────────────────────────────────────────────────────
@@ -108,6 +108,7 @@ internal static class EmitContextFixtures
         var writablesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
         var writableNonKeyNonIdentitiesBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
         var bulkColumnsBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
+        ColumnInfo? concurrencyToken = null;
 
         foreach (var col in allColumns)
         {
@@ -116,8 +117,9 @@ internal static class EmitContextFixtures
             if (!col.IsIdentity) nonIdentitiesBuilder.Add(col);
             if (col is { IsKey: false, IsIdentity: false }) nonKeyNonIdentitiesBuilder.Add(col);
             if (!col.IsIdentity && !col.IsReadOnly) writablesBuilder.Add(col);
-            if (col is { IsKey: false, IsIdentity: false } && !col.IsReadOnly) writableNonKeyNonIdentitiesBuilder.Add(col);
+            if (col is { IsKey: false, IsIdentity: false } && !col.IsReadOnly && !col.IsConcurrencyToken) writableNonKeyNonIdentitiesBuilder.Add(col);
             if (col.IsKey || !col.IsReadOnly) bulkColumnsBuilder.Add(col);
+            if (col.IsConcurrencyToken) concurrencyToken = col;
         }
 
         var keys = keysBuilder.ToImmutable();
@@ -163,7 +165,8 @@ internal static class EmitContextFixtures
             WhereByKey: whereByKey,
             JoinOn: joinOn,
             Quoter: quoter,
-            Profile: profile
+            Profile: profile,
+            ConcurrencyToken: concurrencyToken
         );
     }
 

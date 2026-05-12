@@ -89,8 +89,42 @@ internal static class DiscoveryValidation
             
             var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
             var profile = ProfileInfoCollector.Resolve(dto, diagnostics, dtoProperties, ct);
+
+            // Validate concurrency tokens
+            var concurrencyTokenCount = 0;
             
-            if (propsNeedingConfig.Count == 0) return vdto with { ProfileInfo = profile };
+            foreach (var kvp in profile.ParamsByProperty)
+            {
+                if (!kvp.Value.IsConcurrencyToken) continue;
+                
+                concurrencyTokenCount++;
+                
+                if (concurrencyTokenCount > 1)
+                {
+                    diagnostics.Add(Diagnostic.Create(
+                        SqlDiagnostics.MultipleConcurrencyTokens,
+                        dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                        dto.Dto.Name));
+                    break;
+                }
+                
+                // Validate supported types: int, long, Guid (non-nullable only)
+                var propType = kvp.Value.PropertyType;
+                var isSupported = propType.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64
+                    || propType.IsGuidType;
+                
+                if (!isSupported)
+                {
+                    diagnostics.Add(Diagnostic.Create(
+                        SqlDiagnostics.ConcurrencyTokenInvalidType,
+                        dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                        dto.Dto.Name,
+                        kvp.Key,
+                        propType.ToDisplayString()));
+                }
+            }
+
+            if (propsNeedingConfig.Count == 0) return vdto with { ProfileInfo = profile, Diagnostics = diagnostics.ToImmutable() };
             
             foreach (var kvp in propsNeedingConfig)
             {

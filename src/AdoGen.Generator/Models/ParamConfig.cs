@@ -15,4 +15,5 @@ internal sealed class ParamConfig
     public string? DefaultSqlExpression { get; set; }
     public string SqlTypeLiteral { get; set; } = "";
     public bool IsReadOnly { get; set; }
+    public bool IsConcurrencyToken { get; set; }
 }

@@ -7,10 +7,14 @@ public sealed class DomainTests
         { AdoGenType.SqlDomainModel, TestTypes.User },
         { AdoGenType.SqlDomainModel, TestTypes.AuditEvent },
         { AdoGenType.SqlDomainModel, TestTypes.TestType },
+        { AdoGenType.SqlDomainModel, TestTypes.VersionedOrder },
+        { AdoGenType.SqlDomainModel, TestTypes.VersionedOrderGuid },
 
         { AdoGenType.NpgsqlDomainModel, TestTypes.User },
         { AdoGenType.NpgsqlDomainModel, TestTypes.AuditEvent },
         { AdoGenType.NpgsqlDomainModel, TestTypes.TestType },
+        { AdoGenType.NpgsqlDomainModel, TestTypes.VersionedOrder },
+        { AdoGenType.NpgsqlDomainModel, TestTypes.VersionedOrderGuid },
     };
 
     [Theory]
@@ -33,4 +37,53 @@ public sealed class DomainTests
     [MemberData(nameof(Cases))]
     public void BulkFile_ShouldBeEmpty(AdoGenType genType, TestTypes testType) =>
         genType.GenerateFile(testType, genType.GetBulkType()).Should().BeEmpty();
+
+    [Fact]
+    public void AG012_ShouldEmitted_WhenInvalidConcurrencyTokenType()
+    {
+        // Arrange
+        var source = """
+                     using AdoGen.SqlServer;
+                     namespace Test;
+                     public sealed partial record Bar(Guid Id, string Token) : ISqlDomainModel;
+                     public sealed class BarProfile : SqlProfile<Bar>
+                     {
+                         public BarProfile()
+                         {
+                             RuleFor(x => x.Token).VarChar(50).ConcurrencyToken();
+                         }
+                     }
+                     """;
+        
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlDomainModel);
+        
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG012");
+    }
+    
+    [Fact]
+    public void AG013_ShouldBeEmitted_WhenMultipleConcurrencyTokens()
+    {
+        // Arrange
+        var source = """
+            using AdoGen.SqlServer;
+            namespace Test;
+            public sealed partial record Foo(Guid Id, int Version, int Revision) : ISqlDomainModel;
+            public sealed class FooProfile : SqlProfile<Foo>
+            {
+                public FooProfile()
+                {
+                    RuleFor(x => x.Version).ConcurrencyToken();
+                    RuleFor(x => x.Revision).ConcurrencyToken();
+                }
+            }
+            """;
+        
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlDomainModel);
+        
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG013");
+    }
 }

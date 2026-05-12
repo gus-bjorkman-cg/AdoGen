@@ -143,6 +143,8 @@ public readonly record struct TestTypes : IXunitSerializable
     public static readonly TestTypes User = new(nameof(User));
     public static readonly TestTypes AuditEvent = new(nameof(AuditEvent));
     public static readonly TestTypes TestType = new(nameof(TestType));
+    public static readonly TestTypes VersionedOrder = new(nameof(VersionedOrder));
+    public static readonly TestTypes VersionedOrderGuid = new(nameof(VersionedOrderGuid));
 
     public void Deserialize(IXunitSerializationInfo info) => 
         Unsafe.AsRef(in this) = Items.First(x => x.Name == info.GetValue<string>(nameof(Name)));
@@ -381,6 +383,90 @@ internal sealed class AuditEventSourceHandler : ITestTypeSource
                       Key(x => x.EventId);
                       RuleFor(x => x.EventType).Name("Type").VarChar(50);
                       RuleFor(x => x.JsonPayload).Type(NpgsqlDbType.Bytea);
+                  }
+              }
+              """;
+}
+
+internal sealed class VersionedOrderSourceHandler : ITestTypeSource
+{
+    private VersionedOrderSourceHandler() {}
+    public static VersionedOrderSourceHandler Instance { get; } = new();
+
+    public bool IsMatch(TestTypes type) => type == TestTypes.VersionedOrder;
+
+    public string Handle(AdoGenType genType) =>
+        $$"""
+          using {{genType.Namespace}};
+
+          namespace AdoGen.Generator.Tests;
+
+          public sealed partial record VersionedOrder(Guid Id, string ProductName, int Version) : {{genType.Interface}};
+
+          {{Profile(genType)}}
+          """;
+
+    private static string Profile(AdoGenType genType) =>
+        genType.Provider == DbProvider.SqlServer
+            ? """
+              public sealed class VersionedOrderProfile : SqlProfile<VersionedOrder>
+              {
+                  public VersionedOrderProfile()
+                  {
+                      RuleFor(x => x.ProductName).VarChar(50);
+                      RuleFor(x => x.Version).ConcurrencyToken();
+                  }
+              }
+              """
+            : """
+              public sealed class VersionedOrderNpgsqlProfile : NpgsqlProfile<VersionedOrder>
+              {
+                  public VersionedOrderNpgsqlProfile()
+                  {
+                      RuleFor(x => x.ProductName).VarChar(50);
+                      RuleFor(x => x.Version).ConcurrencyToken();
+                  }
+              }
+              """;
+}
+
+internal sealed class VersionedOrderGuidSourceHandler : ITestTypeSource
+{
+    private VersionedOrderGuidSourceHandler() {}
+    public static VersionedOrderGuidSourceHandler Instance { get; } = new();
+
+    public bool IsMatch(TestTypes type) => type == TestTypes.VersionedOrderGuid;
+
+    public string Handle(AdoGenType genType) =>
+        $$"""
+          using {{genType.Namespace}};
+
+          namespace AdoGen.Generator.Tests;
+
+          public sealed partial record VersionedOrderGuid(Guid Id, string ProductName, Guid RowVersion) : {{genType.Interface}};
+
+          {{Profile(genType)}}
+          """;
+
+    private static string Profile(AdoGenType genType) =>
+        genType.Provider == DbProvider.SqlServer
+            ? """
+              public sealed class VersionedOrderGuidProfile : SqlProfile<VersionedOrderGuid>
+              {
+                  public VersionedOrderGuidProfile()
+                  {
+                      RuleFor(x => x.ProductName).VarChar(50);
+                      RuleFor(x => x.RowVersion).ConcurrencyToken();
+                  }
+              }
+              """
+            : """
+              public sealed class VersionedOrderGuidNpgsqlProfile : NpgsqlProfile<VersionedOrderGuid>
+              {
+                  public VersionedOrderGuidNpgsqlProfile()
+                  {
+                      RuleFor(x => x.ProductName).VarChar(50);
+                      RuleFor(x => x.RowVersion).ConcurrencyToken();
                   }
               }
               """;

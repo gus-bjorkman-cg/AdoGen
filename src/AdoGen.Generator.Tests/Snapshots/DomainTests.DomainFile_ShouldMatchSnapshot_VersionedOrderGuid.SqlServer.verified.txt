@@ -12,9 +12,9 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.Tests.User, Guid>
+public sealed partial record VersionedOrderGuid : ISqlSingleIdModel<global::AdoGen.Generator.Tests.VersionedOrderGuid, Guid>
 {
-    private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[Users] AS t JOIN (VALUES ";
+    private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[VersionedOrderGuids] AS t JOIN (VALUES ";
     private const string SqlDeleteBatchSuffix = ") AS ids([Id]) ON ids.[Id]=t.[Id]";
 
     public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<Guid> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -31,7 +31,7 @@ public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.T
         {
             if (i > 0) sb.Append(',');
             sb.Append($"(@p{i})");
-            cmd.Parameters.Add(UserSql.CreateParameterId(ids[i], $"@p{i}"));
+            cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(ids[i], $"@p{i}"));
         }
         sb.Append(SqlDeleteBatchSuffix);
         cmd.CommandText = sb.ToString();
@@ -40,22 +40,22 @@ public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.T
     }
 }
 
-public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tests.User>
+public sealed partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Generator.Tests.VersionedOrderGuid>
 {
     private const string SqlCreateTable = 
         """
-        CREATE TABLE [dbo].[Users](
+        CREATE TABLE [dbo].[VersionedOrderGuids](
             [Id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
-            [Name] VARCHAR(20) NOT NULL,
-            [Email] VARCHAR(50) NOT NULL
-        ,CONSTRAINT [PK_Users] PRIMARY KEY ([Id]));
+            [ProductName] VARCHAR(50) NOT NULL,
+            [RowVersion] UNIQUEIDENTIFIER NOT NULL
+        ,CONSTRAINT [PK_VersionedOrderGuids] PRIMARY KEY ([Id]));
         """;
-    private const string SqlInsert = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES (@Id, @Name, @Email);";
-    private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES";
-    private const string SqlUpdate = "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id;";
-    private const string SqlDelete = "DELETE FROM [dbo].[Users] WHERE [Id] = @Id;";
-    private const string SqlUpsert = "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES (@Id, @Name, @Email);";
-    private const string SqlTruncate = "TRUNCATE TABLE [dbo].[Users];";
+    private const string SqlInsert = "INSERT INTO [dbo].[VersionedOrderGuids] ([Id], [ProductName], [RowVersion]) VALUES (@Id, @ProductName, @RowVersion);";
+    private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[VersionedOrderGuids] ([Id], [ProductName], [RowVersion]) VALUES";
+    private const string SqlUpdate = "UPDATE [dbo].[VersionedOrderGuids] SET [ProductName] = @ProductName, [RowVersion] = NEWID() WHERE [Id] = @Id AND [RowVersion] = @RowVersion;";
+    private const string SqlDelete = "DELETE FROM [dbo].[VersionedOrderGuids] WHERE [Id] = @Id AND [RowVersion] = @RowVersion;";
+    private const string SqlUpsert = "UPDATE [dbo].[VersionedOrderGuids] SET [ProductName] = @ProductName WHERE [Id] = @Id; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[VersionedOrderGuids] ([Id], [ProductName], [RowVersion]) VALUES (@Id, @ProductName, @RowVersion);";
+    private const string SqlTruncate = "TRUNCATE TABLE [dbo].[VersionedOrderGuids];";
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -64,13 +64,13 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
-        cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
-        cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName(model.ProductName));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -78,7 +78,7 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
     /// <summary>
     /// Inserts multiple database records in one roundtrip. 
     /// Will throw if parameter count exceeds SQL Server limit (2100).
-    /// For type global::AdoGen.Generator.Tests.User, each record will use 3 parameters.
+    /// For type global::AdoGen.Generator.Tests.VersionedOrderGuid, each record will use 3 parameters.
     /// Resulting in a max insert count of 700 per batch.
     /// For larger inserts, consider using SqlBulkCopy or multiple batches.
     /// </summary>
@@ -88,7 +88,7 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
     /// <param name="transaction"></param>
     /// <param name="commandTimeout"></param>
     /// <returns>Number of affected rows</returns>
-    public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.User> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.VersionedOrderGuid> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -106,13 +106,13 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         {
             if (modelIndex > 0) sb.Append(',');
             sb.Append($"(@p{paramIndex}");
-            cmd.Parameters.Add(UserSql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
+            cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
             paramIndex++;
             sb.Append($",@p{paramIndex}");
-            cmd.Parameters.Add(UserSql.CreateParameterName(models[modelIndex].Name, $"@p{paramIndex}"));
+            cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName(models[modelIndex].ProductName, $"@p{paramIndex}"));
             paramIndex++;
             sb.Append($",@p{paramIndex})");
-            cmd.Parameters.Add(UserSql.CreateParameterEmail(models[modelIndex].Email, $"@p{paramIndex}"));
+            cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(models[modelIndex].RowVersion, $"@p{paramIndex}"));
             paramIndex++;
         }
 
@@ -120,33 +120,38 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
-        cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
-        cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName(model.ProductName));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
 
-            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrderGuids");
+                return affected;
     }
 
-    public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
 
-            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrderGuids");
+                return affected;
     }
 
-    public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
-        cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
-        cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
-        cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName(model.ProductName));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }

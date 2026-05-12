@@ -51,7 +51,7 @@ public static class SqlConnectionExtensions
         public ValueTask<int> InsertAsync<T>(List<T> models, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
             where T : ISqlDomainModel<T>
             => T.InsertAsync(models, connection, ct, transaction, commandTimeout);
-
+        
         /// <summary>
         /// Updates a database record.
         /// </summary>
@@ -60,6 +60,10 @@ public static class SqlConnectionExtensions
         /// <param name="transaction"></param>
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
+        /// <exception cref="AdoGenConcurrencyException">
+        /// Thrown when the DTO has a concurrency token configured and 0 rows were affected,
+        /// indicating the row was modified or deleted by another process.
+        /// </exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> UpdateAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
             where T : ISqlDomainModel<T>
@@ -68,6 +72,11 @@ public static class SqlConnectionExtensions
         /// <summary>
         /// Inserts or updates a database record.
         /// </summary>
+        /// <remarks>
+        /// When the DTO has a concurrency token configured, <c>UpsertAsync</c> does <b>not</b>
+        /// enforce the concurrency check — it performs an unconditional UPDATE + INSERT fallback.
+        /// Use <c>UpdateAsync</c> instead if you require optimistic concurrency protection.
+        /// </remarks>
         /// <param name="model"></param>
         /// <param name="ct"></param>
         /// <param name="transaction"></param>
@@ -86,6 +95,10 @@ public static class SqlConnectionExtensions
         /// <param name="transaction"></param>
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
+        /// <exception cref="AdoGenConcurrencyException">
+        /// Thrown when the DTO has a concurrency token configured and 0 rows were affected,
+        /// indicating the row was modified or deleted by another process.
+        /// </exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ValueTask<int> DeleteAsync<T>(T model, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
             where T : ISqlDomainModel<T>
