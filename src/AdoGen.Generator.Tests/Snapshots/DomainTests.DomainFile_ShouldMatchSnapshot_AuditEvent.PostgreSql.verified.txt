@@ -14,6 +14,7 @@ namespace AdoGen.Generator.Tests;
 public sealed partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.AuditEvent, long>
 {
     private const string Pg_SqlDeleteBatchTemplate = """DELETE FROM "log"."Audits" WHERE "EventId" IN (""";
+    private const string Pg_SqlExists = """SELECT 1 FROM "log"."Audits" WHERE "EventId" = @EventId LIMIT 1;""";
 
     public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<long> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -34,6 +35,15 @@ public sealed partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Ge
         cmd.CommandText = sb.ToString();
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<bool> ExistsAsync(NpgsqlConnection connection, long id, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(id));
+        var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return scalar is not null && scalar is not DBNull;
     }
 }
 

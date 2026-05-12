@@ -14,6 +14,7 @@ namespace AdoGen.Generator.Tests;
 public sealed partial record VersionedOrder : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.VersionedOrder, Guid>
 {
     private const string Pg_SqlDeleteBatchTemplate = """DELETE FROM "public"."VersionedOrders" WHERE "Id" IN (""";
+    private const string Pg_SqlExists = """SELECT 1 FROM "public"."VersionedOrders" WHERE "Id" = @Id LIMIT 1;""";
 
     public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<Guid> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -34,6 +35,15 @@ public sealed partial record VersionedOrder : INpgsqlSingleIdModel<global::AdoGe
         cmd.CommandText = sb.ToString();
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<bool> ExistsAsync(NpgsqlConnection connection, Guid id, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(id));
+        var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return scalar is not null && scalar is not DBNull;
     }
 }
 

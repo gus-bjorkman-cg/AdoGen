@@ -19,15 +19,20 @@ public interface ISqlSingleIdModel<TModel, TKey>
     /// Deletes the records with the given ids.
     /// The generated code will create a SQL statement with an IN clause to delete all the records in one roundtrip.
     /// </summary>
-    /// <param name="connection"></param>
-    /// <param name="ids"></param>
-    /// <param name="ct"></param>
-    /// <param name="transaction"></param>
-    /// <param name="commandTimeout"></param>
-    /// <returns></returns>
     static abstract ValueTask<int> DeleteAsync(
         SqlConnection connection,
         List<TKey> ids,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null);
+
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// The generated code uses SELECT 1 … WHERE pk = @id via ExecuteScalarAsync.
+    /// </summary>
+    static abstract ValueTask<bool> ExistsAsync(
+        SqlConnection connection,
+        TKey id,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null);
@@ -178,4 +183,76 @@ public static class SqlConnectionSingleIdExtensions
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, string>
         => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel, TKey>(
+        this SqlConnection connection,
+        TKey id,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, TKey>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+        /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this SqlConnection connection,
+        Guid id,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, Guid>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this SqlConnection connection,
+        long id,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, long>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this SqlConnection connection,
+        int id,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, int>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this SqlConnection connection,
+        short id,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, short>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this SqlConnection connection,
+        string id,
+        CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : ISqlSingleIdModel<TModel, string>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
 }

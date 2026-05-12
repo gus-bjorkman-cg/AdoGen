@@ -180,6 +180,9 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - **Bogus `StrictMode` requires every property to have a rule.** When adding a new property to a DTO used in Faker-based tests, add a corresponding `.RuleFor(x => x.NewProp, ...)` or tests will throw at runtime.
 - **Concurrency token (int/long): same parameter used in both SET and WHERE.** `[Token] = @Token + 1` (SET) and `AND [Token] = @Token` (WHERE) share one parameter. For Guid tokens, only WHERE is augmented; the value is set by the caller as a normal writable column.
 - **`AdoGenConcurrencyException` thrown with fully-qualified `global::` prefix** to avoid ambiguity in projects referencing both `AdoGen.SqlServer` and `AdoGen.PostgreSql`.
+- **Test method naming follows `Subject_ShouldVerb_WhenCondition`.** e.g. `Exists_ShouldReturnTrue_WhenUserExists`. Never use `_Returns`, `_Respects`, or free-form names — always `_Should_When_`.
+- **AAA comments are mandatory when a test has more than one logical step.** Single-action tests (`Act` + `Assert` only) may omit `// Arrange`. Multi-step tests (`Arrange`, `Act`, `Assert`) must have all three comments.
+- **`SELECT EXISTS`-style queries must use `TOP(1)` (SQL Server) or `LIMIT 1` (PostgreSQL)** to stop the engine from scanning past the first matching row.
 
 ---
 

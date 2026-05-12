@@ -16,6 +16,7 @@ public sealed partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Gener
 {
     private const string SqlDeleteBatchPrefix = "DELETE t FROM [log].[Audits] AS t JOIN (VALUES ";
     private const string SqlDeleteBatchSuffix = ") AS ids([EventId]) ON ids.[EventId]=t.[EventId]";
+    private const string SqlExists = "SELECT TOP(1) 1 FROM [log].[Audits] WHERE [EventId] = @EventId;";
 
     public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<long> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -37,6 +38,15 @@ public sealed partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Gener
         cmd.CommandText = sb.ToString();
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<bool> ExistsAsync(SqlConnection connection, long id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(id));
+        var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return scalar is not null && scalar is not DBNull;
     }
 }
 

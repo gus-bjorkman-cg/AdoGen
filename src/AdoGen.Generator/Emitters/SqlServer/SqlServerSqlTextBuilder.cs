@@ -86,6 +86,13 @@ internal static class SqlServerSqlTextBuilder
         => $"TRUNCATE TABLE {ctx.SchemaTableQuoted};";
 
     /// <summary>
+    /// Returns a SELECT TOP(1) 1 FROM … WHERE pk1 = @pk1 [AND pk2 = @pk2] statement.
+    /// TOP(1) ensures the engine stops scanning after the first matching row.
+    /// </summary>
+    public static string Exists(EmitContext ctx)
+        => $"SELECT TOP(1) 1 FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey};";
+
+    /// <summary>
     /// Returns the static prefix of the DELETE…JOIN(VALUES…) statement.
     /// The caller appends "(…), (…)" rows and the ON clause dynamically.
     /// Example for single key:    "DELETE t FROM [dbo].[T] AS t JOIN (VALUES "

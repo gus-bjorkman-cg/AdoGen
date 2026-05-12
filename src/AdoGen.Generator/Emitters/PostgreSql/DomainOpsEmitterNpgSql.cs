@@ -26,6 +26,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         var deleteSql = PostgreSqlSqlTextBuilder.Delete(ctx);
         var upsertSql = PostgreSqlSqlTextBuilder.Upsert(ctx);
         var truncateSql = PostgreSqlSqlTextBuilder.Truncate(ctx);
+        var existsSql = PostgreSqlSqlTextBuilder.Exists(ctx);
 
         // Update/Delete/Upsert method bodies — vary based on whether a concurrency token is configured
         var updateBody = ctx.ConcurrencyToken is not null
@@ -45,19 +46,21 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
 
 
-        var deleteBatchSrc = "";
+        var idBasedSrc = "";
+        
         if (profileInfo.Keys.Length == 1)
         {
             var keyName = profileInfo.Keys[0];
             var keyType = profileInfo.ParamsByProperty[keyName].PropertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var deleteBatchSql = PostgreSqlSqlTextBuilder.DeleteBatchTemplate(ctx, keyName);
 
-            deleteBatchSrc =
+            idBasedSrc =
                 $$""""
 
                    {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
                    {
                        private const string Pg_SqlDeleteBatchTemplate = """{{deleteBatchSql}}""";
+                       private const string Pg_SqlExists = """{{existsSql}}""";
                    
                        public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                        {
@@ -79,6 +82,15 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                    
                            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                        }
+                   
+                       public static async ValueTask<bool> ExistsAsync(NpgsqlConnection connection, {{keyType}} id, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+                       {
+                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                           await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
+                           cmd.Parameters.Add({{dto.Name}}Npgsql.CreateParameter{{keyName}}(id));
+                           var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                           return scalar is not null && scalar is not DBNull;
+                       }
                    }
 
                    """";
@@ -88,13 +100,14 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             var deleteBatchPrefix = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesPrefix(ctx);
             var deleteBatchSuffix = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesSuffix(ctx);
 
-            deleteBatchSrc =
+            idBasedSrc =
                 $$""""
 
-                  {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlCompositeKeyModel<{{ctx.DtoTypeName}}>
+                  {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlCompositeKeyModel<{{ctx.DtoTypeName}}>, INpgsqlCompositeKeyExistsModel<{{ctx.DtoTypeName}}>
                   {
                       private const string Pg_SqlDeleteBatchPrefix = "{{deleteBatchPrefix.Replace("\"", "\\\"")}}";
                       private const string Pg_SqlDeleteBatchSuffix = "{{deleteBatchSuffix.Replace("\"", "\\\"")}}";
+                      private const string Pg_SqlExists = """{{existsSql}}""";
 
                       public static async ValueTask<int> DeleteAsync(List<{{ctx.DtoTypeName}}> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                       {
@@ -117,6 +130,15 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                       }
+
+                      public static async ValueTask<bool> ExistsAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+                      {
+                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
+                  {{ParameterBindingEmitter.BindKeys(ctx, "model", 8)}}
+                          var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                          return scalar is not null && scalar is not DBNull;
+                      }
                   }
 
                   """";
@@ -136,7 +158,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               using AdoGen.PostgreSql;
 
               namespace {{ctx.Namespace}};
-              {{deleteBatchSrc}}
+              {{idBasedSrc}}
               {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlDomainModel<{{ctx.DtoTypeName}}>
               {
                   private const string Pg_SqlCreateTable = 

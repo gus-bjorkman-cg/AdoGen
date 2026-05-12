@@ -23,9 +23,11 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         var updateSql = SqlServerSqlTextBuilder.Update(ctx);
         var deleteSql = SqlServerSqlTextBuilder.Delete(ctx);
         var upsertSql = SqlServerSqlTextBuilder.Upsert(ctx);
-        var nonIdentityPropCount = ctx.Writables.Length;
+        var existsSql = SqlServerSqlTextBuilder.Exists(ctx);
         
-        var deleteSrc = "";
+        var nonIdentityPropCount = ctx.Writables.Length;
+        var idBasedSrc = "";
+        
         
         if (profileInfo.Keys.Length == 1)
         {
@@ -37,13 +39,14 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             var deleteBatchPrefix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesPrefix(ctx);
             var deleteBatchSuffix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesSuffix(ctx);
             
-            deleteSrc =
+            idBasedSrc =
                 $$""""
                   
                   {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
                   {
                       private const string SqlDeleteBatchPrefix = "{{deleteBatchPrefix}}";
                       private const string SqlDeleteBatchSuffix = "{{deleteBatchSuffix}}";
+                      private const string SqlExists = "{{existsSql}}";
                   
                       public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                       {
@@ -66,25 +69,35 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           
                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                       }
+                  
+                      public static async ValueTask<bool> ExistsAsync(SqlConnection connection, {{keyType}} id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                      {
+                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
+                          cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(id));
+                          var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                          return scalar is not null && scalar is not DBNull;
+                      }
                   }
                   
                   """";
         }
         else if (profileInfo.Keys.Length > 1)
         {
-            // Composite-key: implement ISqlCompositeKeyModel<TModel>
-            // Caller uses: connection.DeleteAsync(models, ct)
+            // Composite-key: implement ISqlCompositeKeyModel<TModel> and ISqlCompositeKeyExistsModel<TModel>
+            // Caller uses: connection.DeleteAsync(models, ct) / connection.ExistsAsync(model, ct)
             var keyCount = ctx.Keys.Length;
             var deleteBatchPrefix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesPrefix(ctx);
             var deleteBatchSuffix = SqlServerSqlTextBuilder.DeleteBatchJoinValuesSuffix(ctx);
             
-            deleteSrc =
+            idBasedSrc =
                 $$""""
                   
-                  {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlCompositeKeyModel<{{ctx.DtoTypeName}}>
+                  {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlCompositeKeyModel<{{ctx.DtoTypeName}}>, ISqlCompositeKeyExistsModel<{{ctx.DtoTypeName}}>
                   {
                       private const string SqlDeleteBatchPrefix = "{{deleteBatchPrefix}}";
                       private const string SqlDeleteBatchSuffix = "{{deleteBatchSuffix}}";
+                      private const string SqlExists = "{{existsSql}}";
                       private const int KeyPropertyCount = {{keyCount}};
                   
                       public static async ValueTask<int> DeleteAsync(List<{{ctx.DtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -108,6 +121,15 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           cmd.CommandText = sb.ToString();
                           
                           return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                      }
+                  
+                      public static async ValueTask<bool> ExistsAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                      {
+                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
+                  {{ParameterBindingEmitter.BindKeys(ctx, "model", 8)}}
+                          var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                          return scalar is not null && scalar is not DBNull;
                       }
                   }
                   
@@ -148,7 +170,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             using AdoGen.SqlServer;
 
             namespace {{ctx.Namespace}};
-            {{deleteSrc}}
+            {{idBasedSrc}}
             {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlDomainModel<{{ctx.DtoTypeName}}>
             {
                 private const string SqlCreateTable = 

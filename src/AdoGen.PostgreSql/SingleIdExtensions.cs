@@ -23,6 +23,17 @@ public interface INpgsqlSingleIdModel<TModel, TKey>
         CancellationToken ct,
         NpgsqlTransaction? transaction = null,
         int? commandTimeout = null);
+
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// The generated code uses SELECT 1 … WHERE pk = @id via ExecuteScalarAsync.
+    /// </summary>
+    static abstract ValueTask<bool> ExistsAsync(
+        NpgsqlConnection connection,
+        TKey id,
+        CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null);
 }
 
 /// <summary>
@@ -170,4 +181,76 @@ public static class NpgsqlConnectionSingleIdExtensions
         int? commandTimeout = null)
         where TModel : INpgsqlSingleIdModel<TModel, string>
         => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel, TKey>(
+        this NpgsqlConnection connection,
+        TKey id,
+        CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : INpgsqlSingleIdModel<TModel, TKey>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this NpgsqlConnection connection,
+        Guid id,
+        CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : INpgsqlSingleIdModel<TModel, Guid>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this NpgsqlConnection connection,
+        long id,
+        CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : INpgsqlSingleIdModel<TModel, long>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this NpgsqlConnection connection,
+        int id,
+        CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : INpgsqlSingleIdModel<TModel, int>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this NpgsqlConnection connection,
+        short id,
+        CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : INpgsqlSingleIdModel<TModel, short>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
+    
+    /// <summary>
+    /// Returns true if a record with the given id exists in the database.
+    /// </summary>
+    public static ValueTask<bool> ExistsAsync<TModel>(
+        this NpgsqlConnection connection,
+        string id,
+        CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        where TModel : INpgsqlSingleIdModel<TModel, string>
+        => TModel.ExistsAsync(connection, id, ct, transaction, commandTimeout);
 }

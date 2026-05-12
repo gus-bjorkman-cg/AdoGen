@@ -66,6 +66,22 @@ internal static class ParameterBindingEmitter
     }
 
     /// <summary>
+    /// Produces cmd.Parameters.Add calls for key columns only (no concurrency token, no dynamic naming).
+    /// Used for ExistsAsync where only the key columns are needed, with stable parameter names.
+    /// The returned string ends with a newline.
+    /// </summary>
+    public static string BindKeys(EmitContext ctx, string modelVar, int indent)
+    {
+        var prefix = new string(' ', indent);
+        var sb = new StringBuilder();
+        
+        foreach (var col in ctx.Keys)
+            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+        
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// Produces cmd.Parameters.Add calls for SQL Server upsert:
     /// non-identity columns first, then any identity key columns.
     /// The returned string ends with a newline.

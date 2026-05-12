@@ -86,6 +86,13 @@ internal static class PostgreSqlSqlTextBuilder
 
     public static string Truncate(EmitContext ctx) => $"TRUNCATE TABLE {ctx.SchemaTableQuoted};";
 
+    /// <summary>
+    /// Returns a SELECT 1 FROM … WHERE pk1 = @pk1 [AND pk2 = @pk2] LIMIT 1 statement.
+    /// LIMIT 1 ensures the engine stops scanning after the first matching row.
+    /// </summary>
+    public static string Exists(EmitContext ctx)
+        => $"SELECT 1 FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey} LIMIT 1;";
+
     public static string DeleteBatchTemplate(EmitContext ctx, string keyName)
         => $"DELETE FROM {ctx.SchemaTableQuoted} WHERE \"{keyName}\" IN (";
 

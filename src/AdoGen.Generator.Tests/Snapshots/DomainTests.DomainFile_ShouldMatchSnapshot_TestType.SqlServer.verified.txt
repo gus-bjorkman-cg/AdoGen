@@ -12,10 +12,11 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Generator.Tests.TestType>
+public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Generator.Tests.TestType>, ISqlCompositeKeyExistsModel<global::AdoGen.Generator.Tests.TestType>
 {
     private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[TestTypes] AS t JOIN (VALUES ";
     private const string SqlDeleteBatchSuffix = ") AS ids([Int], [Decimal]) ON ids.[Int]=t.[Int] AND ids.[Decimal]=t.[Decimal]";
+    private const string SqlExists = "SELECT TOP(1) 1 FROM [dbo].[TestTypes] WHERE [Int] = @Int AND [Decimal] = @Decimal;";
     private const int KeyPropertyCount = 2;
 
     public static async ValueTask<int> DeleteAsync(List<global::AdoGen.Generator.Tests.TestType> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -44,6 +45,17 @@ public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Gen
         cmd.CommandText = sb.ToString();
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<bool> ExistsAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+
+        var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return scalar is not null && scalar is not DBNull;
     }
 }
 

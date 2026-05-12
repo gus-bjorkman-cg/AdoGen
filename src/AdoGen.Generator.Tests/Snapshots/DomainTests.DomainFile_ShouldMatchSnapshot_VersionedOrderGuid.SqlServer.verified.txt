@@ -16,6 +16,7 @@ public sealed partial record VersionedOrderGuid : ISqlSingleIdModel<global::AdoG
 {
     private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[VersionedOrderGuids] AS t JOIN (VALUES ";
     private const string SqlDeleteBatchSuffix = ") AS ids([Id]) ON ids.[Id]=t.[Id]";
+    private const string SqlExists = "SELECT TOP(1) 1 FROM [dbo].[VersionedOrderGuids] WHERE [Id] = @Id;";
 
     public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<Guid> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -37,6 +38,15 @@ public sealed partial record VersionedOrderGuid : ISqlSingleIdModel<global::AdoG
         cmd.CommandText = sb.ToString();
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<bool> ExistsAsync(SqlConnection connection, Guid id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(id));
+        var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return scalar is not null && scalar is not DBNull;
     }
 }
 
