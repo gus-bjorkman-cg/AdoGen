@@ -24,16 +24,20 @@ public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.T
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
         await using var cmd = new SqlCommand("", connection, transaction);
+        
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        
         cmd.EnableOptimizedParameterBinding = ids.Count > 24;
         
         var sb = new StringBuilder(SqlDeleteBatchPrefix);
+        
         for (var i = 0; i < ids.Count; i++)
         {
             if (i > 0) sb.Append(',');
             sb.Append($"(@p{i})");
             cmd.Parameters.Add(UserSql.CreateParameterId(ids[i], $"@p{i}"));
         }
+        
         sb.Append(SqlDeleteBatchSuffix);
         cmd.CommandText = sb.ToString();
         
@@ -43,9 +47,12 @@ public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.T
     public static async ValueTask<bool> ExistsAsync(SqlConnection connection, Guid id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(UserSql.CreateParameterId(id));
         var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        
         return scalar is not null && scalar is not DBNull;
     }
 }
@@ -71,14 +78,18 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlCreateTable, CommandType.Text, transaction, commandTimeout);
+        
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
         cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
@@ -86,26 +97,15 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Inserts multiple database records in one roundtrip. 
-    /// Will throw if parameter count exceeds SQL Server limit (2100).
-    /// For type global::AdoGen.Generator.Tests.User, each record will use 3 parameters.
-    /// Resulting in a max insert count of 700 per batch.
-    /// For larger inserts, consider using SqlBulkCopy or multiple batches.
-    /// </summary>
-    /// <param name="models"></param>
-    /// <param name="connection"></param>
-    /// <param name="ct"></param>
-    /// <param name="transaction"></param>
-    /// <param name="commandTimeout"></param>
-    /// <returns>Number of affected rows</returns>
     public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.User> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var cmd = new SqlCommand("", connection, transaction);
+        
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        
         cmd.EnableOptimizedParameterBinding = (models.Count * 3) > 24;
 
         var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * 17);
@@ -128,46 +128,57 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         }
 
         cmd.CommandText = sb.ToString();
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
         cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
 
-            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<global::AdoGen.Generator.Tests.User> InsertAndReturnAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
         cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
 
         await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return User.Map(reader);
+        
         throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
 
-            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
         cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
@@ -178,7 +189,70 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
     public static async ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlTruncate, CommandType.Text, transaction, commandTimeout);
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+}
+
+/// <summary>
+/// Patch command object for <see cref="User"/>.
+/// Set only the properties you want to update; unset properties are not written to the database.
+/// </summary>
+public partial class UserPatch
+{
+    private ulong _mask;
+    public Guid Id { get; }
+
+    public string? Name { get; set { field = value; _mask |= 1UL << 0; } }
+    public string? Email { get; set { field = value; _mask |= 1UL << 1; } }
+    public UserPatch WithName(string value) { Name = value; return this; }
+    public UserPatch WithEmail(string value) { Email = value; return this; }
+    internal string? NameValue => Name;
+    internal string? EmailValue => Email;
+    internal ulong Mask => _mask;
+
+    public UserPatch(Guid id) { Id = id; }
+}
+public sealed partial record User
+{
+    public static async ValueTask<int> PatchAsync(SqlConnection connection, UserPatch patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (patch.Mask == 0UL) return 0;
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+
+        await using var cmd = new SqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+        var sb = new StringBuilder("UPDATE [dbo].[Users] SET ");
+        var separator = "";
+        
+        if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("[Name] = @Name"); separator = ", "; cmd.Parameters.Add(UserSql.CreateParameterName((string)patch.NameValue!)); }
+        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator + "[Email] = @Email"); separator = ", "; cmd.Parameters.Add(UserSql.CreateParameterEmail((string)patch.EmailValue!)); }
+
+        sb.Append(" WHERE [Id] = @Id");
+
+        cmd.CommandText = sb.ToString();
+        cmd.Parameters.Add(UserSql.CreateParameterId(patch.Id));
+        
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+}
+
+/// <summary>Extension methods for patching <see cref="User"/> via <see cref="SqlConnection"/>.</summary>
+public static class UserSqlPatchExtensions
+{
+    /// <summary>
+    /// Executes a partial UPDATE for <see cref="User"/>, touching only the columns
+    /// explicitly set on <paramref name="patch"/>.
+    /// Returns 0 immediately (without sending SQL) when no columns were set.
+    /// </summary>
+    public static global::System.Threading.Tasks.ValueTask<int> PatchAsync(
+        this SqlConnection connection,
+        UserPatch patch,
+        global::System.Threading.CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        => User.PatchAsync(connection, patch, ct, transaction, commandTimeout);
 }

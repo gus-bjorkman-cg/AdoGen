@@ -25,7 +25,9 @@ public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Gen
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
         await using var cmd = new SqlCommand("", connection, transaction);
+        
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        
         cmd.EnableOptimizedParameterBinding = models.Count * KeyPropertyCount > 24;
         
         var sb = new StringBuilder(SqlDeleteBatchPrefix);
@@ -41,6 +43,7 @@ public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Gen
             cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(models[i].Decimal, $"@p{paramIndex}"));
             paramIndex++;
         }
+        
         sb.Append(SqlDeleteBatchSuffix);
         cmd.CommandText = sb.ToString();
         
@@ -54,7 +57,9 @@ public sealed partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Gen
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
 
+
         var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        
         return scalar is not null && scalar is not DBNull;
     }
 }
@@ -105,14 +110,18 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlCreateTable, CommandType.Text, transaction, commandTimeout);
+        
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
@@ -144,26 +153,15 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Inserts multiple database records in one roundtrip. 
-    /// Will throw if parameter count exceeds SQL Server limit (2100).
-    /// For type global::AdoGen.Generator.Tests.TestType, each record will use 27 parameters.
-    /// Resulting in a max insert count of 77 per batch.
-    /// For larger inserts, consider using SqlBulkCopy or multiple batches.
-    /// </summary>
-    /// <param name="models"></param>
-    /// <param name="connection"></param>
-    /// <param name="ct"></param>
-    /// <param name="transaction"></param>
-    /// <param name="commandTimeout"></param>
-    /// <returns>Number of affected rows</returns>
     public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.TestType> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var cmd = new SqlCommand("", connection, transaction);
+        
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        
         cmd.EnableOptimizedParameterBinding = (models.Count * 27) > 24;
 
         var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * 137);
@@ -258,13 +256,16 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         }
 
         cmd.CommandText = sb.ToString();
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
         cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal));
         cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid));
@@ -293,13 +294,15 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
 
-            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<global::AdoGen.Generator.Tests.TestType> InsertAndReturnAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
@@ -329,24 +332,30 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum));
 
         await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return TestType.Map(reader);
+        
         throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
 
-            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
@@ -381,7 +390,164 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
     public static async ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(SqlTruncate, CommandType.Text, transaction, commandTimeout);
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+}
+
+/// <summary>
+/// Patch command object for <see cref="TestType"/>.
+/// Set only the properties you want to update; unset properties are not written to the database.
+/// </summary>
+public partial class TestTypePatch
+{
+    private ulong _mask;
+    public int Int { get; }
+    public decimal Decimal { get; }
+
+    public int? NullableInt { get; set { field = value; _mask |= 1UL << 0; } }
+    public decimal? NullableDecimal { get; set { field = value; _mask |= 1UL << 1; } }
+    public Guid? NullableGuid { get; set { field = value; _mask |= 1UL << 2; } }
+    public string? NullableStringVarchar { get; set { field = value; _mask |= 1UL << 3; } }
+    public string? NullableStringNVarchar { get; set { field = value; _mask |= 1UL << 4; } }
+    public string? StringVarcharRuledNull { get; set { field = value; _mask |= 1UL << 5; } }
+    public string? CharString { get; set { field = value; _mask |= 1UL << 6; } }
+    public string? NCharString { get; set { field = value; _mask |= 1UL << 7; } }
+    public float? Float { get; set { field = value; _mask |= 1UL << 8; } }
+    public float? NullableFloat { get; set { field = value; _mask |= 1UL << 9; } }
+    public DateTime? DateTime { get; set { field = value; _mask |= 1UL << 10; } }
+    public DateTime? NullableDateTime { get; set { field = value; _mask |= 1UL << 11; } }
+    public double? Double { get; set { field = value; _mask |= 1UL << 12; } }
+    public double? NullableDouble { get; set { field = value; _mask |= 1UL << 13; } }
+    public char? Char { get; set { field = value; _mask |= 1UL << 14; } }
+    public char? NChar { get; set { field = value; _mask |= 1UL << 15; } }
+    public char? NullableChar { get; set { field = value; _mask |= 1UL << 16; } }
+    public byte[]? NullableBytes { get; set { field = value; _mask |= 1UL << 17; } }
+    public byte[]? Bytes { get; set { field = value; _mask |= 1UL << 18; } }
+    public global::AdoGen.Generator.Tests.Fruits? Fruits { get; set { field = value; _mask |= 1UL << 19; } }
+    public global::AdoGen.Generator.Tests.Flags? Flags { get; set { field = value; _mask |= 1UL << 20; } }
+    public global::AdoGen.Generator.Tests.ByteEnum? ByteEnum { get; set { field = value; _mask |= 1UL << 21; } }
+    public global::AdoGen.Generator.Tests.ShortEnum? ShortEnum { get; set { field = value; _mask |= 1UL << 22; } }
+    public global::AdoGen.Generator.Tests.IntEnum? IntEnum { get; set { field = value; _mask |= 1UL << 23; } }
+    public global::AdoGen.Generator.Tests.LongEnum? LongEnum { get; set { field = value; _mask |= 1UL << 24; } }
+    public TestTypePatch WithNullableInt(int? value) { NullableInt = value; return this; }
+    public TestTypePatch WithNullableDecimal(decimal? value) { NullableDecimal = value; return this; }
+    public TestTypePatch WithNullableGuid(Guid? value) { NullableGuid = value; return this; }
+    public TestTypePatch WithNullableStringVarchar(string value) { NullableStringVarchar = value; return this; }
+    public TestTypePatch WithNullableStringNVarchar(string value) { NullableStringNVarchar = value; return this; }
+    public TestTypePatch WithStringVarcharRuledNull(string value) { StringVarcharRuledNull = value; return this; }
+    public TestTypePatch WithCharString(string value) { CharString = value; return this; }
+    public TestTypePatch WithNCharString(string value) { NCharString = value; return this; }
+    public TestTypePatch WithFloat(float value) { Float = value; return this; }
+    public TestTypePatch WithNullableFloat(float? value) { NullableFloat = value; return this; }
+    public TestTypePatch WithDateTime(DateTime value) { DateTime = value; return this; }
+    public TestTypePatch WithNullableDateTime(DateTime value) { NullableDateTime = value; return this; }
+    public TestTypePatch WithDouble(double value) { Double = value; return this; }
+    public TestTypePatch WithNullableDouble(double? value) { NullableDouble = value; return this; }
+    public TestTypePatch WithChar(char value) { Char = value; return this; }
+    public TestTypePatch WithNChar(char value) { NChar = value; return this; }
+    public TestTypePatch WithNullableChar(char? value) { NullableChar = value; return this; }
+    public TestTypePatch WithNullableBytes(byte[] value) { NullableBytes = value; return this; }
+    public TestTypePatch WithBytes(byte[] value) { Bytes = value; return this; }
+    public TestTypePatch WithFruits(global::AdoGen.Generator.Tests.Fruits value) { Fruits = value; return this; }
+    public TestTypePatch WithFlags(global::AdoGen.Generator.Tests.Flags value) { Flags = value; return this; }
+    public TestTypePatch WithByteEnum(global::AdoGen.Generator.Tests.ByteEnum value) { ByteEnum = value; return this; }
+    public TestTypePatch WithShortEnum(global::AdoGen.Generator.Tests.ShortEnum value) { ShortEnum = value; return this; }
+    public TestTypePatch WithIntEnum(global::AdoGen.Generator.Tests.IntEnum value) { IntEnum = value; return this; }
+    public TestTypePatch WithLongEnum(global::AdoGen.Generator.Tests.LongEnum value) { LongEnum = value; return this; }
+    internal int? NullableIntValue => NullableInt;
+    internal decimal? NullableDecimalValue => NullableDecimal;
+    internal Guid? NullableGuidValue => NullableGuid;
+    internal string? NullableStringVarcharValue => NullableStringVarchar;
+    internal string? NullableStringNVarcharValue => NullableStringNVarchar;
+    internal string? StringVarcharRuledNullValue => StringVarcharRuledNull;
+    internal string? CharStringValue => CharString;
+    internal string? NCharStringValue => NCharString;
+    internal float? FloatValue => Float;
+    internal float? NullableFloatValue => NullableFloat;
+    internal DateTime? DateTimeValue => DateTime;
+    internal DateTime? NullableDateTimeValue => NullableDateTime;
+    internal double? DoubleValue => Double;
+    internal double? NullableDoubleValue => NullableDouble;
+    internal char? CharValue => Char;
+    internal char? NCharValue => NChar;
+    internal char? NullableCharValue => NullableChar;
+    internal byte[]? NullableBytesValue => NullableBytes;
+    internal byte[]? BytesValue => Bytes;
+    internal global::AdoGen.Generator.Tests.Fruits? FruitsValue => Fruits;
+    internal global::AdoGen.Generator.Tests.Flags? FlagsValue => Flags;
+    internal global::AdoGen.Generator.Tests.ByteEnum? ByteEnumValue => ByteEnum;
+    internal global::AdoGen.Generator.Tests.ShortEnum? ShortEnumValue => ShortEnum;
+    internal global::AdoGen.Generator.Tests.IntEnum? IntEnumValue => IntEnum;
+    internal global::AdoGen.Generator.Tests.LongEnum? LongEnumValue => LongEnum;
+    internal ulong Mask => _mask;
+
+    public TestTypePatch(int @int, decimal @decimal) { Int = @int; Decimal = @decimal; }
+}
+public sealed partial record TestType
+{
+    public static async ValueTask<int> PatchAsync(SqlConnection connection, TestTypePatch patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (patch.Mask == 0UL) return 0;
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+
+        await using var cmd = new SqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+        var sb = new StringBuilder("UPDATE [dbo].[TestTypes] SET ");
+        var separator = "";
+        
+        if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("[NullableInt] = @NullableInt"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt((int)patch.NullableIntValue!)); }
+        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator + "[NullableDecimal] = @NullableDecimal"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal((decimal)patch.NullableDecimalValue!)); }
+        if ((patch.Mask & (1UL << 2)) != 0) { sb.Append(separator + "[NullableGuid] = @NullableGuid"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid((Guid)patch.NullableGuidValue!)); }
+        if ((patch.Mask & (1UL << 3)) != 0) { sb.Append(separator + "[NullableStringVarchar] = @NullableStringVarchar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar((string)patch.NullableStringVarcharValue!)); }
+        if ((patch.Mask & (1UL << 4)) != 0) { sb.Append(separator + "[NullableStringNVarchar] = @NullableStringNVarchar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar((string)patch.NullableStringNVarcharValue!)); }
+        if ((patch.Mask & (1UL << 5)) != 0) { sb.Append(separator + "[StringVarcharRuledNull] = @StringVarcharRuledNull"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull((string)patch.StringVarcharRuledNullValue!)); }
+        if ((patch.Mask & (1UL << 6)) != 0) { sb.Append(separator + "[CharString] = @CharString"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterCharString((string)patch.CharStringValue!)); }
+        if ((patch.Mask & (1UL << 7)) != 0) { sb.Append(separator + "[NCharString] = @NCharString"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString((string)patch.NCharStringValue!)); }
+        if ((patch.Mask & (1UL << 8)) != 0) { sb.Append(separator + "[Float] = @Float"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFloat((float)patch.FloatValue!)); }
+        if ((patch.Mask & (1UL << 9)) != 0) { sb.Append(separator + "[NullableFloat] = @NullableFloat"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat((float)patch.NullableFloatValue!)); }
+        if ((patch.Mask & (1UL << 10)) != 0) { sb.Append(separator + "[DateTime] = @DateTime"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime((DateTime)patch.DateTimeValue!)); }
+        if ((patch.Mask & (1UL << 11)) != 0) { sb.Append(separator + "[NullableDateTime] = @NullableDateTime"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime((DateTime)patch.NullableDateTimeValue!)); }
+        if ((patch.Mask & (1UL << 12)) != 0) { sb.Append(separator + "[Double] = @Double"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterDouble((double)patch.DoubleValue!)); }
+        if ((patch.Mask & (1UL << 13)) != 0) { sb.Append(separator + "[NullableDouble] = @NullableDouble"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble((double)patch.NullableDoubleValue!)); }
+        if ((patch.Mask & (1UL << 14)) != 0) { sb.Append(separator + "[Char] = @Char"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterChar((char)patch.CharValue!)); }
+        if ((patch.Mask & (1UL << 15)) != 0) { sb.Append(separator + "[NChar] = @NChar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNChar((char)patch.NCharValue!)); }
+        if ((patch.Mask & (1UL << 16)) != 0) { sb.Append(separator + "[NullableChar] = @NullableChar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar((char)patch.NullableCharValue!)); }
+        if ((patch.Mask & (1UL << 17)) != 0) { sb.Append(separator + "[NullableBytes] = @NullableBytes"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes((byte[])patch.NullableBytesValue!)); }
+        if ((patch.Mask & (1UL << 18)) != 0) { sb.Append(separator + "[Bytes] = @Bytes"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterBytes((byte[])patch.BytesValue!)); }
+        if ((patch.Mask & (1UL << 19)) != 0) { sb.Append(separator + "[Fruits] = @Fruits"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFruits((global::AdoGen.Generator.Tests.Fruits)patch.FruitsValue!)); }
+        if ((patch.Mask & (1UL << 20)) != 0) { sb.Append(separator + "[Flags] = @Flags"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFlags((global::AdoGen.Generator.Tests.Flags)patch.FlagsValue!)); }
+        if ((patch.Mask & (1UL << 21)) != 0) { sb.Append(separator + "[ByteEnum] = @ByteEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum((global::AdoGen.Generator.Tests.ByteEnum)patch.ByteEnumValue!)); }
+        if ((patch.Mask & (1UL << 22)) != 0) { sb.Append(separator + "[ShortEnum] = @ShortEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum((global::AdoGen.Generator.Tests.ShortEnum)patch.ShortEnumValue!)); }
+        if ((patch.Mask & (1UL << 23)) != 0) { sb.Append(separator + "[IntEnum] = @IntEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum((global::AdoGen.Generator.Tests.IntEnum)patch.IntEnumValue!)); }
+        if ((patch.Mask & (1UL << 24)) != 0) { sb.Append(separator + "[LongEnum] = @LongEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum((global::AdoGen.Generator.Tests.LongEnum)patch.LongEnumValue!)); }
+
+        sb.Append(" WHERE [Int] = @Int AND [Decimal] = @Decimal");
+
+        cmd.CommandText = sb.ToString();
+        cmd.Parameters.Add(TestTypeSql.CreateParameterInt(patch.Int));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(patch.Decimal));
+        
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+}
+
+/// <summary>Extension methods for patching <see cref="TestType"/> via <see cref="SqlConnection"/>.</summary>
+public static class TestTypeSqlPatchExtensions
+{
+    /// <summary>
+    /// Executes a partial UPDATE for <see cref="TestType"/>, touching only the columns
+    /// explicitly set on <paramref name="patch"/>.
+    /// Returns 0 immediately (without sending SQL) when no columns were set.
+    /// </summary>
+    public static global::System.Threading.Tasks.ValueTask<int> PatchAsync(
+        this SqlConnection connection,
+        TestTypePatch patch,
+        global::System.Threading.CancellationToken ct,
+        SqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        => TestType.PatchAsync(connection, patch, ct, transaction, commandTimeout);
 }

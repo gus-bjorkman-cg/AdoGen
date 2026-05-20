@@ -7,4 +7,5 @@ internal readonly record struct DiscoveryDto(
     SqlModelKind Kind,
     INamedTypeSymbol? Profile,
     SemanticModel? ProfileSemanticModel,
-    SqlProviderKind Provider);
+    SqlProviderKind Provider,
+    bool ShouldGeneratePatchClass);  // true for exactly one provider per DTO — the one that owns the shared {Dto}Patch class

@@ -24,21 +24,26 @@ public sealed partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Ge
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchAny, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(new NpgsqlParameter
         {
             ParameterName = "ids",
             NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Bigint,
             Value = ids.ToArray(),
         });
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<bool> ExistsAsync(NpgsqlConnection connection, long id, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(id));
         var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        
         return scalar is not null && scalar is not DBNull;
     }
 }
@@ -66,27 +71,33 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlCreateTable, CommandType.Text, transaction, commandTimeout);
+        
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlInsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
-        
+
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.AuditEvent> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
+        
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var cmd = new NpgsqlCommand("", connection, transaction);
+        
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
         var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 17);
@@ -108,26 +119,33 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
         }
 
         cmd.CommandText = sb.ToString();
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<global::AdoGen.Generator.Tests.AuditEvent> InsertAndReturnAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
 
         await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return AuditEvent.Map(reader);
+        
         throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
@@ -139,7 +157,9 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(model.EventId));
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -148,18 +168,87 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlUpsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
-        
+
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlTruncate, CommandType.Text, transaction, commandTimeout);
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+}
+
+/// <summary>
+/// Patch command object for <see cref="AuditEvent"/>.
+/// Set only the properties you want to update; unset properties are not written to the database.
+/// </summary>
+public sealed partial class AuditEventPatch
+{
+    private ulong _mask;
+    public long EventId { get; }
+
+    public global::System.DateTimeOffset? CreatedAt { get; set { field = value; _mask |= 1UL << 0; } }
+    public string? EventType { get; set { field = value; _mask |= 1UL << 1; } }
+    public byte[]? JsonPayload { get; set { field = value; _mask |= 1UL << 2; } }
+    public AuditEventPatch WithCreatedAt(global::System.DateTimeOffset value) { CreatedAt = value; return this; }
+    public AuditEventPatch WithEventType(string value) { EventType = value; return this; }
+    public AuditEventPatch WithJsonPayload(byte[] value) { JsonPayload = value; return this; }
+    internal global::System.DateTimeOffset? CreatedAtValue => CreatedAt;
+    internal string? EventTypeValue => EventType;
+    internal byte[]? JsonPayloadValue => JsonPayload;
+    internal ulong Mask => _mask;
+
+    public AuditEventPatch(long eventId) { EventId = eventId; }
+}
+public sealed partial record AuditEvent
+{
+    public static async ValueTask<int> PatchAsync(NpgsqlConnection connection, AuditEventPatch patch, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (patch.Mask == 0UL) return 0;
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+
+        await using var cmd = new NpgsqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+        var sb = new StringBuilder("UPDATE \"log\".\"Audits\" SET ");
+        var separator = "";
+        
+        if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("\"CreatedAt\" = @CreatedAt"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt((global::System.DateTimeOffset)patch.CreatedAtValue!)); }
+        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator + "\"Type\" = @Type"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType((string)patch.EventTypeValue!)); }
+        if ((patch.Mask & (1UL << 2)) != 0) { sb.Append(separator + "\"JsonPayload\" = @JsonPayload"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload((byte[])patch.JsonPayloadValue!)); }
+
+        sb.Append(" WHERE \"EventId\" = @EventId");
+
+        cmd.CommandText = sb.ToString();
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(patch.EventId));
+        
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+}
+
+/// <summary>Extension methods for patching <see cref="AuditEvent"/> via <see cref="NpgsqlConnection"/>.</summary>
+public static class AuditEventNpgsqlPatchExtensions
+{
+    /// <summary>
+    /// Executes a partial UPDATE for <see cref="AuditEvent"/>, touching only the columns
+    /// explicitly set on <paramref name="patch"/>.
+    /// Returns 0 immediately (without sending SQL) when no columns were set.
+    /// </summary>
+    public static global::System.Threading.Tasks.ValueTask<int> PatchAsync(
+        this NpgsqlConnection connection,
+        AuditEventPatch patch,
+        global::System.Threading.CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        => AuditEvent.PatchAsync(connection, patch, ct, transaction, commandTimeout);
 }

@@ -30,7 +30,8 @@ internal sealed record EmitContext(
     string JoinOn,                           // "S.[k]=T.[k] AND ..."
     IIdentifierQuoter Quoter,
     ProfileInfo Profile,                     // back-reference for edge cases
-    ColumnInfo? ConcurrencyToken             // null if no concurrency token configured
+    ColumnInfo? ConcurrencyToken,            // null if no concurrency token configured
+    bool ShouldGeneratePatchClass            // true for exactly one provider per DTO — emits the shared {Dto}Patch class
 )
 {
     public bool IsIdentity(string columnName) => Profile.IdentityKeys.Contains(columnName);

@@ -33,10 +33,10 @@ internal static class EmitContextBuilder
         var tableQuoted = quoter.Quote(profile.Table);
         var schemaTableQuoted = quoter.QuoteSchemaTable(profile.Schema, profile.Table);
         var factoryClassName = quoter.FactoryClassName(dto.Name);
-
+        
         // Build ColumnInfo array from properties
         var columnsBuilder = ImmutableArray.CreateBuilder<ColumnInfo>(profile.DtoProperties.Length);
-        
+
         for (var i = 0; i < profile.DtoProperties.Length; i++)
         {
             var p = profile.DtoProperties[i];
@@ -98,6 +98,8 @@ internal static class EmitContextBuilder
         var writableNonKeyNonIdentities = writableNonKeyNonIdentitiesBuilder.ToImmutable();
         var bulkColumns = bulkColumnsBuilder.ToImmutable();
 
+        var patchColumnCount = writableNonKeyNonIdentities.Length;
+
         // WhereByKey: "[a] = @a AND [b] = @b" (spaces around = for readability)
         var whereByKey = BuildJoinedPredicate(keys, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
 
@@ -127,7 +129,8 @@ internal static class EmitContextBuilder
             JoinOn: joinOn,
             Quoter: quoter,
             Profile: profile,
-            ConcurrencyToken: concurrencyToken
+            ConcurrencyToken: concurrencyToken,
+            ShouldGeneratePatchClass: discovery.ShouldGeneratePatchClass && patchColumnCount is > 0 and <= 64
         );
     }
 

@@ -166,7 +166,8 @@ internal static class EmitContextFixtures
             JoinOn: joinOn,
             Quoter: quoter,
             Profile: profile,
-            ConcurrencyToken: concurrencyToken
+            ConcurrencyToken: concurrencyToken,
+            ShouldGeneratePatchClass: false
         );
     }
 

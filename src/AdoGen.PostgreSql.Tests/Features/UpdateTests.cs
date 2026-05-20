@@ -12,7 +12,7 @@ public sealed class UpdateTests : TestBase
     }
 
     [Fact]
-    public async Task User_ShouldBeUpdated()
+    public async Task Update_ShouldUpdateEntity()
     {
         // Act
         await Connection.UpdateAsync(_user, CancellationToken);
@@ -20,6 +20,11 @@ public sealed class UpdateTests : TestBase
         // Assert
         (await GetUser(_user.Id)).Should().Be(_user);
     }
+    
+    [Fact]
+    public async Task Update_ShouldReturnZero_WhenIdNotFound() => 
+        (await Connection.UpdateAsync(DefaultUsers[0] with { Id = Guid.CreateVersion7() }, CancellationToken))
+        .Should().Be(0);
     
     [Fact]
     public async Task Update_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()

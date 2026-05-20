@@ -68,19 +68,27 @@ internal static class Discovery
                             Provider = x.Key, Kind = x.Select(y => y.Kind).FirstOrDefault(),
                             Interface = x.Select(y => y.Interface).FirstOrDefault()
                         })
-                        .Select(x =>
-                        {
-                            var discoveryModel = DiscoveryModel.Empty;
-                            foreach (var typeProfile in typeProfiles.Where(typeProfile => typeProfile.Provider == x.Provider))
-                            {
-                                discoveryModel = typeProfile;
-                                break;
-                            }
-                            
-                            return new DiscoveryDto(type, x.Kind, discoveryModel.Profile, discoveryModel.Model, x.Provider);
-                        });
+                        .ToArray();
 
-                    builder.AddRange(typeDiscoveries);
+                    // Determine which provider (the lowest-value one with Domain-or-higher) owns the shared {Dto}Patch class
+                    var patchOwner = typeDiscoveries
+                        .Where(x => x.Kind >= SqlModelKind.Domain)
+                        .OrderBy(x => (int)x.Provider)
+                        .Select(x => (SqlProviderKind?)x.Provider)
+                        .FirstOrDefault();
+
+                    foreach (var typeDiscovery in typeDiscoveries)
+                    {
+                        var discoveryModel = DiscoveryModel.Empty;
+                        foreach (var typeProfile in typeProfiles.Where(typeProfile => typeProfile.Provider == typeDiscovery.Provider))
+                        {
+                            discoveryModel = typeProfile;
+                            break;
+                        }
+
+                        builder.Add(new DiscoveryDto(type, typeDiscovery.Kind, discoveryModel.Profile, discoveryModel.Model, typeDiscovery.Provider,
+                            ShouldGeneratePatchClass: typeDiscovery.Kind >= SqlModelKind.Domain && typeDiscovery.Provider == patchOwner));
+                    }
                 }
 
                 return builder.ToImmutable();

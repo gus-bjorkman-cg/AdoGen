@@ -3,7 +3,7 @@ namespace AdoGen.SqlServer.Tests.Features;
 public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
 {
     [Fact]
-    public async Task User_ShouldBeUpdated()
+    public async Task Update_ShouldUpdateEntity()
     {
         // Arrange
         var user = DefaultUsers[0] with { Name = "other name" };
@@ -15,6 +15,11 @@ public sealed class UpdateTests(TestContext testContext) : TestBase(testContext)
         (await GetUser(user.Id)).Should().Be(user);
     }
     
+    [Fact]
+    public async Task Update_ShouldReturnZero_WhenIdNotFound() => 
+        (await Connection.UpdateAsync(DefaultUsers[0] with { Id = Guid.CreateVersion7() }, CancellationToken))
+        .Should().Be(0);
+
     [Fact]
     public async Task Update_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
     {

@@ -27,7 +27,7 @@ internal static class ProfileInfoCollector
         ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var (dto, _, profile, model, provider) = discoveryDto;
+        var (dto, _, profile, model, provider, _) = discoveryDto;
         var collected = Collect(profile!, dto, model!, diagnostics, provider, props, ct);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)

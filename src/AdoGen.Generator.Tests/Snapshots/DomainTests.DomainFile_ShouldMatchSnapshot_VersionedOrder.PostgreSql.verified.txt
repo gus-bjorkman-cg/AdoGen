@@ -24,21 +24,26 @@ public sealed partial record VersionedOrder : INpgsqlSingleIdModel<global::AdoGe
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchAny, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(new NpgsqlParameter
         {
             ParameterName = "ids",
             NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid,
             Value = ids.ToArray(),
         });
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<bool> ExistsAsync(NpgsqlConnection connection, Guid id, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(id));
         var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        
         return scalar is not null && scalar is not DBNull;
     }
 }
@@ -65,27 +70,33 @@ public sealed partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlCreateTable, CommandType.Text, transaction, commandTimeout);
+        
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.VersionedOrder model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlInsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
-        
+
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.VersionedOrder> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
+        
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var cmd = new NpgsqlCommand("", connection, transaction);
+        
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
         var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 17);
@@ -107,26 +118,33 @@ public sealed partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.
         }
 
         cmd.CommandText = sb.ToString();
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<global::AdoGen.Generator.Tests.VersionedOrder> InsertAndReturnAsync(global::AdoGen.Generator.Tests.VersionedOrder model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
 
         await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return VersionedOrder.Map(reader);
+        
         throw new InvalidOperationException("InsertAndReturnAsync produced no row.");
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.VersionedOrder model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
@@ -139,7 +157,9 @@ public sealed partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.VersionedOrder model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
         
@@ -151,18 +171,84 @@ public sealed partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.VersionedOrder model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlUpsert, CommandType.Text, transaction, commandTimeout);
+        
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
-        
+
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public static async ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        
         await using var cmd = connection.CreateCommand(Pg_SqlTruncate, CommandType.Text, transaction, commandTimeout);
+        
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+}
+
+/// <summary>
+/// Patch command object for <see cref="VersionedOrder"/>.
+/// Set only the properties you want to update; unset properties are not written to the database.
+/// </summary>
+public sealed partial class VersionedOrderPatch
+{
+    private ulong _mask;
+    public Guid Id { get; }
+    public int Version { get; set; }
+    public VersionedOrderPatch WithVersion(int value) { Version = value; return this; }
+    internal int VersionValue => Version;
+    public string? ProductName { get; set { field = value; _mask |= 1UL << 0; } }
+    public VersionedOrderPatch WithProductName(string value) { ProductName = value; return this; }
+    internal string? ProductNameValue => ProductName;
+    internal ulong Mask => _mask;
+
+    public VersionedOrderPatch(Guid id) { Id = id; }
+}
+public sealed partial record VersionedOrder
+{
+    public static async ValueTask<int> PatchAsync(NpgsqlConnection connection, VersionedOrderPatch patch, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        if (patch.Mask == 0UL) return 0;
+        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+
+        await using var cmd = new NpgsqlCommand("", connection, transaction);
+        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+        var sb = new StringBuilder("UPDATE \"public\".\"VersionedOrders\" SET ");
+        var separator = "";
+        
+        if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("\"ProductName\" = @ProductName"); separator = ", "; cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName((string)patch.ProductNameValue!)); }
+
+        sb.Append(" WHERE \"Id\" = @Id");
+            cmd.CommandText += " AND \"Version\" = @Version";
+            cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(patch.VersionValue));
+        cmd.CommandText = sb.ToString();
+        cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(patch.Id));
+        
+          var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+          if (affected == 0) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("public.VersionedOrders");
+          return affected;
+    }
+}
+
+/// <summary>Extension methods for patching <see cref="VersionedOrder"/> via <see cref="NpgsqlConnection"/>.</summary>
+public static class VersionedOrderNpgsqlPatchExtensions
+{
+    /// <summary>
+    /// Executes a partial UPDATE for <see cref="VersionedOrder"/>, touching only the columns
+    /// explicitly set on <paramref name="patch"/>.
+    /// Returns 0 immediately (without sending SQL) when no columns were set.
+    /// </summary>
+    public static global::System.Threading.Tasks.ValueTask<int> PatchAsync(
+        this NpgsqlConnection connection,
+        VersionedOrderPatch patch,
+        global::System.Threading.CancellationToken ct,
+        NpgsqlTransaction? transaction = null,
+        int? commandTimeout = null)
+        => VersionedOrder.PatchAsync(connection, patch, ct, transaction, commandTimeout);
 }
