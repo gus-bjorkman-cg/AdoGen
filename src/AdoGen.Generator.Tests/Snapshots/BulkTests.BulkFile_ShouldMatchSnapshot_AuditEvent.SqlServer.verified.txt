@@ -29,7 +29,7 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
     private const string _sqlApply =
         """
         BEGIN TRY
-        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
         CREATE INDEX [IX_AdoGen_Audits_Op_Key] ON #AdoGen_AuditEvent ([Operation], [EventId]);
 
         UPDATE T
@@ -54,7 +54,23 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
         WHERE S.[Operation] = 'D';
         SET @deleted = @@ROWCOUNT;
 
-        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
+        UPDATE T
+        SET
+            T.[CreatedAt] = S.[CreatedAt],
+            T.[Type] = S.[Type],
+            T.[JsonPayload] = S.[JsonPayload]
+        FROM [log].[Audits] AS T
+            JOIN #AdoGen_AuditEvent AS S ON S.[EventId] = T.[EventId]
+        WHERE S.[Operation] = 'M';
+        SET @upserted = @@ROWCOUNT;
+
+        INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload])
+        SELECT S.[CreatedAt], S.[Type], S.[JsonPayload]
+        FROM #AdoGen_AuditEvent AS S
+        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [log].[Audits] AS T WHERE S.[EventId] = T.[EventId]);
+        SET @upserted = @upserted + @@ROWCOUNT;
+
+        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
 
         END TRY
         BEGIN CATCH

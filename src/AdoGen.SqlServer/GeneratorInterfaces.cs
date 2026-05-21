@@ -128,17 +128,18 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
 
 /// <summary>
 /// Struct that represents the result of a bulk apply operation,
-/// containing the number of inserted, updated, and deleted records.
+/// containing the number of inserted, updated, deleted, and upserted records.
 /// </summary>
 /// <param name="Inserted"></param>
 /// <param name="Updated"></param>
 /// <param name="Deleted"></param>
-public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted)
+/// <param name="Upserted"></param>
+public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted, int Upserted)
 {
     /// <summary>
     /// Static property that represents an empty result.
     /// </summary>
-    public static BulkApplyResult Empty { get; } = new(0, 0, 0);
+    public static BulkApplyResult Empty { get; } = new(0, 0, 0, 0);
 }
 
 /// <summary>

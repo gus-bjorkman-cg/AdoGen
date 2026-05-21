@@ -224,11 +224,19 @@ public sealed class PostgreSqlSqlTextBuilderTests
                     DELETE FROM "public"."Users" AS T
                     USING "adogen_users_tmp" AS S
                     WHERE S."operation" = 'D' AND S."Id" = T."Id"
+                    RETURNING 1),
+                upserted AS (
+                    INSERT INTO "public"."Users" ("Id", "Name", "Email")
+                        SELECT S."Id", S."Name", S."Email"
+                        FROM "adogen_users_tmp" AS S
+                        WHERE S."operation" = 'M'
+                    ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Email" = EXCLUDED."Email"
                     RETURNING 1)
                 SELECT
                     (SELECT COUNT(*) FROM inserted) AS Inserted,
                     (SELECT COUNT(*) FROM updated) AS Updated,
-                    (SELECT COUNT(*) FROM deleted) AS Deleted;
+                    (SELECT COUNT(*) FROM deleted) AS Deleted,
+                    (SELECT COUNT(*) FROM upserted) AS Upserted;
             """);
     }
 
@@ -250,11 +258,14 @@ public sealed class PostgreSqlSqlTextBuilderTests
                     DELETE FROM "dbo"."Counters" AS T
                     USING "adogen_counters_tmp" AS S
                     WHERE S."operation" = 'D' AND S."CounterId" = T."CounterId"
-                    RETURNING 1)
+                    RETURNING 1),
+                upserted AS (
+                    SELECT 1 WHERE false)
                 SELECT
                     (SELECT COUNT(*) FROM inserted) AS Inserted,
                     (SELECT COUNT(*) FROM updated) AS Updated,
-                    (SELECT COUNT(*) FROM deleted) AS Deleted;
+                    (SELECT COUNT(*) FROM deleted) AS Deleted,
+                    (SELECT COUNT(*) FROM upserted) AS Upserted;
             """);
     }
 }

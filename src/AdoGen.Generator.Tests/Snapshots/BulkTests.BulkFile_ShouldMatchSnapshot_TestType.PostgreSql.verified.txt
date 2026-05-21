@@ -93,11 +93,19 @@ public sealed class TestTypeNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.T
         DELETE FROM "public"."TestTypes" AS T
         USING "adoGen_testtype_tmp" AS S
         WHERE S."operation" = 'D' AND S."Int" = T."Int" AND S."Decimal" = T."Decimal"
+        RETURNING 1),
+    upserted AS (
+        INSERT INTO "public"."TestTypes" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum")
+            SELECT S."Int", S."NullableInt", S."Decimal", S."NullableDecimal", S."NullableGuid", S."NullableStringVarchar", S."NullableStringNVarchar", S."StringVarcharRuledNull", S."CharString", S."NCharString", S."Float", S."NullableFloat", S."DateTime", S."NullableDateTime", S."Double", S."NullableDouble", S."Char", S."NChar", S."NullableChar", S."NullableBytes", S."Bytes", S."Fruits", S."Flags", S."ByteEnum", S."ShortEnum", S."IntEnum", S."LongEnum"
+            FROM "adoGen_testtype_tmp" AS S
+            WHERE S."operation" = 'M'
+        ON CONFLICT ("Int", "Decimal") DO UPDATE SET "NullableInt" = EXCLUDED."NullableInt", "NullableDecimal" = EXCLUDED."NullableDecimal", "NullableGuid" = EXCLUDED."NullableGuid", "NullableStringVarchar" = EXCLUDED."NullableStringVarchar", "NullableStringNVarchar" = EXCLUDED."NullableStringNVarchar", "StringVarcharRuledNull" = EXCLUDED."StringVarcharRuledNull", "CharString" = EXCLUDED."CharString", "NCharString" = EXCLUDED."NCharString", "Float" = EXCLUDED."Float", "NullableFloat" = EXCLUDED."NullableFloat", "DateTime" = EXCLUDED."DateTime", "NullableDateTime" = EXCLUDED."NullableDateTime", "Double" = EXCLUDED."Double", "NullableDouble" = EXCLUDED."NullableDouble", "Char" = EXCLUDED."Char", "NChar" = EXCLUDED."NChar", "NullableChar" = EXCLUDED."NullableChar", "NullableBytes" = EXCLUDED."NullableBytes", "Bytes" = EXCLUDED."Bytes", "Fruits" = EXCLUDED."Fruits", "Flags" = EXCLUDED."Flags", "ByteEnum" = EXCLUDED."ByteEnum", "ShortEnum" = EXCLUDED."ShortEnum", "IntEnum" = EXCLUDED."IntEnum", "LongEnum" = EXCLUDED."LongEnum"
         RETURNING 1)
     SELECT
         (SELECT COUNT(*) FROM inserted) AS Inserted,
         (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted;
+        (SELECT COUNT(*) FROM deleted) AS Deleted,
+        (SELECT COUNT(*) FROM upserted) AS Upserted;
     """;
 
     private const string _copyCommand = """COPY "adoGen_testtype_tmp" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum", "operation") FROM STDIN (FORMAT BINARY)""";

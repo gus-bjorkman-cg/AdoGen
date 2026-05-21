@@ -45,11 +45,19 @@ public sealed class VersionedOrderGuidNpgsqlBulk : BulkBatchNpg<global::AdoGen.G
         DELETE FROM "public"."VersionedOrderGuids" AS T
         USING "adoGen_versionedorderguid_tmp" AS S
         WHERE S."operation" = 'D' AND S."Id" = T."Id"
+        RETURNING 1),
+    upserted AS (
+        INSERT INTO "public"."VersionedOrderGuids" ("Id", "ProductName", "RowVersion")
+            SELECT S."Id", S."ProductName", S."RowVersion"
+            FROM "adoGen_versionedorderguid_tmp" AS S
+            WHERE S."operation" = 'M'
+        ON CONFLICT ("Id") DO UPDATE SET "ProductName" = EXCLUDED."ProductName"
         RETURNING 1)
     SELECT
         (SELECT COUNT(*) FROM inserted) AS Inserted,
         (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted;
+        (SELECT COUNT(*) FROM deleted) AS Deleted,
+        (SELECT COUNT(*) FROM upserted) AS Upserted;
     """;
 
     private const string _copyCommand = """COPY "adoGen_versionedorderguid_tmp" ("Id", "ProductName", "RowVersion", "operation") FROM STDIN (FORMAT BINARY)""";

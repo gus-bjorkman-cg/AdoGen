@@ -28,7 +28,7 @@ public sealed class VersionedOrderGuidBulk : BulkBatchSql<global::AdoGen.Generat
     private const string _sqlApply =
         """
         BEGIN TRY
-        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
         CREATE INDEX [IX_AdoGen_VersionedOrderGuids_Op_Key] ON #AdoGen_VersionedOrderGuid ([Operation], [Id]);
 
         UPDATE T
@@ -51,7 +51,21 @@ public sealed class VersionedOrderGuidBulk : BulkBatchSql<global::AdoGen.Generat
         WHERE S.[Operation] = 'D';
         SET @deleted = @@ROWCOUNT;
 
-        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
+        UPDATE T
+        SET
+            T.[ProductName] = S.[ProductName]
+        FROM [dbo].[VersionedOrderGuids] AS T
+            JOIN #AdoGen_VersionedOrderGuid AS S ON S.[Id] = T.[Id]
+        WHERE S.[Operation] = 'M';
+        SET @upserted = @@ROWCOUNT;
+
+        INSERT INTO [dbo].[VersionedOrderGuids] ([Id], [ProductName], [RowVersion])
+        SELECT S.[Id], S.[ProductName], S.[RowVersion]
+        FROM #AdoGen_VersionedOrderGuid AS S
+        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[VersionedOrderGuids] AS T WHERE S.[Id] = T.[Id]);
+        SET @upserted = @upserted + @@ROWCOUNT;
+
+        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
 
         END TRY
         BEGIN CATCH

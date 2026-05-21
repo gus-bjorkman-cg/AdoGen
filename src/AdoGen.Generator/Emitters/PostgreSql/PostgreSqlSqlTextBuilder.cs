@@ -174,6 +174,11 @@ internal static class PostgreSqlSqlTextBuilder
         var updateSet = string.Join(",\n        ", Enumerable.Select(ctx.WritableNonKeyNonIdentities,
             col => $"        \"{col.ParameterName}\" = S.\"{col.ParameterName}\""));
 
+        var nonIdentityKeys = FilterNonIdentityKeys(ctx.Keys);
+        var conflictKeys = BuildJoined(nonIdentityKeys, col => col.ColumnNameQuoted);
+        var updateSetOnConflict = BuildJoined(ctx.WritableNonKeyNonIdentities,
+            col => $"{col.ColumnNameQuoted} = EXCLUDED.{col.ColumnNameQuoted}");
+
         var sb = new StringBuilder();
 
         sb.AppendLine($"    CREATE INDEX IF NOT EXISTS \"{idxName}\" ON {tempTableRef} ({idxCols});");
@@ -211,12 +216,28 @@ internal static class PostgreSqlSqlTextBuilder
         sb.AppendLine($"        DELETE FROM {schemaTable} AS T");
         sb.AppendLine($"        USING {tempTableRef} AS S");
         sb.AppendLine($"        WHERE S.\"operation\" = 'D' AND {joinOn}");
-        sb.AppendLine("        RETURNING 1)");
+        sb.AppendLine("        RETURNING 1),");
+
+        sb.AppendLine("    upserted AS (");
+        if (ctx.Writables.Length > 0 && conflictKeys.Length > 0 && updateSetOnConflict.Length > 0)
+        {
+            sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
+            sb.AppendLine($"            SELECT {insertSelect}");
+            sb.AppendLine($"            FROM {tempTableRef} AS S");
+            sb.AppendLine("            WHERE S.\"operation\" = 'M'");
+            sb.AppendLine($"        ON CONFLICT ({conflictKeys}) DO UPDATE SET {updateSetOnConflict}");
+            sb.AppendLine("        RETURNING 1)");
+        }
+        else
+        {
+            sb.AppendLine("        SELECT 1 WHERE false)");
+        }
 
         sb.AppendLine("    SELECT");
         sb.AppendLine("        (SELECT COUNT(*) FROM inserted) AS Inserted,");
         sb.AppendLine("        (SELECT COUNT(*) FROM updated) AS Updated,");
-        sb.AppendLine("        (SELECT COUNT(*) FROM deleted) AS Deleted;");
+        sb.AppendLine("        (SELECT COUNT(*) FROM deleted) AS Deleted,");
+        sb.AppendLine("        (SELECT COUNT(*) FROM upserted) AS Upserted;");
 
         return sb.ToString().TrimEnd();
     }

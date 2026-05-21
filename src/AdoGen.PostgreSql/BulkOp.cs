@@ -38,7 +38,12 @@ public readonly record struct BulkOp
     public static readonly BulkOp Delete = new('D');
 
     /// <summary>
-    /// Returns the string representation of the BulkOp, which is the single character value ('I', 'U', or 'D').
+    /// Represents an Upsert (insert-or-update) operation in a bulk operation context. The Value property will be 'M'.
+    /// </summary>
+    public static readonly BulkOp Upsert = new('M');
+
+    /// <summary>
+    /// Returns the string representation of the BulkOp, which is the single character value ('I', 'U', 'D', or 'M').
     /// </summary>
     public override string ToString() => StringValue;
 }

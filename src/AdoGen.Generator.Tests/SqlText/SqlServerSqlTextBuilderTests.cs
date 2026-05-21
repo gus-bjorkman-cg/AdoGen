@@ -212,7 +212,7 @@ public sealed class SqlServerSqlTextBuilderTests
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
                     CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
             
                     UPDATE T
@@ -236,7 +236,22 @@ public sealed class SqlServerSqlTextBuilderTests
                     WHERE S.[Operation] = 'D';
                     SET @deleted = @@ROWCOUNT;
             
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
+                    UPDATE T
+                    SET
+                        T.[Name] = S.[Name],
+                        T.[Email] = S.[Email]
+                    FROM [dbo].[Users] AS T
+                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
+                    WHERE S.[Operation] = 'M';
+                    SET @upserted = @@ROWCOUNT;
+            
+                    INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
+                    SELECT S.[Id], S.[Name], S.[Email]
+                    FROM #AdoGen_User AS S
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
+                    SET @upserted = @upserted + @@ROWCOUNT;
+            
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
             
                     END TRY
                     BEGIN CATCH
@@ -256,7 +271,7 @@ public sealed class SqlServerSqlTextBuilderTests
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
                     CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
 
                     INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
@@ -271,7 +286,22 @@ public sealed class SqlServerSqlTextBuilderTests
                     WHERE S.[Operation] = 'D';
                     SET @deleted = @@ROWCOUNT;
 
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
+                    UPDATE T
+                    SET
+                        T.[Name] = S.[Name],
+                        T.[Email] = S.[Email]
+                    FROM [dbo].[Users] AS T
+                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
+                    WHERE S.[Operation] = 'M';
+                    SET @upserted = @@ROWCOUNT;
+
+                    INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
+                    SELECT S.[Id], S.[Name], S.[Email]
+                    FROM #AdoGen_User AS S
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
+                    SET @upserted = @upserted + @@ROWCOUNT;
+
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
 
                     END TRY
                     BEGIN CATCH
@@ -291,7 +321,7 @@ public sealed class SqlServerSqlTextBuilderTests
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
                     CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
 
                     UPDATE T
@@ -309,7 +339,22 @@ public sealed class SqlServerSqlTextBuilderTests
                     WHERE S.[Operation] = 'D';
                     SET @deleted = @@ROWCOUNT;
 
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
+                    UPDATE T
+                    SET
+                        T.[Name] = S.[Name],
+                        T.[Email] = S.[Email]
+                    FROM [dbo].[Users] AS T
+                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
+                    WHERE S.[Operation] = 'M';
+                    SET @upserted = @@ROWCOUNT;
+
+                    INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
+                    SELECT S.[Id], S.[Name], S.[Email]
+                    FROM #AdoGen_User AS S
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
+                    SET @upserted = @upserted + @@ROWCOUNT;
+
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
 
                     END TRY
                     BEGIN CATCH
@@ -329,7 +374,7 @@ public sealed class SqlServerSqlTextBuilderTests
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
                     CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
 
                     DELETE T
@@ -338,7 +383,22 @@ public sealed class SqlServerSqlTextBuilderTests
                     WHERE S.[Operation] = 'D';
                     SET @deleted = @@ROWCOUNT;
 
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
+                    UPDATE T
+                    SET
+                        T.[Name] = S.[Name],
+                        T.[Email] = S.[Email]
+                    FROM [dbo].[Users] AS T
+                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
+                    WHERE S.[Operation] = 'M';
+                    SET @upserted = @@ROWCOUNT;
+
+                    INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
+                    SELECT S.[Id], S.[Name], S.[Email]
+                    FROM #AdoGen_User AS S
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
+                    SET @upserted = @upserted + @@ROWCOUNT;
+
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
 
                     END TRY
                     BEGIN CATCH

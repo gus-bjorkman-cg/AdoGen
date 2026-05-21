@@ -155,7 +155,7 @@ internal static class SqlServerSqlTextBuilder
         var sb = new StringBuilder();
 
         sb.AppendLine("BEGIN TRY");
-        sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;");
+        sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;");
         sb.AppendLine(idxClause);
         sb.AppendLine();
 
@@ -187,7 +187,26 @@ internal static class SqlServerSqlTextBuilder
         sb.AppendLine("        WHERE S.[Operation] = 'D';");
         sb.AppendLine("        SET @deleted = @@ROWCOUNT;");
         sb.AppendLine();
-        sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;");
+
+        if (options.HasUpserts && ctx.WritableNonKeyNonIdentities.Length > 0 && ctx.Writables.Length > 0)
+        {
+            sb.AppendLine("        UPDATE T");
+            sb.AppendLine("        SET");
+            sb.AppendLine("        " + updateSet);
+            sb.AppendLine($"        FROM {schemaTable} AS T");
+            sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
+            sb.AppendLine("        WHERE S.[Operation] = 'M';");
+            sb.AppendLine("        SET @upserted = @@ROWCOUNT;");
+            sb.AppendLine();
+            sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
+            sb.AppendLine($"        SELECT {insertSelect}");
+            sb.AppendLine($"        FROM {tempTableName} AS S");
+            sb.AppendLine($"        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM {schemaTable} AS T WHERE {joinOn});");
+            sb.AppendLine("        SET @upserted = @upserted + @@ROWCOUNT;");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;");
         sb.AppendLine();
         sb.AppendLine("        END TRY");
         sb.AppendLine("        BEGIN CATCH");
@@ -220,4 +239,4 @@ internal static class SqlServerSqlTextBuilder
 }
 
 /// <summary>Options controlling which DML operations to include in the BulkApply SQL.</summary>
-internal readonly record struct BulkApplyOptions(bool HasInserts, bool HasUpdates);
+internal readonly record struct BulkApplyOptions(bool HasInserts, bool HasUpdates, bool HasUpserts = true);

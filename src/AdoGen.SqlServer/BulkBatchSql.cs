@@ -53,6 +53,11 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     public bool HasDeletes { get; private set; }
     
     /// <summary>
+    /// Indicates whether the batch contains upsert operations.
+    /// </summary>
+    public bool HasUpserts { get; private set; }
+    
+    /// <summary>
     /// The SQL command to create the temp table for the bulk copy operation. Set by the generated code in build time.
     /// </summary>
     protected abstract string SqlCreateTempTable { get; }
@@ -139,6 +144,20 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     /// <param name="items"></param>
     public void RemoveRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Delete);
 
+    /// <summary>
+    /// Adds the item to the batch with upsert (insert-or-update) operation.
+    /// The actual upsert will happen when SaveChangesAsync is called.
+    /// </summary>
+    /// <param name="item"></param>
+    public void Upsert(T item) => AddEntity(item, BulkOp.Upsert);
+
+    /// <summary>
+    /// Adds the items to the batch with upsert (insert-or-update) operation.
+    /// The actual upsert will happen when SaveChangesAsync is called.
+    /// </summary>
+    /// <param name="items"></param>
+    public void UpsertRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Upsert);
+
     private void AddEntity(T item, BulkOp operation)
     {
         Items.Add(item);
@@ -147,6 +166,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         if (operation == BulkOp.Insert) HasInserts = true;
         else if (operation == BulkOp.Update) HasUpdates = true;
         else if (operation == BulkOp.Delete) HasDeletes = true;
+        else if (operation == BulkOp.Upsert) HasUpserts = true;
     }
 
     private void AddEntityRange(IEnumerable<T> items, BulkOp operation)
@@ -160,6 +180,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         if (operation == BulkOp.Insert) HasInserts = true;
         else if (operation == BulkOp.Update) HasUpdates = true;
         else if (operation == BulkOp.Delete) HasDeletes = true;
+        else if (operation == BulkOp.Upsert) HasUpserts = true;
     }
 
     /// <summary>
@@ -187,14 +208,14 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         
         var timeout = commandTimeout ?? DefaultTimeoutSeconds;
 
-        if (HasInserts && !HasUpdates && !HasDeletes)
+        if (HasInserts && !HasUpdates && !HasDeletes && !HasUpserts)
         {
             var parameterCount = Items.Count * FieldCount;
             
             if (parameterCount < 2100)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, timeout).ConfigureAwait(false);
-                return new BulkApplyResult(inserted, 0, 0);
+                return new BulkApplyResult(inserted, 0, 0, 0);
             }
         }
         
@@ -227,7 +248,8 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         return new BulkApplyResult(
             Inserted: resultReader.GetInt32(0),
             Updated: resultReader.GetInt32(1),
-            Deleted: resultReader.GetInt32(2));
+            Deleted: resultReader.GetInt32(2),
+            Upserted: resultReader.GetInt32(3));
     }
     
     /// <summary>
@@ -241,5 +263,6 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         HasInserts = false;
         HasUpdates = false;
         HasDeletes = false;
+        HasUpserts = false;
     }
 }

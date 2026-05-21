@@ -46,11 +46,19 @@ public sealed class UserNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.Tests
         DELETE FROM "public"."Users" AS T
         USING "adoGen_user_tmp" AS S
         WHERE S."operation" = 'D' AND S."Id" = T."Id"
+        RETURNING 1),
+    upserted AS (
+        INSERT INTO "public"."Users" ("Id", "Name", "Email")
+            SELECT S."Id", S."Name", S."Email"
+            FROM "adoGen_user_tmp" AS S
+            WHERE S."operation" = 'M'
+        ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Email" = EXCLUDED."Email"
         RETURNING 1)
     SELECT
         (SELECT COUNT(*) FROM inserted) AS Inserted,
         (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted;
+        (SELECT COUNT(*) FROM deleted) AS Deleted,
+        (SELECT COUNT(*) FROM upserted) AS Upserted;
     """;
 
     private const string _copyCommand = """COPY "adoGen_user_tmp" ("Id", "Name", "Email", "operation") FROM STDIN (FORMAT BINARY)""";

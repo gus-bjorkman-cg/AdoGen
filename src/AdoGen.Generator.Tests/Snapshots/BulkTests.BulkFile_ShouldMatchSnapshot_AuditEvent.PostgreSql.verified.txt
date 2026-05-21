@@ -48,11 +48,14 @@ public sealed class AuditEventNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator
         DELETE FROM "log"."Audits" AS T
         USING "adoGen_auditevent_tmp" AS S
         WHERE S."operation" = 'D' AND S."EventId" = T."EventId"
-        RETURNING 1)
+        RETURNING 1),
+    upserted AS (
+        SELECT 1 WHERE false)
     SELECT
         (SELECT COUNT(*) FROM inserted) AS Inserted,
         (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted;
+        (SELECT COUNT(*) FROM deleted) AS Deleted,
+        (SELECT COUNT(*) FROM upserted) AS Upserted;
     """;
 
     private const string _copyCommand = """COPY "adoGen_auditevent_tmp" ("EventId", "CreatedAt", "Type", "JsonPayload", "operation") FROM STDIN (FORMAT BINARY)""";
