@@ -52,8 +52,7 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
     private const string _sqlApply =
         """
         BEGIN TRY
-        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
-        CREATE INDEX [IX_AdoGen_TestTypes_Op_Key] ON #AdoGen_TestType ([Operation], [Int], [Decimal]);
+        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
 
         UPDATE T
         SET
@@ -84,7 +83,7 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
             T.[LongEnum] = S.[LongEnum]
         FROM [dbo].[TestTypes] AS T
             JOIN #AdoGen_TestType AS S ON S.[Int] = T.[Int] AND S.[Decimal] = T.[Decimal]
-        WHERE S.[Operation] = 'U';
+        WHERE S.[Operation] IN ('U', 'M');
         SET @updated = @@ROWCOUNT;
 
         INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum])
@@ -99,57 +98,28 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
         WHERE S.[Operation] = 'D';
         SET @deleted = @@ROWCOUNT;
 
-        UPDATE T
-        SET
-            T.[NullableInt] = S.[NullableInt],
-            T.[NullableDecimal] = S.[NullableDecimal],
-            T.[NullableGuid] = S.[NullableGuid],
-            T.[NullableStringVarchar] = S.[NullableStringVarchar],
-            T.[NullableStringNVarchar] = S.[NullableStringNVarchar],
-            T.[StringVarcharRuledNull] = S.[StringVarcharRuledNull],
-            T.[CharString] = S.[CharString],
-            T.[NCharString] = S.[NCharString],
-            T.[Float] = S.[Float],
-            T.[NullableFloat] = S.[NullableFloat],
-            T.[DateTime] = S.[DateTime],
-            T.[NullableDateTime] = S.[NullableDateTime],
-            T.[Double] = S.[Double],
-            T.[NullableDouble] = S.[NullableDouble],
-            T.[Char] = S.[Char],
-            T.[NChar] = S.[NChar],
-            T.[NullableChar] = S.[NullableChar],
-            T.[NullableBytes] = S.[NullableBytes],
-            T.[Bytes] = S.[Bytes],
-            T.[Fruits] = S.[Fruits],
-            T.[Flags] = S.[Flags],
-            T.[ByteEnum] = S.[ByteEnum],
-            T.[ShortEnum] = S.[ShortEnum],
-            T.[IntEnum] = S.[IntEnum],
-            T.[LongEnum] = S.[LongEnum]
-        FROM [dbo].[TestTypes] AS T
-            JOIN #AdoGen_TestType AS S ON S.[Int] = T.[Int] AND S.[Decimal] = T.[Decimal]
-        WHERE S.[Operation] = 'M';
-        SET @upserted = @@ROWCOUNT;
-
         INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum])
         SELECT S.[Int], S.[NullableInt], S.[Decimal], S.[NullableDecimal], S.[NullableGuid], S.[NullableStringVarchar], S.[NullableStringNVarchar], S.[StringVarcharRuledNull], S.[CharString], S.[NCharString], S.[Float], S.[NullableFloat], S.[DateTime], S.[NullableDateTime], S.[Double], S.[NullableDouble], S.[Char], S.[NChar], S.[NullableChar], S.[NullableBytes], S.[Bytes], S.[Fruits], S.[Flags], S.[ByteEnum], S.[ShortEnum], S.[IntEnum], S.[LongEnum]
         FROM #AdoGen_TestType AS S
-        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[TestTypes] AS T WHERE S.[Int] = T.[Int] AND S.[Decimal] = T.[Decimal]);
-        SET @upserted = @upserted + @@ROWCOUNT;
+        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[TestTypes] AS T WITH (UPDLOCK, HOLDLOCK) WHERE S.[Int] = T.[Int] AND S.[Decimal] = T.[Decimal]);
+        SET @inserted = @inserted + @@ROWCOUNT;
 
-        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
+        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
 
         END TRY
         BEGIN CATCH
-            IF OBJECT_ID('tempdb..#AdoGen_TestType') IS NOT NULL DROP TABLE #AdoGen_TestType;
+            DROP TABLE IF EXISTS #AdoGen_TestType;
             THROW;
         END CATCH;
-        IF OBJECT_ID('tempdb..#AdoGen_TestType') IS NOT NULL DROP TABLE #AdoGen_TestType;
+        DROP TABLE IF EXISTS #AdoGen_TestType;
         """;
+
+    private const string _sqlApplyWithIndex = """CREATE INDEX [IX_AdoGen_TestTypes_Op_Key] ON #AdoGen_TestType ([Operation], [Int], [Decimal]);""" + "\n" + _sqlApply;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
+    protected override string SqlApplyWithIndex => _sqlApplyWithIndex;
     protected override int FieldCount => 28;
 
      /// <summary>

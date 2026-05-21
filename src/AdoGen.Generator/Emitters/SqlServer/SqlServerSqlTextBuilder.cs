@@ -141,12 +141,20 @@ internal static class SqlServerSqlTextBuilder
              """;
     }
 
+    /// <summary>
+    /// Generates just the CREATE INDEX statement for the temp table.
+    /// Prepended by the runtime when Items.Count >= 128.
+    /// </summary>
+    public static string BulkCreateIndex(EmitContext ctx, string tempTableName)
+    {
+        var idxCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
+        return $"CREATE INDEX [IX_AdoGen_{ctx.Profile.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
+    }
+
     public static string BulkApply(EmitContext ctx, string tempTableName, BulkApplyOptions options)
     {
         var schemaTable = ctx.SchemaTableQuoted;
         var joinOn = ctx.JoinOn;
-        var idxCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
-        var idxClause = $"        CREATE INDEX [IX_AdoGen_{ctx.Profile.Table}_Op_Key] ON {tempTableName} ([Operation], {idxCols});";
         var updateSet = string.Join(",\n        ", Enumerable.Select(ctx.WritableNonKeyNonIdentities,
             col => $"    T.{col.ColumnNameQuoted} = S.{col.ColumnNameQuoted}"));
         var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
@@ -155,18 +163,18 @@ internal static class SqlServerSqlTextBuilder
         var sb = new StringBuilder();
 
         sb.AppendLine("BEGIN TRY");
-        sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;");
-        sb.AppendLine(idxClause);
+        sb.AppendLine("        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;");
         sb.AppendLine();
 
-        if (options.HasUpdates && ctx.WritableNonKeyNonIdentities.Length > 0)
+        // U and M updates together — key already exists in both cases
+        if ((options.HasUpdates || options.HasUpserts) && ctx.WritableNonKeyNonIdentities.Length > 0)
         {
             sb.AppendLine("        UPDATE T");
             sb.AppendLine("        SET");
             sb.AppendLine("        " + updateSet);
             sb.AppendLine($"        FROM {schemaTable} AS T");
             sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
-            sb.AppendLine("        WHERE S.[Operation] = 'U';");
+            sb.AppendLine("        WHERE S.[Operation] IN ('U', 'M');");
             sb.AppendLine("        SET @updated = @@ROWCOUNT;");
             sb.AppendLine();
         }
@@ -188,25 +196,18 @@ internal static class SqlServerSqlTextBuilder
         sb.AppendLine("        SET @deleted = @@ROWCOUNT;");
         sb.AppendLine();
 
-        if (options.HasUpserts && ctx.WritableNonKeyNonIdentities.Length > 0 && ctx.Writables.Length > 0)
+        // M insert-missing — use UPDLOCK, HOLDLOCK to serialize concurrent upserts
+        if (options.HasUpserts && ctx.Writables.Length > 0)
         {
-            sb.AppendLine("        UPDATE T");
-            sb.AppendLine("        SET");
-            sb.AppendLine("        " + updateSet);
-            sb.AppendLine($"        FROM {schemaTable} AS T");
-            sb.AppendLine($"            JOIN {tempTableName} AS S ON {joinOn}");
-            sb.AppendLine("        WHERE S.[Operation] = 'M';");
-            sb.AppendLine("        SET @upserted = @@ROWCOUNT;");
-            sb.AppendLine();
             sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
             sb.AppendLine($"        SELECT {insertSelect}");
             sb.AppendLine($"        FROM {tempTableName} AS S");
-            sb.AppendLine($"        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM {schemaTable} AS T WHERE {joinOn});");
-            sb.AppendLine("        SET @upserted = @upserted + @@ROWCOUNT;");
+            sb.AppendLine($"        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM {schemaTable} AS T WITH (UPDLOCK, HOLDLOCK) WHERE {joinOn});");
+            sb.AppendLine("        SET @inserted = @inserted + @@ROWCOUNT;");
             sb.AppendLine();
         }
 
-        sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;");
+        sb.AppendLine("        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;");
         sb.AppendLine();
         sb.AppendLine("        END TRY");
         sb.AppendLine("        BEGIN CATCH");
@@ -219,7 +220,7 @@ internal static class SqlServerSqlTextBuilder
     }
 
     private static string DropGuard(string name)
-        => $"        IF OBJECT_ID('tempdb..{name}') IS NOT NULL DROP TABLE {name};";
+        => $"        DROP TABLE IF EXISTS {name};";
 
     private static bool IsIntOrLong(string propertyType)
         => propertyType is "int" or "long" or "global::System.Int32" or "global::System.Int64";

@@ -38,9 +38,11 @@ internal sealed class BulkEmitterSqlServer : IEmitter
 
         // SQL strings — produced by SqlServerSqlTextBuilder
         var tempTableSql = SqlServerSqlTextBuilder.BulkCreateTempTable(ctx, tempTableName);
-        var applySql = SqlServerSqlTextBuilder.BulkApply(ctx, tempTableName,
-            new BulkApplyOptions(HasInserts: ctx.Writables.Length > 0,
-                HasUpdates: ctx.WritableNonKeyNonIdentities.Length > 0));
+        var applyOptions = new BulkApplyOptions(
+            HasInserts: ctx.Writables.Length > 0,
+            HasUpdates: ctx.WritableNonKeyNonIdentities.Length > 0);
+        var applySql = SqlServerSqlTextBuilder.BulkApply(ctx, tempTableName, applyOptions);
+        var createIndexSql = SqlServerSqlTextBuilder.BulkCreateIndex(ctx, tempTableName);
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
@@ -75,9 +77,12 @@ internal sealed class BulkEmitterSqlServer : IEmitter
                        {{{applySql}}}
                        """;
 
+                   private const string _sqlApplyWithIndex = """{{{createIndexSql}}}""" + "\n" + _sqlApply;
+
                    protected override string SqlCreateTempTable => _sqlCreateTempTable;
                    protected override string TempTableName => _tempTableName;
                    protected override string SqlApply => _sqlApply;
+                   protected override string SqlApplyWithIndex => _sqlApplyWithIndex;
                    protected override int FieldCount => {{{bulkFieldCount + 1}}};
 
                     /// <summary>

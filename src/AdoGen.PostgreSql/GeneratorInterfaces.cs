@@ -84,14 +84,14 @@ public interface INpgsqlDomainModel<T> where T : INpgsqlDomainModel<T>
 
 /// <summary>
 /// Struct that represents the result of a bulk apply operation,
-/// containing the number of inserted, updated, deleted, and upserted records.
+/// containing the number of inserted, updated, and deleted records.
 /// </summary>
-public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted, int Upserted)
+public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted)
 {
     /// <summary>
     /// Static property that represents an empty result.
     /// </summary>
-    public static BulkApplyResult Empty { get; } = new(0, 0, 0, 0);
+    public static BulkApplyResult Empty { get; } = new(0, 0, 0);
 }
 
 /// <summary>

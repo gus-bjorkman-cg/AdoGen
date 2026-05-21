@@ -16,44 +16,43 @@ public sealed class TestTypeNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.T
 {
     private const string _tempTableName = "adoGen_testtype_tmp";
 
-    private const string _sqlCreateTempTable = 
-    """
-    CREATE TEMP TABLE IF NOT EXISTS "adoGen_testtype_tmp"(
-        "Int" INTEGER NOT NULL,
-        "NullableInt" INTEGER NULL,
-        "Decimal" NUMERIC(4,2) NOT NULL,
-        "NullableDecimal" NUMERIC(6,3) NULL,
-        "NullableGuid" UUID NULL,
-        "NullableStringVarchar" VARCHAR(100) NULL,
-        "NullableStringNVarchar" VARCHAR(100) NULL,
-        "StringVarcharRuledNull" VARCHAR(100) NULL,
-        "CharString" TEXT NOT NULL,
-        "NCharString" TEXT NOT NULL,
-        "Float" REAL NOT NULL,
-        "NullableFloat" REAL NULL,
-        "DateTime" TIMESTAMP NOT NULL,
-        "NullableDateTime" TIMESTAMP NULL,
-        "Double" DOUBLE PRECISION NOT NULL,
-        "NullableDouble" DOUBLE PRECISION NULL,
-        "Char" CHAR(1) NOT NULL,
-        "NChar" CHAR(1) NOT NULL,
-        "NullableChar" CHAR(1) NULL,
-        "NullableBytes" BYTEA NULL,
-        "Bytes" BYTEA NOT NULL,
-        "Fruits" INTEGER NOT NULL,
-        "Flags" INTEGER NOT NULL,
-        "ByteEnum" SMALLINT NOT NULL,
-        "ShortEnum" SMALLINT NOT NULL,
-        "IntEnum" INTEGER NOT NULL,
-        "LongEnum" BIGINT NOT NULL,
-        "operation" CHAR(1) NOT NULL);
-    """;
-    
-    private const string _sqlApply = 
-    """
-    CREATE INDEX IF NOT EXISTS "ix_adoGen_testtype_tmp_op_keys" ON "adoGen_testtype_tmp" ("operation", "Int", "Decimal");
-
-    WITH updated AS (
+    private const string _sqlCreateTempTable =
+        """
+        CREATE TEMP TABLE IF NOT EXISTS "adoGen_testtype_tmp"(
+            "Int" INTEGER NOT NULL,
+            "NullableInt" INTEGER NULL,
+            "Decimal" NUMERIC(4,2) NOT NULL,
+            "NullableDecimal" NUMERIC(6,3) NULL,
+            "NullableGuid" UUID NULL,
+            "NullableStringVarchar" VARCHAR(100) NULL,
+            "NullableStringNVarchar" VARCHAR(100) NULL,
+            "StringVarcharRuledNull" VARCHAR(100) NULL,
+            "CharString" TEXT NOT NULL,
+            "NCharString" TEXT NOT NULL,
+            "Float" REAL NOT NULL,
+            "NullableFloat" REAL NULL,
+            "DateTime" TIMESTAMP NOT NULL,
+            "NullableDateTime" TIMESTAMP NULL,
+            "Double" DOUBLE PRECISION NOT NULL,
+            "NullableDouble" DOUBLE PRECISION NULL,
+            "Char" CHAR(1) NOT NULL,
+            "NChar" CHAR(1) NOT NULL,
+            "NullableChar" CHAR(1) NULL,
+            "NullableBytes" BYTEA NULL,
+            "Bytes" BYTEA NOT NULL,
+            "Fruits" INTEGER NOT NULL,
+            "Flags" INTEGER NOT NULL,
+            "ByteEnum" SMALLINT NOT NULL,
+            "ShortEnum" SMALLINT NOT NULL,
+            "IntEnum" INTEGER NOT NULL,
+            "LongEnum" BIGINT NOT NULL,
+            "operation" CHAR(1) NOT NULL);
+        """;
+    private const string _sqlCreateIndex = """CREATE UNIQUE INDEX "uix_adoGen_testtype_tmp_op_keys" ON "adoGen_testtype_tmp" ("operation", "Int", "Decimal");""";
+    private const string _sqlAnalyze = """ANALYZE "adoGen_testtype_tmp";""";
+    private const string _copyCommand = """COPY "adoGen_testtype_tmp" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum", "operation") FROM STDIN (FORMAT BINARY)""";
+    private const string _sqlUpdateU =
+        """
         UPDATE "public"."TestTypes" AS T
             SET "NullableInt" = S."NullableInt",
                 "NullableDecimal" = S."NullableDecimal",
@@ -82,37 +81,69 @@ public sealed class TestTypeNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.T
                 "LongEnum" = S."LongEnum"
         FROM "adoGen_testtype_tmp" AS S
         WHERE S."operation" = 'U' AND S."Int" = T."Int" AND S."Decimal" = T."Decimal"
-        RETURNING 1),
-    inserted AS (
+        """;
+    private const string _sqlInsertI =
+        """
         INSERT INTO "public"."TestTypes" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum")
             SELECT S."Int", S."NullableInt", S."Decimal", S."NullableDecimal", S."NullableGuid", S."NullableStringVarchar", S."NullableStringNVarchar", S."StringVarcharRuledNull", S."CharString", S."NCharString", S."Float", S."NullableFloat", S."DateTime", S."NullableDateTime", S."Double", S."NullableDouble", S."Char", S."NChar", S."NullableChar", S."NullableBytes", S."Bytes", S."Fruits", S."Flags", S."ByteEnum", S."ShortEnum", S."IntEnum", S."LongEnum"
             FROM "adoGen_testtype_tmp" AS S
             WHERE S."operation" = 'I'
-        RETURNING 1),
-    deleted AS (
+        """;
+    private const string _sqlDeleteD =
+        """
         DELETE FROM "public"."TestTypes" AS T
         USING "adoGen_testtype_tmp" AS S
         WHERE S."operation" = 'D' AND S."Int" = T."Int" AND S."Decimal" = T."Decimal"
-        RETURNING 1),
-    upserted AS (
+        """;
+    private const string _sqlUpdateM =
+        """
+        UPDATE "public"."TestTypes" AS T
+            SET "NullableInt" = S."NullableInt",
+                "NullableDecimal" = S."NullableDecimal",
+                "NullableGuid" = S."NullableGuid",
+                "NullableStringVarchar" = S."NullableStringVarchar",
+                "NullableStringNVarchar" = S."NullableStringNVarchar",
+                "StringVarcharRuledNull" = S."StringVarcharRuledNull",
+                "CharString" = S."CharString",
+                "NCharString" = S."NCharString",
+                "Float" = S."Float",
+                "NullableFloat" = S."NullableFloat",
+                "DateTime" = S."DateTime",
+                "NullableDateTime" = S."NullableDateTime",
+                "Double" = S."Double",
+                "NullableDouble" = S."NullableDouble",
+                "Char" = S."Char",
+                "NChar" = S."NChar",
+                "NullableChar" = S."NullableChar",
+                "NullableBytes" = S."NullableBytes",
+                "Bytes" = S."Bytes",
+                "Fruits" = S."Fruits",
+                "Flags" = S."Flags",
+                "ByteEnum" = S."ByteEnum",
+                "ShortEnum" = S."ShortEnum",
+                "IntEnum" = S."IntEnum",
+                "LongEnum" = S."LongEnum"
+        FROM "adoGen_testtype_tmp" AS S
+        WHERE S."operation" = 'M' AND S."Int" = T."Int" AND S."Decimal" = T."Decimal"
+        """;
+    private const string _sqlInsertM =
+        """
         INSERT INTO "public"."TestTypes" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum")
             SELECT S."Int", S."NullableInt", S."Decimal", S."NullableDecimal", S."NullableGuid", S."NullableStringVarchar", S."NullableStringNVarchar", S."StringVarcharRuledNull", S."CharString", S."NCharString", S."Float", S."NullableFloat", S."DateTime", S."NullableDateTime", S."Double", S."NullableDouble", S."Char", S."NChar", S."NullableChar", S."NullableBytes", S."Bytes", S."Fruits", S."Flags", S."ByteEnum", S."ShortEnum", S."IntEnum", S."LongEnum"
             FROM "adoGen_testtype_tmp" AS S
             WHERE S."operation" = 'M'
-        ON CONFLICT ("Int", "Decimal") DO UPDATE SET "NullableInt" = EXCLUDED."NullableInt", "NullableDecimal" = EXCLUDED."NullableDecimal", "NullableGuid" = EXCLUDED."NullableGuid", "NullableStringVarchar" = EXCLUDED."NullableStringVarchar", "NullableStringNVarchar" = EXCLUDED."NullableStringNVarchar", "StringVarcharRuledNull" = EXCLUDED."StringVarcharRuledNull", "CharString" = EXCLUDED."CharString", "NCharString" = EXCLUDED."NCharString", "Float" = EXCLUDED."Float", "NullableFloat" = EXCLUDED."NullableFloat", "DateTime" = EXCLUDED."DateTime", "NullableDateTime" = EXCLUDED."NullableDateTime", "Double" = EXCLUDED."Double", "NullableDouble" = EXCLUDED."NullableDouble", "Char" = EXCLUDED."Char", "NChar" = EXCLUDED."NChar", "NullableChar" = EXCLUDED."NullableChar", "NullableBytes" = EXCLUDED."NullableBytes", "Bytes" = EXCLUDED."Bytes", "Fruits" = EXCLUDED."Fruits", "Flags" = EXCLUDED."Flags", "ByteEnum" = EXCLUDED."ByteEnum", "ShortEnum" = EXCLUDED."ShortEnum", "IntEnum" = EXCLUDED."IntEnum", "LongEnum" = EXCLUDED."LongEnum"
-        RETURNING 1)
-    SELECT
-        (SELECT COUNT(*) FROM inserted) AS Inserted,
-        (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted,
-        (SELECT COUNT(*) FROM upserted) AS Upserted;
-    """;
-
-    private const string _copyCommand = """COPY "adoGen_testtype_tmp" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum", "operation") FROM STDIN (FORMAT BINARY)""";
+        ON CONFLICT ("Int", "Decimal") DO NOTHING
+        """;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
-    protected override string SqlApply => _sqlApply;
+    protected override string SqlCreateIndex => _sqlCreateIndex;
+    protected override string SqlAnalyze => _sqlAnalyze;
+    protected override string? SqlUpdateU => _sqlUpdateU;
+    protected override string? SqlInsertI => _sqlInsertI;
+    protected override string SqlDeleteD => _sqlDeleteD;
+    protected override string? SqlUpdateM => _sqlUpdateM;
+    protected override string? SqlInsertM => _sqlInsertM;
     protected override int FieldCount => 28;
 
     public TestTypeNpgsqlBulk(int capacity = 0) : base(capacity) { }

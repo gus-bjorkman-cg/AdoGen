@@ -16,53 +16,59 @@ public sealed class AuditEventNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator
 {
     private const string _tempTableName = "adoGen_auditevent_tmp";
 
-    private const string _sqlCreateTempTable = 
-    """
-    CREATE TEMP TABLE IF NOT EXISTS "adoGen_auditevent_tmp"(
-        "EventId" BIGINT NOT NULL,
-        "CreatedAt" TIMESTAMPTZ NOT NULL,
-        "Type" VARCHAR(50) NOT NULL,
-        "JsonPayload" BYTEA NOT NULL,
-        "operation" CHAR(1) NOT NULL);
-    """;
-    
-    private const string _sqlApply = 
-    """
-    CREATE INDEX IF NOT EXISTS "ix_adoGen_auditevent_tmp_op_keys" ON "adoGen_auditevent_tmp" ("operation", "EventId");
-
-    WITH updated AS (
+    private const string _sqlCreateTempTable =
+        """
+        CREATE TEMP TABLE IF NOT EXISTS "adoGen_auditevent_tmp"(
+            "EventId" BIGINT NOT NULL,
+            "CreatedAt" TIMESTAMPTZ NOT NULL,
+            "Type" VARCHAR(50) NOT NULL,
+            "JsonPayload" BYTEA NOT NULL,
+            "operation" CHAR(1) NOT NULL);
+        """;
+    private const string _sqlCreateIndex = """CREATE INDEX "ix_adoGen_auditevent_tmp_op_keys" ON "adoGen_auditevent_tmp" ("operation", "EventId");""";
+    private const string _sqlAnalyze = """ANALYZE "adoGen_auditevent_tmp";""";
+    private const string _copyCommand = """COPY "adoGen_auditevent_tmp" ("EventId", "CreatedAt", "Type", "JsonPayload", "operation") FROM STDIN (FORMAT BINARY)""";
+    private const string _sqlUpdateU =
+        """
         UPDATE "log"."Audits" AS T
             SET "CreatedAt" = S."CreatedAt",
                 "Type" = S."Type",
                 "JsonPayload" = S."JsonPayload"
         FROM "adoGen_auditevent_tmp" AS S
         WHERE S."operation" = 'U' AND S."EventId" = T."EventId"
-        RETURNING 1),
-    inserted AS (
+        """;
+    private const string _sqlInsertI =
+        """
         INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload")
             SELECT S."CreatedAt", S."Type", S."JsonPayload"
             FROM "adoGen_auditevent_tmp" AS S
             WHERE S."operation" = 'I'
-        RETURNING 1),
-    deleted AS (
+        """;
+    private const string _sqlDeleteD =
+        """
         DELETE FROM "log"."Audits" AS T
         USING "adoGen_auditevent_tmp" AS S
         WHERE S."operation" = 'D' AND S."EventId" = T."EventId"
-        RETURNING 1),
-    upserted AS (
-        SELECT 1 WHERE false)
-    SELECT
-        (SELECT COUNT(*) FROM inserted) AS Inserted,
-        (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted,
-        (SELECT COUNT(*) FROM upserted) AS Upserted;
-    """;
-
-    private const string _copyCommand = """COPY "adoGen_auditevent_tmp" ("EventId", "CreatedAt", "Type", "JsonPayload", "operation") FROM STDIN (FORMAT BINARY)""";
+        """;
+    private const string _sqlUpdateM =
+        """
+        UPDATE "log"."Audits" AS T
+            SET "CreatedAt" = S."CreatedAt",
+                "Type" = S."Type",
+                "JsonPayload" = S."JsonPayload"
+        FROM "adoGen_auditevent_tmp" AS S
+        WHERE S."operation" = 'M' AND S."EventId" = T."EventId"
+        """;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
-    protected override string SqlApply => _sqlApply;
+    protected override string SqlCreateIndex => _sqlCreateIndex;
+    protected override string SqlAnalyze => _sqlAnalyze;
+    protected override string? SqlUpdateU => _sqlUpdateU;
+    protected override string? SqlInsertI => _sqlInsertI;
+    protected override string SqlDeleteD => _sqlDeleteD;
+    protected override string? SqlUpdateM => _sqlUpdateM;
+    protected override string? SqlInsertM => null;
     protected override int FieldCount => 5;
 
     public AuditEventNpgsqlBulk(int capacity = 0) : base(capacity) { }

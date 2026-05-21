@@ -69,7 +69,7 @@ public sealed class AuditTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        result.Should().Be(new BulkApplyResult(10, 10, 10, 0));
+        result.Should().Be(new BulkApplyResult(10, 10, 10));
     }
 }
 

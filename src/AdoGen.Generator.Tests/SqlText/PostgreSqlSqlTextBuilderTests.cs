@@ -1,4 +1,5 @@
 using AdoGen.Generator.Emitters.PostgreSql;
+using AwesomeAssertions.Execution;
 
 namespace AdoGen.Generator.Tests.SqlText;
 
@@ -187,11 +188,11 @@ public sealed class PostgreSqlSqlTextBuilderTests
         
         actual.Should().Be(
             """
-                CREATE TEMP TABLE IF NOT EXISTS "adogen_users_tmp"(
-                    "Id" UUID NOT NULL,
-                    "Name" VARCHAR(20) NOT NULL,
-                    "Email" VARCHAR(50) NOT NULL,
-                    "operation" CHAR(1) NOT NULL);
+            CREATE TEMP TABLE IF NOT EXISTS "adogen_users_tmp"(
+                "Id" UUID NOT NULL,
+                "Name" VARCHAR(20) NOT NULL,
+                "Email" VARCHAR(50) NOT NULL,
+                "operation" CHAR(1) NOT NULL);
             """);
     }
 
@@ -200,72 +201,76 @@ public sealed class PostgreSqlSqlTextBuilderTests
     [Fact]
     public void BulkApply_ShouldIncludeAllDmlBlocks_WhenAllOperationsPresent()
     {
-        var actual = PostgreSqlSqlTextBuilder.BulkApply(
+        var stmts = PostgreSqlSqlTextBuilder.BulkApply(
             EmitContextFixtures.PostgreSqlUser(), "adogen_users_tmp", "\"public\".\"Users\"");
 
-        actual.Should().Be(
+        using var _ = new AssertionScope();
+
+        stmts.UpdateU.Should().Be(
             """
-                CREATE INDEX IF NOT EXISTS "ix_adogen_users_tmp_op_keys" ON "adogen_users_tmp" ("operation", "Id");
-            
-                WITH updated AS (
-                    UPDATE "public"."Users" AS T
-                        SET "Name" = S."Name",
-                            "Email" = S."Email"
-                    FROM "adogen_users_tmp" AS S
-                    WHERE S."operation" = 'U' AND S."Id" = T."Id"
-                    RETURNING 1),
-                inserted AS (
-                    INSERT INTO "public"."Users" ("Id", "Name", "Email")
-                        SELECT S."Id", S."Name", S."Email"
-                        FROM "adogen_users_tmp" AS S
-                        WHERE S."operation" = 'I'
-                    RETURNING 1),
-                deleted AS (
-                    DELETE FROM "public"."Users" AS T
-                    USING "adogen_users_tmp" AS S
-                    WHERE S."operation" = 'D' AND S."Id" = T."Id"
-                    RETURNING 1),
-                upserted AS (
-                    INSERT INTO "public"."Users" ("Id", "Name", "Email")
-                        SELECT S."Id", S."Name", S."Email"
-                        FROM "adogen_users_tmp" AS S
-                        WHERE S."operation" = 'M'
-                    ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Email" = EXCLUDED."Email"
-                    RETURNING 1)
-                SELECT
-                    (SELECT COUNT(*) FROM inserted) AS Inserted,
-                    (SELECT COUNT(*) FROM updated) AS Updated,
-                    (SELECT COUNT(*) FROM deleted) AS Deleted,
-                    (SELECT COUNT(*) FROM upserted) AS Upserted;
+            UPDATE "public"."Users" AS T
+                SET "Name" = S."Name",
+                    "Email" = S."Email"
+            FROM "adogen_users_tmp" AS S
+            WHERE S."operation" = 'U' AND S."Id" = T."Id"
+            """);
+
+        stmts.InsertI.Should().Be(
+            """
+            INSERT INTO "public"."Users" ("Id", "Name", "Email")
+                SELECT S."Id", S."Name", S."Email"
+                FROM "adogen_users_tmp" AS S
+                WHERE S."operation" = 'I'
+            """);
+
+        stmts.DeleteD.Should().Be(
+            """
+            DELETE FROM "public"."Users" AS T
+            USING "adogen_users_tmp" AS S
+            WHERE S."operation" = 'D' AND S."Id" = T."Id"
+            """);
+
+        stmts.UpdateM.Should().Be(
+            """
+            UPDATE "public"."Users" AS T
+                SET "Name" = S."Name",
+                    "Email" = S."Email"
+            FROM "adogen_users_tmp" AS S
+            WHERE S."operation" = 'M' AND S."Id" = T."Id"
+            """);
+
+        stmts.InsertM.Should().Be(
+            """
+            INSERT INTO "public"."Users" ("Id", "Name", "Email")
+                SELECT S."Id", S."Name", S."Email"
+                FROM "adogen_users_tmp" AS S
+                WHERE S."operation" = 'M'
+            ON CONFLICT ("Id") DO NOTHING
             """);
     }
 
     [Fact]
     public void BulkApply_ShouldUseSelectFalseForUpdateBlock_WhenNoNonKeyNonIdentityColumns()
     {
-        var actual = PostgreSqlSqlTextBuilder.BulkApply(
+        var stmts = PostgreSqlSqlTextBuilder.BulkApply(
             EmitContextFixtures.PostgreSqlIdentityOnlyKey(), "adogen_counters_tmp", "\"dbo\".\"Counters\"");
 
-        actual.Should().Be(
-            """
-                CREATE INDEX IF NOT EXISTS "ix_adogen_counters_tmp_op_keys" ON "adogen_counters_tmp" ("operation", "CounterId");
+        using var _ = new AssertionScope();
 
-                WITH updated AS (
-                    SELECT 1 WHERE false),
-                inserted AS (
-                    SELECT 1 WHERE false),
-                deleted AS (
-                    DELETE FROM "dbo"."Counters" AS T
-                    USING "adogen_counters_tmp" AS S
-                    WHERE S."operation" = 'D' AND S."CounterId" = T."CounterId"
-                    RETURNING 1),
-                upserted AS (
-                    SELECT 1 WHERE false)
-                SELECT
-                    (SELECT COUNT(*) FROM inserted) AS Inserted,
-                    (SELECT COUNT(*) FROM updated) AS Updated,
-                    (SELECT COUNT(*) FROM deleted) AS Deleted,
-                    (SELECT COUNT(*) FROM upserted) AS Upserted;
+        // No non-key writable columns — both update statements are null
+        stmts.UpdateU.Should().BeNull();
+        stmts.UpdateM.Should().BeNull();
+
+        // No writable columns — insert statements are null
+        stmts.InsertI.Should().BeNull();
+        stmts.InsertM.Should().BeNull();
+
+        // Delete is always present
+        stmts.DeleteD.Should().Be(
+            """
+            DELETE FROM "dbo"."Counters" AS T
+            USING "adogen_counters_tmp" AS S
+            WHERE S."operation" = 'D' AND S."CounterId" = T."CounterId"
             """);
     }
 }

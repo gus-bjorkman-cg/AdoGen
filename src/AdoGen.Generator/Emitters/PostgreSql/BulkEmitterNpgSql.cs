@@ -41,12 +41,19 @@ internal sealed class BulkEmitterNpgSql : IEmitter
         
         // SQL strings — produced by PostgreSqlSqlTextBuilder
         var tempTableSql = PostgreSqlSqlTextBuilder.BulkCreateTempTable(ctx, tempTableName);
-        var applySql = PostgreSqlSqlTextBuilder.BulkApply(ctx, tempTableName, ctx.SchemaTableQuoted);
+        var createIndexSql = PostgreSqlSqlTextBuilder.BulkCreateIndex(ctx, tempTableName);
+        var analyzeSql = PostgreSqlSqlTextBuilder.BulkAnalyze(tempTableName);
+        var stmts = PostgreSqlSqlTextBuilder.BulkApply(ctx, tempTableName, ctx.SchemaTableQuoted);
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         var copyColumnsEscaped = BuildJoined(bulkColumns, col => $"\"{col.ParameterName}\"") + ", \"operation\"";
         var copyCommand = $"""COPY "{tempTableName}" ({copyColumnsEscaped}) FROM STDIN (FORMAT BINARY)""";
+
+        // Build SQL const declarations as code strings before the template.
+        // Using a helper avoids nested raw-string-literal indentation problems
+        // and produces clean """ literals in the generated file.
+        var sqlConsts = BuildSqlConsts(tempTableSql, createIndexSql, analyzeSql, copyCommand, stmts);
 
         var src =
             $$$$""""
@@ -68,21 +75,17 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 {
                     private const string _tempTableName = "{{{{tempTableName}}}}";
 
-                    private const string _sqlCreateTempTable = 
-                    """
-                {{{{tempTableSql}}}}
-                    """;
-                    
-                    private const string _sqlApply = 
-                    """
-                {{{{applySql}}}}
-                    """;
-
-                    private const string _copyCommand = """{{{{copyCommand}}}}""";
+                {{{{sqlConsts}}}}
 
                     protected override string SqlCreateTempTable => _sqlCreateTempTable;
                     protected override string TempTableName => _tempTableName;
-                    protected override string SqlApply => _sqlApply;
+                    protected override string SqlCreateIndex => _sqlCreateIndex;
+                    protected override string SqlAnalyze => _sqlAnalyze;
+                    protected override string? SqlUpdateU => {{{{(stmts.UpdateU is null ? "null" : "_sqlUpdateU")}}}};
+                    protected override string? SqlInsertI => {{{{(stmts.InsertI is null ? "null" : "_sqlInsertI")}}}};
+                    protected override string SqlDeleteD => _sqlDeleteD;
+                    protected override string? SqlUpdateM => {{{{(stmts.UpdateM is null ? "null" : "_sqlUpdateM")}}}};
+                    protected override string? SqlInsertM => {{{{(stmts.InsertM is null ? "null" : "_sqlInsertM")}}}};
                     protected override int FieldCount => {{{{bulkFieldCount + 1}}}};
 
                     public {{{{bulkTypeName}}}}(int capacity = 0) : base(capacity) { }
@@ -110,7 +113,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
 
         spc.AddSource($"{dto.Name}.Bulk.Npgsql.g.cs", src);
         return;
-        
+
         string EmitImporterWrites()
         {
             var sb = new StringBuilder();
@@ -135,8 +138,55 @@ internal sealed class BulkEmitterNpgSql : IEmitter
         }
     }
 
-    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector)
+    /// <summary>
+    /// Builds all SQL const declarations as a pre-formatted code block.
+    /// Using a dedicated method avoids nested raw-string-literal indentation problems
+    /// inside the outer $$$$"""" template. Each const uses a """ raw string literal —
+    /// clean, readable, no double-quote escaping.
+    /// </summary>
+    private static string BuildSqlConsts(
+        string tempTableSql,
+        string createIndexSql,
+        string analyzeSql,
+        string copyCommand,
+        BulkApplyStatements stmts)
     {
+        const string I = "    "; // 4-space indent for class body members
+        var sb = new StringBuilder();
+
+        AppendMultilineConst(sb, I, "_sqlCreateTempTable", tempTableSql);
+        sb.AppendLine($"{I}private const string _sqlCreateIndex = \"\"\"{createIndexSql}\"\"\";");
+        sb.AppendLine($"{I}private const string _sqlAnalyze = \"\"\"{analyzeSql}\"\"\";");
+        sb.AppendLine($"{I}private const string _copyCommand = \"\"\"{copyCommand}\"\"\";");
+
+        if (stmts.UpdateU is not null) AppendMultilineConst(sb, I, "_sqlUpdateU", stmts.UpdateU);
+        if (stmts.InsertI is not null) AppendMultilineConst(sb, I, "_sqlInsertI", stmts.InsertI);
+        AppendMultilineConst(sb, I, "_sqlDeleteD", stmts.DeleteD);
+        if (stmts.UpdateM is not null) AppendMultilineConst(sb, I, "_sqlUpdateM", stmts.UpdateM);
+        if (stmts.InsertM is not null) AppendMultilineConst(sb, I, "_sqlInsertM", stmts.InsertM);
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Appends a multiline """ raw string literal const.
+    /// Content lines are indented 4 spaces past <paramref name="indent"/> so the
+    /// closing """ is the sole dedented line and the raw string rule is satisfied.
+    /// </summary>
+    private static void AppendMultilineConst(StringBuilder sb, string indent, string name, string content)
+    {
+        var contentIndent = indent + "    ";
+        sb.AppendLine($"{indent}private const string {name} =");
+        sb.AppendLine($"{contentIndent}\"\"\"");
+        foreach (var rawLine in content.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            sb.AppendLine(line.Length == 0 ? "" : $"{contentIndent}{line}");
+        }
+        sb.AppendLine($"{contentIndent}\"\"\";");
+    }
+
+    private static string BuildJoined(ImmutableArray<ColumnInfo> columns, Func<ColumnInfo, string> selector)    {
         if (columns.Length == 0) return string.Empty;
         if (columns.Length == 1) return selector(columns[0]);
         var sb = new StringBuilder(capacity: columns.Length * 24);

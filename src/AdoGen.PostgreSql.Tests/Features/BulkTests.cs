@@ -35,7 +35,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(10, 0, 0, 0));
+        actual.Should().Be(new BulkApplyResult(10, 0, 0));
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(0, users.Count, 0, 0));
+        actual.Should().Be(new BulkApplyResult(0, users.Count, 0));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(0, 0, DefaultUsers.Count, 0));
+        actual.Should().Be(new BulkApplyResult(0, 0, DefaultUsers.Count));
     }
 
     [Fact]
@@ -145,8 +145,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(usersToAdd.Count, usersToUpdate.Count, usersToDelete.Count,
-            usersToUpsert.Count));
+        actual.Should().Be(new BulkApplyResult(usersToAdd.Count + usersToUpsert.Count, usersToUpdate.Count, usersToDelete.Count));
     }
     
     [Fact]

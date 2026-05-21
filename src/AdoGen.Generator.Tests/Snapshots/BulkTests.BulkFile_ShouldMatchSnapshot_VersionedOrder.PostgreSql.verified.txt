@@ -16,55 +16,62 @@ public sealed class VersionedOrderNpgsqlBulk : BulkBatchNpg<global::AdoGen.Gener
 {
     private const string _tempTableName = "adoGen_versionedorder_tmp";
 
-    private const string _sqlCreateTempTable = 
-    """
-    CREATE TEMP TABLE IF NOT EXISTS "adoGen_versionedorder_tmp"(
-        "Id" UUID NOT NULL,
-        "ProductName" VARCHAR(50) NOT NULL,
-        "Version" INTEGER NOT NULL,
-        "operation" CHAR(1) NOT NULL);
-    """;
-    
-    private const string _sqlApply = 
-    """
-    CREATE INDEX IF NOT EXISTS "ix_adoGen_versionedorder_tmp_op_keys" ON "adoGen_versionedorder_tmp" ("operation", "Id");
-
-    WITH updated AS (
+    private const string _sqlCreateTempTable =
+        """
+        CREATE TEMP TABLE IF NOT EXISTS "adoGen_versionedorder_tmp"(
+            "Id" UUID NOT NULL,
+            "ProductName" VARCHAR(50) NOT NULL,
+            "Version" INTEGER NOT NULL,
+            "operation" CHAR(1) NOT NULL);
+        """;
+    private const string _sqlCreateIndex = """CREATE UNIQUE INDEX "uix_adoGen_versionedorder_tmp_op_keys" ON "adoGen_versionedorder_tmp" ("operation", "Id");""";
+    private const string _sqlAnalyze = """ANALYZE "adoGen_versionedorder_tmp";""";
+    private const string _copyCommand = """COPY "adoGen_versionedorder_tmp" ("Id", "ProductName", "Version", "operation") FROM STDIN (FORMAT BINARY)""";
+    private const string _sqlUpdateU =
+        """
         UPDATE "public"."VersionedOrders" AS T
             SET "ProductName" = S."ProductName"
         FROM "adoGen_versionedorder_tmp" AS S
         WHERE S."operation" = 'U' AND S."Id" = T."Id"
-        RETURNING 1),
-    inserted AS (
+        """;
+    private const string _sqlInsertI =
+        """
         INSERT INTO "public"."VersionedOrders" ("Id", "ProductName", "Version")
             SELECT S."Id", S."ProductName", S."Version"
             FROM "adoGen_versionedorder_tmp" AS S
             WHERE S."operation" = 'I'
-        RETURNING 1),
-    deleted AS (
+        """;
+    private const string _sqlDeleteD =
+        """
         DELETE FROM "public"."VersionedOrders" AS T
         USING "adoGen_versionedorder_tmp" AS S
         WHERE S."operation" = 'D' AND S."Id" = T."Id"
-        RETURNING 1),
-    upserted AS (
+        """;
+    private const string _sqlUpdateM =
+        """
+        UPDATE "public"."VersionedOrders" AS T
+            SET "ProductName" = S."ProductName"
+        FROM "adoGen_versionedorder_tmp" AS S
+        WHERE S."operation" = 'M' AND S."Id" = T."Id"
+        """;
+    private const string _sqlInsertM =
+        """
         INSERT INTO "public"."VersionedOrders" ("Id", "ProductName", "Version")
             SELECT S."Id", S."ProductName", S."Version"
             FROM "adoGen_versionedorder_tmp" AS S
             WHERE S."operation" = 'M'
-        ON CONFLICT ("Id") DO UPDATE SET "ProductName" = EXCLUDED."ProductName"
-        RETURNING 1)
-    SELECT
-        (SELECT COUNT(*) FROM inserted) AS Inserted,
-        (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted,
-        (SELECT COUNT(*) FROM upserted) AS Upserted;
-    """;
-
-    private const string _copyCommand = """COPY "adoGen_versionedorder_tmp" ("Id", "ProductName", "Version", "operation") FROM STDIN (FORMAT BINARY)""";
+        ON CONFLICT ("Id") DO NOTHING
+        """;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
-    protected override string SqlApply => _sqlApply;
+    protected override string SqlCreateIndex => _sqlCreateIndex;
+    protected override string SqlAnalyze => _sqlAnalyze;
+    protected override string? SqlUpdateU => _sqlUpdateU;
+    protected override string? SqlInsertI => _sqlInsertI;
+    protected override string SqlDeleteD => _sqlDeleteD;
+    protected override string? SqlUpdateM => _sqlUpdateM;
+    protected override string? SqlInsertM => _sqlInsertM;
     protected override int FieldCount => 4;
 
     public VersionedOrderNpgsqlBulk(int capacity = 0) : base(capacity) { }

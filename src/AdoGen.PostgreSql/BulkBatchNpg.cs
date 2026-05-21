@@ -70,10 +70,31 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     protected abstract string TempTableName { get; }
 
     /// <summary>
-    /// The SQL command to apply the batch of operations using an index on the temp table.
+    /// The SQL command to create the staging index after data is loaded.
     /// Set by generated code.
     /// </summary>
-    protected abstract string SqlApply { get; }
+    protected abstract string SqlCreateIndex { get; }
+
+    /// <summary>
+    /// The SQL ANALYZE statement for the temp table. Executed when rowCount > 1000.
+    /// Set by generated code.
+    /// </summary>
+    protected abstract string SqlAnalyze { get; }
+
+    /// <summary>UPDATE for 'U' rows. Null when the DTO has no non-key writable columns.</summary>
+    protected abstract string? SqlUpdateU { get; }
+
+    /// <summary>INSERT for 'I' rows. Null when the DTO has no writable columns.</summary>
+    protected abstract string? SqlInsertI { get; }
+
+    /// <summary>DELETE for 'D' rows. Always present.</summary>
+    protected abstract string SqlDeleteD { get; }
+
+    /// <summary>UPDATE for 'M' rows (upsert update pass). Null when no non-key writable columns.</summary>
+    protected abstract string? SqlUpdateM { get; }
+
+    /// <summary>INSERT for 'M' rows using ON CONFLICT DO NOTHING. Null when no writable columns or no conflict keys.</summary>
+    protected abstract string? SqlInsertM { get; }
 
     /// <summary>
     /// The number of fields written per row.
@@ -197,27 +218,46 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
             if (parameterCount < ParameterThreshold)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
-                return new BulkApplyResult(inserted, 0, 0, 0);
+                return new BulkApplyResult(inserted, 0, 0);
             }
         }
 
-        await using (var create = connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, commandTimeout))
-        {
-            await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-        }
+        await using var createCmd =
+            connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, commandTimeout);
+        await createCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
 
         await WriteItemsToServerAsync(connection, ct).ConfigureAwait(false);
-        
-        await using var cmd = connection.CreateCommand(SqlApply, CommandType.Text, transaction, commandTimeout);
-        await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
-        if (!await resultReader.ReadAsync(ct).ConfigureAwait(false)) return BulkApplyResult.Empty;
+        // All post-COPY work in a single NpgsqlBatch — one round trip.
+        await using var batch = new NpgsqlBatch(connection, transaction);
 
-        return new BulkApplyResult(
-            Inserted: resultReader.GetInt32(0),
-            Updated: resultReader.GetInt32(1),
-            Deleted: resultReader.GetInt32(2),
-            Upserted: resultReader.GetInt32(3));
+        // Staging index after COPY — no IF NOT EXISTS; fresh temp table every time
+        batch.BatchCommands.Add(new NpgsqlBatchCommand(SqlCreateIndex));
+
+        // ANALYZE when batch is large enough for the planner to benefit
+        if (Items.Count > 1000)
+            batch.BatchCommands.Add(new NpgsqlBatchCommand(SqlAnalyze));
+
+        // Track DML command indices so we can read RecordsAffected per operation
+        var updateUIdx = AddIfNotNull(batch, SqlUpdateU);
+        var insertIIdx = AddIfNotNull(batch, SqlInsertI);
+        var deleteDIdx = AddCmd(batch, SqlDeleteD);
+        var updateMIdx = AddIfNotNull(batch, SqlUpdateM);
+        var insertMIdx = AddIfNotNull(batch, SqlInsertM);
+
+        await batch.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+
+        var totalInserted = 0;
+        var totalUpdated  = 0;
+        var totalDeleted  = 0;
+
+        if (updateUIdx >= 0) totalUpdated  += batch.BatchCommands[updateUIdx].RecordsAffected;
+        if (insertIIdx >= 0) totalInserted += batch.BatchCommands[insertIIdx].RecordsAffected;
+                             totalDeleted  += batch.BatchCommands[deleteDIdx].RecordsAffected;
+        if (updateMIdx >= 0) totalUpdated  += batch.BatchCommands[updateMIdx].RecordsAffected;
+        if (insertMIdx >= 0) totalInserted += batch.BatchCommands[insertMIdx].RecordsAffected;
+
+        return new BulkApplyResult(totalInserted, totalUpdated, totalDeleted);
     }
 
     /// <summary>
@@ -232,4 +272,13 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
         HasDeletes = false;
         HasUpserts = false;
     }
+
+    private static int AddCmd(NpgsqlBatch batch, string sql)
+    {
+        batch.BatchCommands.Add(new NpgsqlBatchCommand(sql));
+        return batch.BatchCommands.Count - 1;
+    }
+
+    private static int AddIfNotNull(NpgsqlBatch batch, string? sql)
+        => sql is not null ? AddCmd(batch, sql) : -1;
 }

@@ -151,95 +151,118 @@ internal static class PostgreSqlSqlTextBuilder
         {
             var col = ctx.BulkColumns[i];
             var nullability = col.IsNullable ? "NULL" : "NOT NULL";
-            sbColDefs.AppendLine($"        \"{col.ParameterName}\" {col.SqlType} {nullability},");
+            sbColDefs.AppendLine($"    \"{col.ParameterName}\" {col.SqlType} {nullability},");
         }
-        sbColDefs.Append("        \"operation\" CHAR(1) NOT NULL");
+        sbColDefs.Append("    \"operation\" CHAR(1) NOT NULL");
 
         return $"""
-                 CREATE TEMP TABLE IF NOT EXISTS "{tempTableName}"(
-             {sbColDefs});
-             """;
+                CREATE TEMP TABLE IF NOT EXISTS "{tempTableName}"(
+                {sbColDefs});
+                """;
     }
 
-    public static string BulkApply(EmitContext ctx, string tempTableName, string schemaTable)
+    /// <summary>
+    /// Returns the CREATE INDEX statement to run after data is loaded into the temp table.
+    /// UNIQUE only when all key columns are non-identity — identity keys have a placeholder value
+    /// during 'I' rows so uniqueness across (operation, key) cannot be guaranteed.
+    /// No IF NOT EXISTS — the temp table is always freshly created.
+    /// </summary>
+    public static string BulkCreateIndex(EmitContext ctx, string tempTableName)
+    {
+        var keyCols = BuildJoined(ctx.Keys, col => $"\"{col.ParameterName}\"");
+        var hasIdentityKey = false;
+        for (var i = 0; i < ctx.Keys.Length; i++)
+            if (ctx.Keys[i].IsIdentity) { hasIdentityKey = true; break; }
+        var unique = hasIdentityKey ? "" : "UNIQUE ";
+        var idxPrefix = hasIdentityKey ? "ix" : "uix";
+        var idxName = $"{idxPrefix}_{tempTableName}_op_keys";
+        return $"CREATE {unique}INDEX \"{idxName}\" ON \"{tempTableName}\" (\"operation\", {keyCols});";
+    }
+
+    /// <summary>
+    /// Returns the ANALYZE statement for the temp table — useful when rowCount >= 1000
+    /// to give the planner accurate statistics before the DML statements run.
+    /// </summary>
+    public static string BulkAnalyze(string tempTableName)
+        => $"ANALYZE \"{tempTableName}\";";
+
+    /// <summary>
+    /// Generates individual DML SQL statements for sequential execution.
+    /// Each statement is a standalone UPDATE/INSERT/DELETE that the runtime executes
+    /// via ExecuteNonQueryAsync, collecting affected row counts independently.
+    /// Avoids the single large data-modifying CTE pattern which hits PostgreSQL
+    /// restrictions when multiple CTEs touch the same target table.
+    /// </summary>
+    public static BulkApplyStatements BulkApply(EmitContext ctx, string tempTableName, string schemaTable)
     {
         var joinOn = ctx.JoinOn;
-        var keyCols = BuildJoined(ctx.Keys, col => $"\"{col.ParameterName}\"");
-        var idxCols = $"\"operation\", {keyCols}";
-        var idxName = $"ix_{tempTableName}_op_keys";
         var tempTableRef = $"\"{tempTableName}\"";
         var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
         var insertSelect = BuildJoined(ctx.Writables, col => $"S.{col.ColumnNameQuoted}");
-        
-        var updateSet = string.Join(",\n        ", Enumerable.Select(ctx.WritableNonKeyNonIdentities,
-            col => $"        \"{col.ParameterName}\" = S.\"{col.ParameterName}\""));
+
+        var updateSet = string.Join(",\n    ", Enumerable.Select(ctx.WritableNonKeyNonIdentities,
+            col => $"    \"{col.ParameterName}\" = S.\"{col.ParameterName}\""));
 
         var nonIdentityKeys = FilterNonIdentityKeys(ctx.Keys);
         var conflictKeys = BuildJoined(nonIdentityKeys, col => col.ColumnNameQuoted);
-        var updateSetOnConflict = BuildJoined(ctx.WritableNonKeyNonIdentities,
-            col => $"{col.ColumnNameQuoted} = EXCLUDED.{col.ColumnNameQuoted}");
 
-        var sb = new StringBuilder();
-
-        sb.AppendLine($"    CREATE INDEX IF NOT EXISTS \"{idxName}\" ON {tempTableRef} ({idxCols});");
-        sb.AppendLine();
-
-        sb.AppendLine("    WITH updated AS (");
+        // U: update existing rows
+        string? updateU = null;
         if (ctx.WritableNonKeyNonIdentities.Length > 0)
         {
-            sb.AppendLine($"        UPDATE {schemaTable} AS T");
-            sb.AppendLine("            SET " + updateSet.TrimStart());
-            sb.AppendLine($"        FROM {tempTableRef} AS S");
-            sb.AppendLine($"        WHERE S.\"operation\" = 'U' AND {joinOn}");
-            sb.AppendLine("        RETURNING 1),");
-        }
-        else
-        {
-            sb.AppendLine("        SELECT 1 WHERE false),");
+            var sb = new StringBuilder();
+            sb.AppendLine($"UPDATE {schemaTable} AS T");
+            sb.AppendLine("    SET " + updateSet.TrimStart());
+            sb.AppendLine($"FROM {tempTableRef} AS S");
+            sb.Append($"WHERE S.\"operation\" = 'U' AND {joinOn}");
+            updateU = sb.ToString();
         }
 
-        sb.AppendLine("    inserted AS (");
+        // I: insert new rows; let unique constraint violations fail naturally
+        string? insertI = null;
         if (ctx.Writables.Length > 0)
         {
-            sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
-            sb.AppendLine($"            SELECT {insertSelect}");
-            sb.AppendLine($"            FROM {tempTableRef} AS S");
-            sb.AppendLine("            WHERE S.\"operation\" = 'I'");
-            sb.AppendLine("        RETURNING 1),");
+            var sb = new StringBuilder();
+            sb.AppendLine($"INSERT INTO {schemaTable} ({insertCols})");
+            sb.AppendLine($"    SELECT {insertSelect}");
+            sb.AppendLine($"    FROM {tempTableRef} AS S");
+            sb.Append("    WHERE S.\"operation\" = 'I'");
+            insertI = sb.ToString();
         }
-        else
+
+        // D: delete existing rows
+        var sb2 = new StringBuilder();
+        sb2.AppendLine($"DELETE FROM {schemaTable} AS T");
+        sb2.AppendLine($"USING {tempTableRef} AS S");
+        sb2.Append($"WHERE S.\"operation\" = 'D' AND {joinOn}");
+        var deleteD = sb2.ToString();
+
+        // M update: update existing rows (counted into Updated)
+        string? updateM = null;
+        if (ctx.WritableNonKeyNonIdentities.Length > 0)
         {
-            sb.AppendLine("        SELECT 1 WHERE false),");
+            var sb = new StringBuilder();
+            sb.AppendLine($"UPDATE {schemaTable} AS T");
+            sb.AppendLine("    SET " + updateSet.TrimStart());
+            sb.AppendLine($"FROM {tempTableRef} AS S");
+            sb.Append($"WHERE S.\"operation\" = 'M' AND {joinOn}");
+            updateM = sb.ToString();
         }
 
-        sb.AppendLine("    deleted AS (");
-        sb.AppendLine($"        DELETE FROM {schemaTable} AS T");
-        sb.AppendLine($"        USING {tempTableRef} AS S");
-        sb.AppendLine($"        WHERE S.\"operation\" = 'D' AND {joinOn}");
-        sb.AppendLine("        RETURNING 1),");
-
-        sb.AppendLine("    upserted AS (");
-        if (ctx.Writables.Length > 0 && conflictKeys.Length > 0 && updateSetOnConflict.Length > 0)
+        // M insert-missing: only rows not matched by M-update above, using ON CONFLICT DO NOTHING
+        string? insertM = null;
+        if (ctx.Writables.Length > 0 && conflictKeys.Length > 0)
         {
-            sb.AppendLine($"        INSERT INTO {schemaTable} ({insertCols})");
-            sb.AppendLine($"            SELECT {insertSelect}");
-            sb.AppendLine($"            FROM {tempTableRef} AS S");
-            sb.AppendLine("            WHERE S.\"operation\" = 'M'");
-            sb.AppendLine($"        ON CONFLICT ({conflictKeys}) DO UPDATE SET {updateSetOnConflict}");
-            sb.AppendLine("        RETURNING 1)");
-        }
-        else
-        {
-            sb.AppendLine("        SELECT 1 WHERE false)");
+            var sb = new StringBuilder();
+            sb.AppendLine($"INSERT INTO {schemaTable} ({insertCols})");
+            sb.AppendLine($"    SELECT {insertSelect}");
+            sb.AppendLine($"    FROM {tempTableRef} AS S");
+            sb.AppendLine("    WHERE S.\"operation\" = 'M'");
+            sb.Append($"ON CONFLICT ({conflictKeys}) DO NOTHING");
+            insertM = sb.ToString();
         }
 
-        sb.AppendLine("    SELECT");
-        sb.AppendLine("        (SELECT COUNT(*) FROM inserted) AS Inserted,");
-        sb.AppendLine("        (SELECT COUNT(*) FROM updated) AS Updated,");
-        sb.AppendLine("        (SELECT COUNT(*) FROM deleted) AS Deleted,");
-        sb.AppendLine("        (SELECT COUNT(*) FROM upserted) AS Upserted;");
-
-        return sb.ToString().TrimEnd();
+        return new BulkApplyStatements(updateU, insertI, deleteD, updateM, insertM);
     }
 
     private static bool IsIntOrLong(string propertyType)
@@ -270,4 +293,21 @@ internal static class PostgreSqlSqlTextBuilder
         return sb.ToString();
     }
 }
+
+/// <summary>
+/// Holds the individual DML SQL statements for the PostgreSQL bulk apply operation.
+/// Each non-null string is executed sequentially via ExecuteNonQueryAsync.
+/// Null entries indicate the operation is not applicable for this DTO's shape.
+/// </summary>
+/// <param name="UpdateU">UPDATE for 'U' operation rows — null when no non-key writable columns.</param>
+/// <param name="InsertI">INSERT for 'I' operation rows — null when no writable columns.</param>
+/// <param name="DeleteD">DELETE for 'D' operation rows — always present.</param>
+/// <param name="UpdateM">UPDATE for 'M' operation rows (upsert update pass) — null when no non-key writable columns.</param>
+/// <param name="InsertM">INSERT for 'M' operation rows (upsert insert-missing pass) — null when no writable columns or no conflict keys.</param>
+internal readonly record struct BulkApplyStatements(
+    string? UpdateU,
+    string? InsertI,
+    string DeleteD,
+    string? UpdateM,
+    string? InsertM);
 

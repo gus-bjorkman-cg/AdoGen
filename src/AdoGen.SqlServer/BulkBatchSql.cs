@@ -74,6 +74,13 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     protected abstract string SqlApply { get; }
     
     /// <summary>
+    /// The SQL command to apply the batch of operations to the target table with a CREATE INDEX
+    /// prepended. Precomputed at class-load time from SqlCreateIndex + SqlApply.
+    /// Used for larger batches (&gt;=128 rows). Set by the generated code at build time.
+    /// </summary>
+    protected abstract string SqlApplyWithIndex { get; }
+    
+    /// <summary>
     /// The number of fields in the temp table for the bulk copy operation. Set by the generated code in build time.
     /// </summary>
     protected abstract int FieldCount { get; }
@@ -215,19 +222,15 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
             if (parameterCount < 2100)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, timeout).ConfigureAwait(false);
-                return new BulkApplyResult(inserted, 0, 0, 0);
+                return new BulkApplyResult(inserted, 0, 0);
             }
         }
-        
-        await using (var create = connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, timeout))
-        {
-            await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-        }
 
-        using (var bulk = new SqlBulkCopy(
-                   connection, 
-                   sqlBulkCopyOptions, 
-                   transaction))
+        await using var command = connection.CreateCommand(SqlCreateTempTable, CommandType.Text, transaction, timeout);
+        
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        
+        using (var bulk = new SqlBulkCopy(connection, sqlBulkCopyOptions, transaction))
         {
             bulk.DestinationTableName = TempTableName;
             bulk.BatchSize = BulkCopyBatchSize;
@@ -240,16 +243,16 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
             await WriteItemsToServerAsync(bulk, ct).ConfigureAwait(false);
         }
 
-        await using var cmd = connection.CreateCommand(SqlApply, CommandType.Text, transaction, timeout);
-        await using var resultReader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        command.CommandText = Items.Count >= 128 ? SqlApplyWithIndex : SqlApply;
+        
+        await using var resultReader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
         if (!await resultReader.ReadAsync(ct).ConfigureAwait(false)) return BulkApplyResult.Empty;
 
         return new BulkApplyResult(
             Inserted: resultReader.GetInt32(0),
             Updated: resultReader.GetInt32(1),
-            Deleted: resultReader.GetInt32(2),
-            Upserted: resultReader.GetInt32(3));
+            Deleted: resultReader.GetInt32(2));
     }
     
     /// <summary>

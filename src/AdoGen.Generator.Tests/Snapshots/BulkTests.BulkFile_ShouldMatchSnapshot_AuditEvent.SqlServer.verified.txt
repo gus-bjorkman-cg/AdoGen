@@ -29,8 +29,7 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
     private const string _sqlApply =
         """
         BEGIN TRY
-        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
-        CREATE INDEX [IX_AdoGen_Audits_Op_Key] ON #AdoGen_AuditEvent ([Operation], [EventId]);
+        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
 
         UPDATE T
         SET
@@ -39,7 +38,7 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
             T.[JsonPayload] = S.[JsonPayload]
         FROM [log].[Audits] AS T
             JOIN #AdoGen_AuditEvent AS S ON S.[EventId] = T.[EventId]
-        WHERE S.[Operation] = 'U';
+        WHERE S.[Operation] IN ('U', 'M');
         SET @updated = @@ROWCOUNT;
 
         INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload])
@@ -54,35 +53,28 @@ public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests
         WHERE S.[Operation] = 'D';
         SET @deleted = @@ROWCOUNT;
 
-        UPDATE T
-        SET
-            T.[CreatedAt] = S.[CreatedAt],
-            T.[Type] = S.[Type],
-            T.[JsonPayload] = S.[JsonPayload]
-        FROM [log].[Audits] AS T
-            JOIN #AdoGen_AuditEvent AS S ON S.[EventId] = T.[EventId]
-        WHERE S.[Operation] = 'M';
-        SET @upserted = @@ROWCOUNT;
-
         INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload])
         SELECT S.[CreatedAt], S.[Type], S.[JsonPayload]
         FROM #AdoGen_AuditEvent AS S
-        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [log].[Audits] AS T WHERE S.[EventId] = T.[EventId]);
-        SET @upserted = @upserted + @@ROWCOUNT;
+        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [log].[Audits] AS T WITH (UPDLOCK, HOLDLOCK) WHERE S.[EventId] = T.[EventId]);
+        SET @inserted = @inserted + @@ROWCOUNT;
 
-        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
+        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
 
         END TRY
         BEGIN CATCH
-            IF OBJECT_ID('tempdb..#AdoGen_AuditEvent') IS NOT NULL DROP TABLE #AdoGen_AuditEvent;
+            DROP TABLE IF EXISTS #AdoGen_AuditEvent;
             THROW;
         END CATCH;
-        IF OBJECT_ID('tempdb..#AdoGen_AuditEvent') IS NOT NULL DROP TABLE #AdoGen_AuditEvent;
+        DROP TABLE IF EXISTS #AdoGen_AuditEvent;
         """;
+
+    private const string _sqlApplyWithIndex = """CREATE INDEX [IX_AdoGen_Audits_Op_Key] ON #AdoGen_AuditEvent ([Operation], [EventId]);""" + "\n" + _sqlApply;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
+    protected override string SqlApplyWithIndex => _sqlApplyWithIndex;
     protected override int FieldCount => 5;
 
      /// <summary>

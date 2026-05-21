@@ -16,56 +16,64 @@ public sealed class UserNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.Tests
 {
     private const string _tempTableName = "adoGen_user_tmp";
 
-    private const string _sqlCreateTempTable = 
-    """
-    CREATE TEMP TABLE IF NOT EXISTS "adoGen_user_tmp"(
-        "Id" UUID NOT NULL,
-        "Name" VARCHAR(20) NOT NULL,
-        "Email" VARCHAR(50) NOT NULL,
-        "operation" CHAR(1) NOT NULL);
-    """;
-    
-    private const string _sqlApply = 
-    """
-    CREATE INDEX IF NOT EXISTS "ix_adoGen_user_tmp_op_keys" ON "adoGen_user_tmp" ("operation", "Id");
-
-    WITH updated AS (
+    private const string _sqlCreateTempTable =
+        """
+        CREATE TEMP TABLE IF NOT EXISTS "adoGen_user_tmp"(
+            "Id" UUID NOT NULL,
+            "Name" VARCHAR(20) NOT NULL,
+            "Email" VARCHAR(50) NOT NULL,
+            "operation" CHAR(1) NOT NULL);
+        """;
+    private const string _sqlCreateIndex = """CREATE UNIQUE INDEX "uix_adoGen_user_tmp_op_keys" ON "adoGen_user_tmp" ("operation", "Id");""";
+    private const string _sqlAnalyze = """ANALYZE "adoGen_user_tmp";""";
+    private const string _copyCommand = """COPY "adoGen_user_tmp" ("Id", "Name", "Email", "operation") FROM STDIN (FORMAT BINARY)""";
+    private const string _sqlUpdateU =
+        """
         UPDATE "public"."Users" AS T
             SET "Name" = S."Name",
                 "Email" = S."Email"
         FROM "adoGen_user_tmp" AS S
         WHERE S."operation" = 'U' AND S."Id" = T."Id"
-        RETURNING 1),
-    inserted AS (
+        """;
+    private const string _sqlInsertI =
+        """
         INSERT INTO "public"."Users" ("Id", "Name", "Email")
             SELECT S."Id", S."Name", S."Email"
             FROM "adoGen_user_tmp" AS S
             WHERE S."operation" = 'I'
-        RETURNING 1),
-    deleted AS (
+        """;
+    private const string _sqlDeleteD =
+        """
         DELETE FROM "public"."Users" AS T
         USING "adoGen_user_tmp" AS S
         WHERE S."operation" = 'D' AND S."Id" = T."Id"
-        RETURNING 1),
-    upserted AS (
+        """;
+    private const string _sqlUpdateM =
+        """
+        UPDATE "public"."Users" AS T
+            SET "Name" = S."Name",
+                "Email" = S."Email"
+        FROM "adoGen_user_tmp" AS S
+        WHERE S."operation" = 'M' AND S."Id" = T."Id"
+        """;
+    private const string _sqlInsertM =
+        """
         INSERT INTO "public"."Users" ("Id", "Name", "Email")
             SELECT S."Id", S."Name", S."Email"
             FROM "adoGen_user_tmp" AS S
             WHERE S."operation" = 'M'
-        ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Email" = EXCLUDED."Email"
-        RETURNING 1)
-    SELECT
-        (SELECT COUNT(*) FROM inserted) AS Inserted,
-        (SELECT COUNT(*) FROM updated) AS Updated,
-        (SELECT COUNT(*) FROM deleted) AS Deleted,
-        (SELECT COUNT(*) FROM upserted) AS Upserted;
-    """;
-
-    private const string _copyCommand = """COPY "adoGen_user_tmp" ("Id", "Name", "Email", "operation") FROM STDIN (FORMAT BINARY)""";
+        ON CONFLICT ("Id") DO NOTHING
+        """;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
-    protected override string SqlApply => _sqlApply;
+    protected override string SqlCreateIndex => _sqlCreateIndex;
+    protected override string SqlAnalyze => _sqlAnalyze;
+    protected override string? SqlUpdateU => _sqlUpdateU;
+    protected override string? SqlInsertI => _sqlInsertI;
+    protected override string SqlDeleteD => _sqlDeleteD;
+    protected override string? SqlUpdateM => _sqlUpdateM;
+    protected override string? SqlInsertM => _sqlInsertM;
     protected override int FieldCount => 4;
 
     public UserNpgsqlBulk(int capacity = 0) : base(capacity) { }

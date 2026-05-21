@@ -212,53 +212,43 @@ public sealed class SqlServerSqlTextBuilderTests
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
-                    CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
-            
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+
                     UPDATE T
                     SET
                         T.[Name] = S.[Name],
                         T.[Email] = S.[Email]
                     FROM [dbo].[Users] AS T
                         JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
-                    WHERE S.[Operation] = 'U';
+                    WHERE S.[Operation] IN ('U', 'M');
                     SET @updated = @@ROWCOUNT;
-            
+
                     INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
                     SELECT S.[Id], S.[Name], S.[Email]
                     FROM #AdoGen_User AS S
                     WHERE S.[Operation] = 'I';
                     SET @inserted = @@ROWCOUNT;
-            
+
                     DELETE T
                     FROM [dbo].[Users] AS T
                         JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
                     WHERE S.[Operation] = 'D';
                     SET @deleted = @@ROWCOUNT;
-            
-                    UPDATE T
-                    SET
-                        T.[Name] = S.[Name],
-                        T.[Email] = S.[Email]
-                    FROM [dbo].[Users] AS T
-                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
-                    WHERE S.[Operation] = 'M';
-                    SET @upserted = @@ROWCOUNT;
-            
+
                     INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
                     SELECT S.[Id], S.[Name], S.[Email]
                     FROM #AdoGen_User AS S
-                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
-                    SET @upserted = @upserted + @@ROWCOUNT;
-            
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
-            
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WITH (UPDLOCK, HOLDLOCK) WHERE S.[Id] = T.[Id]);
+                    SET @inserted = @inserted + @@ROWCOUNT;
+
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
+
                     END TRY
                     BEGIN CATCH
-                        IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                        DROP TABLE IF EXISTS #AdoGen_User;
                         THROW;
                     END CATCH;
-                    IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                    DROP TABLE IF EXISTS #AdoGen_User;
             """);
     }
 
@@ -268,11 +258,20 @@ public sealed class SqlServerSqlTextBuilderTests
         var actual = SqlServerSqlTextBuilder.BulkApply(EmitContextFixtures.SqlServerUser(), "#AdoGen_User",
             new BulkApplyOptions(true, false));
 
+        // HasUpserts defaults to true, so UPDATE IN ('U','M') and M insert-missing are still emitted
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
-                    CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
+
+                    UPDATE T
+                    SET
+                        T.[Name] = S.[Name],
+                        T.[Email] = S.[Email]
+                    FROM [dbo].[Users] AS T
+                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
+                    WHERE S.[Operation] IN ('U', 'M');
+                    SET @updated = @@ROWCOUNT;
 
                     INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
                     SELECT S.[Id], S.[Name], S.[Email]
@@ -286,29 +285,20 @@ public sealed class SqlServerSqlTextBuilderTests
                     WHERE S.[Operation] = 'D';
                     SET @deleted = @@ROWCOUNT;
 
-                    UPDATE T
-                    SET
-                        T.[Name] = S.[Name],
-                        T.[Email] = S.[Email]
-                    FROM [dbo].[Users] AS T
-                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
-                    WHERE S.[Operation] = 'M';
-                    SET @upserted = @@ROWCOUNT;
-
                     INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
                     SELECT S.[Id], S.[Name], S.[Email]
                     FROM #AdoGen_User AS S
-                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
-                    SET @upserted = @upserted + @@ROWCOUNT;
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WITH (UPDLOCK, HOLDLOCK) WHERE S.[Id] = T.[Id]);
+                    SET @inserted = @inserted + @@ROWCOUNT;
 
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
 
                     END TRY
                     BEGIN CATCH
-                        IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                        DROP TABLE IF EXISTS #AdoGen_User;
                         THROW;
                     END CATCH;
-                    IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                    DROP TABLE IF EXISTS #AdoGen_User;
             """);
     }
 
@@ -318,11 +308,11 @@ public sealed class SqlServerSqlTextBuilderTests
         var actual = SqlServerSqlTextBuilder.BulkApply(EmitContextFixtures.SqlServerUser(), "#AdoGen_User",
             new BulkApplyOptions(false, true));
 
+        // HasUpserts defaults to true, so M insert-missing is still emitted
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
-                    CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
 
                     UPDATE T
                     SET
@@ -330,7 +320,7 @@ public sealed class SqlServerSqlTextBuilderTests
                         T.[Email] = S.[Email]
                     FROM [dbo].[Users] AS T
                         JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
-                    WHERE S.[Operation] = 'U';
+                    WHERE S.[Operation] IN ('U', 'M');
                     SET @updated = @@ROWCOUNT;
 
                     DELETE T
@@ -339,29 +329,20 @@ public sealed class SqlServerSqlTextBuilderTests
                     WHERE S.[Operation] = 'D';
                     SET @deleted = @@ROWCOUNT;
 
-                    UPDATE T
-                    SET
-                        T.[Name] = S.[Name],
-                        T.[Email] = S.[Email]
-                    FROM [dbo].[Users] AS T
-                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
-                    WHERE S.[Operation] = 'M';
-                    SET @upserted = @@ROWCOUNT;
-
                     INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
                     SELECT S.[Id], S.[Name], S.[Email]
                     FROM #AdoGen_User AS S
-                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
-                    SET @upserted = @upserted + @@ROWCOUNT;
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WITH (UPDLOCK, HOLDLOCK) WHERE S.[Id] = T.[Id]);
+                    SET @inserted = @inserted + @@ROWCOUNT;
 
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
 
                     END TRY
                     BEGIN CATCH
-                        IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                        DROP TABLE IF EXISTS #AdoGen_User;
                         THROW;
                     END CATCH;
-                    IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                    DROP TABLE IF EXISTS #AdoGen_User;
             """);
     }
 
@@ -371,17 +352,11 @@ public sealed class SqlServerSqlTextBuilderTests
         var actual = SqlServerSqlTextBuilder.BulkApply(EmitContextFixtures.SqlServerUser(), "#AdoGen_User",
             new BulkApplyOptions(false, false));
 
+        // HasUpserts defaults to true, so UPDATE IN ('U','M') and M insert-missing are still emitted
         actual.Should().Be(
             """
             BEGIN TRY
-                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
-                    CREATE INDEX [IX_AdoGen_Users_Op_Key] ON #AdoGen_User ([Operation], [Id]);
-
-                    DELETE T
-                    FROM [dbo].[Users] AS T
-                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
-                    WHERE S.[Operation] = 'D';
-                    SET @deleted = @@ROWCOUNT;
+                    DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
 
                     UPDATE T
                     SET
@@ -389,23 +364,29 @@ public sealed class SqlServerSqlTextBuilderTests
                         T.[Email] = S.[Email]
                     FROM [dbo].[Users] AS T
                         JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
-                    WHERE S.[Operation] = 'M';
-                    SET @upserted = @@ROWCOUNT;
+                    WHERE S.[Operation] IN ('U', 'M');
+                    SET @updated = @@ROWCOUNT;
+
+                    DELETE T
+                    FROM [dbo].[Users] AS T
+                        JOIN #AdoGen_User AS S ON S.[Id] = T.[Id]
+                    WHERE S.[Operation] = 'D';
+                    SET @deleted = @@ROWCOUNT;
 
                     INSERT INTO [dbo].[Users] ([Id], [Name], [Email])
                     SELECT S.[Id], S.[Name], S.[Email]
                     FROM #AdoGen_User AS S
-                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WHERE S.[Id] = T.[Id]);
-                    SET @upserted = @upserted + @@ROWCOUNT;
+                    WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[Users] AS T WITH (UPDLOCK, HOLDLOCK) WHERE S.[Id] = T.[Id]);
+                    SET @inserted = @inserted + @@ROWCOUNT;
 
-                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
+                    SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
 
                     END TRY
                     BEGIN CATCH
-                        IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                        DROP TABLE IF EXISTS #AdoGen_User;
                         THROW;
                     END CATCH;
-                    IF OBJECT_ID('tempdb..#AdoGen_User') IS NOT NULL DROP TABLE #AdoGen_User;
+                    DROP TABLE IF EXISTS #AdoGen_User;
             """);
     }
 }

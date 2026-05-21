@@ -28,15 +28,14 @@ public sealed class VersionedOrderBulk : BulkBatchSql<global::AdoGen.Generator.T
     private const string _sqlApply =
         """
         BEGIN TRY
-        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0, @upserted INT = 0;
-        CREATE INDEX [IX_AdoGen_VersionedOrders_Op_Key] ON #AdoGen_VersionedOrder ([Operation], [Id]);
+        DECLARE @inserted INT = 0, @updated INT = 0, @deleted INT = 0;
 
         UPDATE T
         SET
             T.[ProductName] = S.[ProductName]
         FROM [dbo].[VersionedOrders] AS T
             JOIN #AdoGen_VersionedOrder AS S ON S.[Id] = T.[Id]
-        WHERE S.[Operation] = 'U';
+        WHERE S.[Operation] IN ('U', 'M');
         SET @updated = @@ROWCOUNT;
 
         INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version])
@@ -51,33 +50,28 @@ public sealed class VersionedOrderBulk : BulkBatchSql<global::AdoGen.Generator.T
         WHERE S.[Operation] = 'D';
         SET @deleted = @@ROWCOUNT;
 
-        UPDATE T
-        SET
-            T.[ProductName] = S.[ProductName]
-        FROM [dbo].[VersionedOrders] AS T
-            JOIN #AdoGen_VersionedOrder AS S ON S.[Id] = T.[Id]
-        WHERE S.[Operation] = 'M';
-        SET @upserted = @@ROWCOUNT;
-
         INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version])
         SELECT S.[Id], S.[ProductName], S.[Version]
         FROM #AdoGen_VersionedOrder AS S
-        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[VersionedOrders] AS T WHERE S.[Id] = T.[Id]);
-        SET @upserted = @upserted + @@ROWCOUNT;
+        WHERE S.[Operation] = 'M' AND NOT EXISTS (SELECT 1 FROM [dbo].[VersionedOrders] AS T WITH (UPDLOCK, HOLDLOCK) WHERE S.[Id] = T.[Id]);
+        SET @inserted = @inserted + @@ROWCOUNT;
 
-        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted, @upserted AS Upserted;
+        SELECT @inserted AS Inserted, @updated AS Updated, @deleted AS Deleted;
 
         END TRY
         BEGIN CATCH
-            IF OBJECT_ID('tempdb..#AdoGen_VersionedOrder') IS NOT NULL DROP TABLE #AdoGen_VersionedOrder;
+            DROP TABLE IF EXISTS #AdoGen_VersionedOrder;
             THROW;
         END CATCH;
-        IF OBJECT_ID('tempdb..#AdoGen_VersionedOrder') IS NOT NULL DROP TABLE #AdoGen_VersionedOrder;
+        DROP TABLE IF EXISTS #AdoGen_VersionedOrder;
         """;
+
+    private const string _sqlApplyWithIndex = """CREATE INDEX [IX_AdoGen_VersionedOrders_Op_Key] ON #AdoGen_VersionedOrder ([Operation], [Id]);""" + "\n" + _sqlApply;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
     protected override string SqlApply => _sqlApply;
+    protected override string SqlApplyWithIndex => _sqlApplyWithIndex;
     protected override int FieldCount => 4;
 
      /// <summary>
