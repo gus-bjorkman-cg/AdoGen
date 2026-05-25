@@ -112,6 +112,54 @@ public sealed class ExecuteTests(TestContext testContext) : TestBase(testContext
             .AllSatisfy(x => x.Should().NotBe("updated"));
     }
 
+    [Fact]
+    public async Task Execute_ShouldThrowOperationCanceledException_WhenSingleParameter_AndCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        // Act
+        var act = async () =>
+            await Connection.ExecuteAsync(SqlUpdateSingleParam, UserSql.CreateParameterId(DefaultUsers[0].Id), cts.Token);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldThrowSqlException_WhenSingleParameter_AndCommandTimeoutIsReached()
+    {
+        // Arrange
+        await using var transaction = await LockTable("Users");
+
+        // Act
+        var act = async () =>
+        {
+            await using var connectionB = new SqlConnection(ConnectionString);
+            await connectionB.ExecuteAsync(SqlUpdateSingleParam, UserSql.CreateParameterId(DefaultUsers[0].Id), CancellationToken, commandTimeout: 1);
+        };
+
+        // Assert
+        (await act.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(-2);
+        transaction.Rollback();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRespectDbTransaction_WhenSingleParameter()
+    {
+        // Arrange
+        var id = DefaultUsers[0].Id;
+        await using var transaction = Connection.BeginTransaction();
+
+        // Act
+        await Connection.ExecuteAsync(SqlUpdateSingleParam, UserSql.CreateParameterId(id), CancellationToken, transaction: transaction);
+        await transaction.RollbackAsync(CancellationToken);
+
+        // Assert
+        (await GetUser(id)).Should().Be(DefaultUsers[0]);
+    }
+
     private const string SqlUpdateMultiParam = "UPDATE Users SET Name = @Name WHERE Id = @Id";
         
     [Fact]
@@ -161,5 +209,64 @@ public sealed class ExecuteTests(TestContext testContext) : TestBase(testContext
         // Assert
         (await GetAllUsers()).Where(x => x.Id != id).Select(x => x.Name).Should()
             .AllSatisfy(x => x.Should().NotBe("multi param"));
+    }
+
+    [Fact]
+    public async Task Execute_ShouldThrowOperationCanceledException_WhenMultipleParameters_AndCtsIsCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        // Act
+        var act = async () =>
+            await Connection.ExecuteAsync(
+                SqlUpdateMultiParam,
+                [UserSql.CreateParameterId(DefaultUsers[0].Id), UserSql.CreateParameterName("multi param")],
+                cts.Token);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldThrowSqlException_WhenMultipleParameters_AndCommandTimeoutIsReached()
+    {
+        // Arrange
+        await using var transaction = await LockTable("Users");
+
+        // Act
+        var act = async () =>
+        {
+            await using var connectionB = new SqlConnection(ConnectionString);
+            await connectionB.ExecuteAsync(
+                SqlUpdateMultiParam,
+                [UserSql.CreateParameterId(DefaultUsers[0].Id), UserSql.CreateParameterName("multi param")],
+                CancellationToken,
+                commandTimeout: 1);
+        };
+
+        // Assert
+        (await act.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(-2);
+        transaction.Rollback();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRespectDbTransaction_WhenMultipleParameters()
+    {
+        // Arrange
+        var id = DefaultUsers[0].Id;
+        await using var transaction = Connection.BeginTransaction();
+
+        // Act
+        await Connection.ExecuteAsync(
+            SqlUpdateMultiParam,
+            [UserSql.CreateParameterId(id), UserSql.CreateParameterName("multi param")],
+            CancellationToken,
+            transaction: transaction);
+        await transaction.RollbackAsync(CancellationToken);
+
+        // Assert
+        (await GetUser(id)).Should().Be(DefaultUsers[0]);
     }
 }
