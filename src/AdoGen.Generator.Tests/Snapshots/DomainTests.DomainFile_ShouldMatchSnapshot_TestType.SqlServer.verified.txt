@@ -395,6 +395,151 @@ public sealed partial record TestType : ISqlDomainModel<global::AdoGen.Generator
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsert);
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpdate);
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlDelete);
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpsert);
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsertAndReturn);
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

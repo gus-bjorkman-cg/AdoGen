@@ -124,6 +124,25 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <param name="commandTimeout"></param>
     /// <returns>The inserted row with all server-populated columns filled in.</returns>
     static abstract ValueTask<T> InsertAndReturnAsync(T model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>Adds an INSERT command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddInsertBatchCommand(SqlBatch batch, T model);
+
+    /// <summary>Adds an UPDATE command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddUpdateBatchCommand(SqlBatch batch, T model);
+
+    /// <summary>Adds a DELETE command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddDeleteBatchCommand(SqlBatch batch, T model);
+
+    /// <summary>Adds an INSERT OR UPDATE (upsert) command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddUpsertBatchCommand(SqlBatch batch, T model);
+
+    /// <summary>
+    /// Adds an INSERT … OUTPUT INSERTED.* command for <typeparamref name="T"/> to the batch.
+    /// Read the inserted row back by calling <c>T.Map(reader)</c> on the corresponding result set
+    /// after executing the batch with <see cref="SqlBatch.ExecuteReaderAsync"/>.
+    /// </summary>
+    static abstract void AddInsertAndReturnBatchCommand(SqlBatch batch, T model);
 }
 
 /// <summary>

@@ -199,6 +199,55 @@ public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Gen
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsert);
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpdate);
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlDelete);
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpsert);
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsertAndReturn);
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

@@ -387,6 +387,151 @@ public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Genera
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsert);
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(model.LongEnum));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpdate);
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(model.LongEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlDelete);
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpsert);
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(model.LongEnum));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.TestType model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsertAndReturn);
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(model.NullableInt));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(model.NullableDecimal));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(model.NullableGuid));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(model.CharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(model.NCharString));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(model.Float));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(model.NullableFloat));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(model.DateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(model.NullableDateTime));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(model.Double));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(model.NullableDouble));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(model.Char));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(model.NChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(model.NullableChar));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(model.NullableBytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(model.Bytes));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(model.Fruits));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(model.Flags));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(model.ByteEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(model.ShortEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(model.IntEnum));
+        batchCmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(model.LongEnum));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

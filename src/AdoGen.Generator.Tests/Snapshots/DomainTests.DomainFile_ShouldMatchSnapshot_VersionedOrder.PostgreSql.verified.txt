@@ -189,6 +189,55 @@ public sealed partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsert);
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpdate);
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlDelete);
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpsert);
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.VersionedOrder model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsertAndReturn);
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
+        batchCmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

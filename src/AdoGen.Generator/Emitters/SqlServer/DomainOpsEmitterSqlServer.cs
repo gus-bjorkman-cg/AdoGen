@@ -297,6 +297,41 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
+
+                public static void AddInsertBatchCommand(SqlBatch batch, {{ctx.DtoTypeName}} model)
+                {
+                    var batchCmd = new SqlBatchCommand(SqlInsert);
+            {{ParameterBindingEmitter.BindAll(ctx, "model", 8, "batchCmd")}}
+                    batch.BatchCommands.Add(batchCmd);
+                }
+
+                public static void AddUpdateBatchCommand(SqlBatch batch, {{ctx.DtoTypeName}} model)
+                {
+                    var batchCmd = new SqlBatchCommand(SqlUpdate);
+            {{ParameterBindingEmitter.BindForUpdate(ctx, "model", 8, "batchCmd")}}
+                    batch.BatchCommands.Add(batchCmd);
+                }
+
+                public static void AddDeleteBatchCommand(SqlBatch batch, {{ctx.DtoTypeName}} model)
+                {
+                    var batchCmd = new SqlBatchCommand(SqlDelete);
+            {{ParameterBindingEmitter.BindForDelete(ctx, "model", 8, "batchCmd")}}
+                    batch.BatchCommands.Add(batchCmd);
+                }
+
+                public static void AddUpsertBatchCommand(SqlBatch batch, {{ctx.DtoTypeName}} model)
+                {
+                    var batchCmd = new SqlBatchCommand(SqlUpsert);
+            {{ParameterBindingEmitter.BindForUpsertSqlServer(ctx, "model", 8, "batchCmd")}}
+                    batch.BatchCommands.Add(batchCmd);
+                }
+
+                public static void AddInsertAndReturnBatchCommand(SqlBatch batch, {{ctx.DtoTypeName}} model)
+                {
+                    var batchCmd = new SqlBatchCommand(SqlInsertAndReturn);
+            {{ParameterBindingEmitter.BindAll(ctx, "model", 8, "batchCmd")}}
+                    batch.BatchCommands.Add(batchCmd);
+                }
             }
             """";
         

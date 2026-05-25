@@ -194,6 +194,54 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsert);
+        batchCmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpdate);
+        batchCmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
+        batchCmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlDelete);
+        batchCmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpsert);
+        batchCmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsertAndReturn);
+        batchCmd.Parameters.Add(UserSql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

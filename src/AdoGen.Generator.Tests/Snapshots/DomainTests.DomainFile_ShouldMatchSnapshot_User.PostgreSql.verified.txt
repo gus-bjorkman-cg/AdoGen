@@ -184,6 +184,54 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsert);
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpdate);
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlDelete);
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpsert);
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.User model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsertAndReturn);
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterId(model.Id));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name));
+        batchCmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

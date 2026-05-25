@@ -14,13 +14,13 @@ internal static class ParameterBindingEmitter
     /// Produces cmd.Parameters.Add calls for all columns (Insert / Upsert for PG, Insert for SS).
     /// The returned string ends with a newline.
     /// </summary>
-    public static string BindAll(EmitContext ctx, string modelVar, int indent)
+    public static string BindAll(EmitContext ctx, string modelVar, int indent, string cmdVar = "cmd")
     {
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
         foreach (var col in ctx.Writables)
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+            sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
         
         return sb.ToString();
     }
@@ -30,19 +30,19 @@ internal static class ParameterBindingEmitter
     /// then the concurrency token (if any).
     /// The returned string ends with a newline.
     /// </summary>
-    public static string BindForUpdate(EmitContext ctx, string modelVar, int indent)
+    public static string BindForUpdate(EmitContext ctx, string modelVar, int indent, string cmdVar = "cmd")
     {
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
         foreach (var col in ctx.WritableNonKeyNonIdentities)
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+            sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
         
         foreach (var col in ctx.Keys)
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+            sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
 
         if (ctx.ConcurrencyToken is { } token)
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}({modelVar}.{token.Name}));");
+            sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}({modelVar}.{token.Name}));");
         
         return sb.ToString();
     }
@@ -51,16 +51,16 @@ internal static class ParameterBindingEmitter
     /// Produces cmd.Parameters.Add calls for delete: key columns only, plus concurrency token if any.
     /// The returned string ends with a newline.
     /// </summary>
-    public static string BindForDelete(EmitContext ctx, string modelVar, int indent)
+    public static string BindForDelete(EmitContext ctx, string modelVar, int indent, string cmdVar = "cmd")
     {
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
         foreach (var col in ctx.Keys)
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+            sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
 
         if (ctx.ConcurrencyToken is { } token)
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}({modelVar}.{token.Name}));");
+            sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}({modelVar}.{token.Name}));");
         
         return sb.ToString();
     }
@@ -86,18 +86,18 @@ internal static class ParameterBindingEmitter
     /// non-identity columns first, then any identity key columns.
     /// The returned string ends with a newline.
     /// </summary>
-    public static string BindForUpsertSqlServer(EmitContext ctx, string modelVar, int indent)
+    public static string BindForUpsertSqlServer(EmitContext ctx, string modelVar, int indent, string cmdVar = "cmd")
     {
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
         
         foreach (var col in ctx.Writables)
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+            sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
         
         foreach (var col in ctx.Keys)
         {
             if (col.IsIdentity)
-                sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
+                sb.AppendLine($"{prefix}{cmdVar}.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}));");
         }
         
         return sb.ToString();

@@ -197,6 +197,56 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsert);
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpdate);
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlDelete);
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlUpsert);
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterEventId(model.EventId));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(SqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new SqlBatchCommand(SqlInsertAndReturn);
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

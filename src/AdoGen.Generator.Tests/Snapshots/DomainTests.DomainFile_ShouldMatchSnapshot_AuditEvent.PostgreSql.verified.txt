@@ -186,6 +186,55 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+    public static void AddInsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsert);
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpdateBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpdate);
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(model.EventId));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddDeleteBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlDelete);
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(model.EventId));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddUpsertBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpsert);
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
+
+    public static void AddInsertAndReturnBatchCommand(NpgsqlBatch batch, global::AdoGen.Generator.Tests.AuditEvent model)
+    {
+        var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsertAndReturn);
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+
+        batch.BatchCommands.Add(batchCmd);
+    }
 }
 
 /// <summary>

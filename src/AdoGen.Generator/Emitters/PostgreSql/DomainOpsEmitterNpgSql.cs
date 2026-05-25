@@ -267,6 +267,41 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                       
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                   }
+
+                  public static void AddInsertBatchCommand(NpgsqlBatch batch, {{ctx.DtoTypeName}} model)
+                  {
+                      var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsert);
+              {{ParameterBindingEmitter.BindAll(ctx, "model", 8, "batchCmd")}}
+                      batch.BatchCommands.Add(batchCmd);
+                  }
+
+                  public static void AddUpdateBatchCommand(NpgsqlBatch batch, {{ctx.DtoTypeName}} model)
+                  {
+                      var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpdate);
+              {{ParameterBindingEmitter.BindForUpdate(ctx, "model", 8, "batchCmd")}}
+                      batch.BatchCommands.Add(batchCmd);
+                  }
+
+                  public static void AddDeleteBatchCommand(NpgsqlBatch batch, {{ctx.DtoTypeName}} model)
+                  {
+                      var batchCmd = new NpgsqlBatchCommand(Pg_SqlDelete);
+              {{ParameterBindingEmitter.BindForDelete(ctx, "model", 8, "batchCmd")}}
+                      batch.BatchCommands.Add(batchCmd);
+                  }
+
+                  public static void AddUpsertBatchCommand(NpgsqlBatch batch, {{ctx.DtoTypeName}} model)
+                  {
+                      var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpsert);
+              {{ParameterBindingEmitter.BindAll(ctx, "model", 8, "batchCmd")}}
+                      batch.BatchCommands.Add(batchCmd);
+                  }
+
+                  public static void AddInsertAndReturnBatchCommand(NpgsqlBatch batch, {{ctx.DtoTypeName}} model)
+                  {
+                      var batchCmd = new NpgsqlBatchCommand(Pg_SqlInsertAndReturn);
+              {{ParameterBindingEmitter.BindAll(ctx, "model", 8, "batchCmd")}}
+                      batch.BatchCommands.Add(batchCmd);
+                  }
               }
               """";
 
