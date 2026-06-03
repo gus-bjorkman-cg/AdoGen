@@ -1,3 +1,4 @@
+using System.Globalization;
 using AdoGen.Sample.Features.Users.Commands;
 
 namespace AdoGen.PostgreSql.Tests.Features.Users.Commands;
@@ -10,7 +11,7 @@ public sealed class UpdateUsersBulkNpgsqlCommandHandlerTests(TestContext testCon
     public async Task UpdateUsersBulkCommandHandler_ShouldUpdateUsers()
     {
         // Arrange
-        var users = DefaultUsers.Select((x, i) => x with { Name = i.ToString() }).ToList();
+        var users = DefaultUsers.Select((x, i) => x with { Name = i.ToString(CultureInfo.InvariantCulture) }).ToList();
 
         // Act
         await _sut.NpgSql(new UpdateUsersBulkCommand(users), CancellationToken);

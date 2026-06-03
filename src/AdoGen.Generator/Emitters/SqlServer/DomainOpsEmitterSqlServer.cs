@@ -390,17 +390,17 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         }
 
         var concurrencyWhere = ctx.ConcurrencyToken is { } token
-            ? $"            cmd.CommandText += \" AND [{token.ParameterName}] = @{token.ParameterName}\";\n" +
-              $"            cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}(patch.{token.Name}Value));\n"
+            ? $"        cmd.CommandText += \" AND [{token.ParameterName}] = @{token.ParameterName}\";\n" +
+              $"        cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}(patch.{token.Name}Value));\n"
             : "";
 
         var concurrencyThrow = ctx.ConcurrencyToken is not null
             ? $$"""
-                        var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                        if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                        return affected;
+                      var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                      if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
+                      return affected;
               """
-            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+            : "      return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
 
         var patchClassBody = ctx.ShouldGeneratePatchClass
             ? $$""""
@@ -428,6 +428,8 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             {{patchClassBody}}
             {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}}
             {
+            #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
+            
                 public static async ValueTask<int> PatchAsync(SqlConnection connection, {{patchClassName}} patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (patch.Mask == 0UL) return 0;
@@ -448,6 +450,8 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     
             {{concurrencyThrow}}
                 }
+            
+            #pragma warning restore CS0219
             }
 
             /// <summary>Extension methods for patching <see cref="{{dto.Name}}"/> via <see cref="SqlConnection"/>.</summary>

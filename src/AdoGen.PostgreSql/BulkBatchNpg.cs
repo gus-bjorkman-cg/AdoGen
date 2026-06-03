@@ -207,8 +207,9 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
         CancellationToken ct,
         int? commandTimeout = null)
     {
+        ArgumentNullException.ThrowIfNull(transaction);
+        
         if (Items.Count == 0) return BulkApplyResult.Empty;
-        if (transaction is null) throw new ArgumentNullException(nameof(transaction));
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
         if (HasInserts && !HasUpdates && !HasDeletes && !HasUpserts)

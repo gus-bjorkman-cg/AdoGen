@@ -96,7 +96,7 @@ public interface INpgsqlDomainModel<T> where T : INpgsqlDomainModel<T>
     /// <summary>
     /// Adds an INSERT … RETURNING * command for <typeparamref name="T"/> to the batch.
     /// Read the inserted row back by calling <c>T.Map(reader)</c> on the corresponding result set
-    /// after executing the batch with <see cref="NpgsqlBatch.ExecuteReaderAsync"/>.
+    /// after executing the batch with <see cref="NpgsqlBatch.ExecuteReaderAsync(CancellationToken)"/>.
     /// </summary>
     static abstract void AddInsertAndReturnBatchCommand(NpgsqlBatch batch, T model);
 }

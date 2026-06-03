@@ -122,7 +122,7 @@ internal static class ProfileInfoCollector
         // Ensure configs exist for all props (conventions)
         foreach (var prop in dtoProps.Values)
         {
-            if (!configs.ContainsKey(prop.Name))
+            if (!configs.TryGetValue(prop.Name, out var config))
             {
                 configs[prop.Name] = new ParamConfig
                 {
@@ -132,9 +132,8 @@ internal static class ProfileInfoCollector
                     DbType = prop.MapDefaultDbType(provider)
                 };
             }
-            else if (configs[prop.Name].DbType is null)
+            else if (config.DbType is null)
             {
-                var config = configs[prop.Name];
                 config.DbType = prop.MapDefaultDbType(provider);
             }
         }

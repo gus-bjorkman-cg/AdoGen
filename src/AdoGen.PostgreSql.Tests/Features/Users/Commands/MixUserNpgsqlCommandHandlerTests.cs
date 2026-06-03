@@ -1,3 +1,4 @@
+using System.Globalization;
 using AdoGen.Sample.Features.Users.Commands;
 
 namespace AdoGen.PostgreSql.Tests.Features.Users.Commands;
@@ -11,7 +12,7 @@ public sealed class MixUserNpgsqlCommandHandlerTests(TestContext testContext) : 
     {
         // Arrange
         var usersToInsert = UserFaker.Generate(10).ToList();
-        var usersToUpdate = DefaultUsers.Take(5).Select((x, i) => x with { Name = i.ToString() }).ToList();
+        var usersToUpdate = DefaultUsers.Take(5).Select((x, i) => x with { Name = i.ToString(CultureInfo.InvariantCulture) }).ToList();
         var usersToDelete = DefaultUsers.Skip(5).ToList();
 
         // Act

@@ -4,6 +4,8 @@ using NpgsqlTypes;
 
 namespace AdoGen.PostgreSql;
 
+#pragma warning disable CA1720 // Identifier contains type name — intentional SQL type naming
+
 /// <summary>
 /// The generator inspects the constructor body and reads calls to RuleFor(...).
 /// It should be used to configure db types and properties for PostgreSQL.
@@ -138,3 +140,5 @@ public sealed class PropertyBuilder<TProp>
     /// </summary>
     public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
 }
+
+#pragma warning restore CA1720

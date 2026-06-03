@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using AdoGen.PostgreSql;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
@@ -16,7 +17,7 @@ public class PgFirstOrDefault : PgTestBase
 
     protected override ValueTask Initialize()
     {
-        _names = Enumerable.Range(0, OperationCount).Select(x => x.ToString()).ToArray();
+        _names = Enumerable.Range(0, OperationCount).Select(x => x.ToString(CultureInfo.InvariantCulture)).ToArray();
         return ValueTask.CompletedTask;
     }
 

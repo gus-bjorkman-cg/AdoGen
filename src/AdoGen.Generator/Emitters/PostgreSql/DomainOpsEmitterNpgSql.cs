@@ -414,6 +414,8 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             {{patchClassBody}}
             {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}}
             {
+            #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
+            
                 public static async ValueTask<int> PatchAsync(NpgsqlConnection connection, {{patchClassName}} patch, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (patch.Mask == 0UL) return 0;
@@ -434,6 +436,8 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                     
             {{concurrencyThrow}}
                 }
+            
+            #pragma warning restore CS0219
             }
 
             /// <summary>Extension methods for patching <see cref="{{dto.Name}}"/> via <see cref="NpgsqlConnection"/>.</summary>

@@ -4,6 +4,8 @@ using System.Linq.Expressions;
 
 namespace AdoGen.SqlServer;
 
+#pragma warning disable CA1720 // Identifier contains type name — intentional SQL type naming
+
 /// <summary>
 /// The generator inspects the constructor body and reads calls to RuleFor(...).
 /// It should be used to configure db types and properties.
@@ -174,3 +176,5 @@ public sealed class PropertyBuilder<TProp>
     /// <returns></returns>
     public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
 }
+
+#pragma warning restore CA1720

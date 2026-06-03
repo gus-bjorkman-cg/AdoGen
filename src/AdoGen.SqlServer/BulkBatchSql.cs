@@ -209,8 +209,9 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         SqlBulkCopyOptions sqlBulkCopyOptions = SqlBulkCopyOptions.KeepNulls | SqlBulkCopyOptions.TableLock,
         bool enableStreaming = false)
     {
+        ArgumentNullException.ThrowIfNull(transaction);
+        
         if (Items.Count == 0) return BulkApplyResult.Empty;
-        if (transaction is null) throw new ArgumentNullException(nameof(transaction));
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
         var timeout = commandTimeout ?? DefaultTimeoutSeconds;

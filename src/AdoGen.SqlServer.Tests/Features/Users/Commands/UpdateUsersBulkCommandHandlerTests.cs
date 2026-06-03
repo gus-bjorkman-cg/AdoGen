@@ -1,3 +1,4 @@
+using System.Globalization;
 using AdoGen.Sample.Features.Users.Commands;
 
 namespace AdoGen.SqlServer.Tests.Features.Users.Commands;
@@ -10,7 +11,7 @@ public sealed class UpdateUsersBulkCommandHandlerTests(TestContext testContext) 
     public async Task UpdateUsersBulkCommandHandler_ShouldUpdateUsers()
     {
         // Arrange
-        var users = DefaultUsers.Select((x, i) => x with { Name = i.ToString() }).ToList();
+        var users = DefaultUsers.Select((x, i) => x with { Name = i.ToString(CultureInfo.InvariantCulture) }).ToList();
         
         // Act
         await _sut.SqlServer(new UpdateUsersBulkCommand(users), CancellationToken);

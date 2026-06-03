@@ -11,7 +11,7 @@ public abstract class TestBase : IAsyncLifetime
     protected List<User> DefaultUsers { get; }
     protected List<Order> DefaultOrders { get; }
 
-    protected readonly NpgsqlConnection Connection;
+    protected NpgsqlConnection Connection { get; }
 
     protected static CancellationToken CancellationToken => TestContext.CancellationToken;
 

@@ -1,8 +1,10 @@
 namespace AdoGen.Sample.Features.Users.Commands;
 
-public record struct TruncateUsersCommand
+public readonly record struct TruncateUsersCommand
 {
+#pragma warning disable CA1805 // Explicitly initialized to default — intentional singleton clarity
     public static TruncateUsersCommand Instance { get; } = new();
+#pragma warning restore CA1805
 }
 
 public sealed class TruncateUsersCommandHandler(string connectionString)

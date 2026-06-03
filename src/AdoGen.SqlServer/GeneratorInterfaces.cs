@@ -140,7 +140,7 @@ public interface ISqlDomainModel<T> where T : ISqlDomainModel<T>
     /// <summary>
     /// Adds an INSERT … OUTPUT INSERTED.* command for <typeparamref name="T"/> to the batch.
     /// Read the inserted row back by calling <c>T.Map(reader)</c> on the corresponding result set
-    /// after executing the batch with <see cref="SqlBatch.ExecuteReaderAsync"/>.
+    /// after executing the batch with <see cref="SqlBatch.ExecuteReaderAsync(CancellationToken)"/>.
     /// </summary>
     static abstract void AddInsertAndReturnBatchCommand(SqlBatch batch, T model);
 }

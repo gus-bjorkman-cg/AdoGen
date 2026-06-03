@@ -1,3 +1,4 @@
+using System.Globalization;
 using AdoGen.Sample.Features.Users;
 
 namespace AdoGen.PostgreSql.Tests.Features;
@@ -64,7 +65,7 @@ public sealed class TruncateTests(TestContext testContext) : TestBase(testContex
     {
         await using var command = Connection.CreateCommand("""SELECT COUNT(*) FROM "public"."Users" """);
         var value = await command.ExecuteScalarAsync(CancellationToken);
-        return Convert.ToInt64(value);
+        return Convert.ToInt64(value, CultureInfo.InvariantCulture);
     }
 }
 

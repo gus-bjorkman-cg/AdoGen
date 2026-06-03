@@ -10,6 +10,8 @@ public enum Fruits
     Orange
 }
 
+#pragma warning disable CA1711 // Dummy names for dummy type
+
 [Flags]
 public enum Flags
 {
@@ -47,6 +49,9 @@ public enum LongEnum : long
     ValueC = 3
 }
 
+#pragma warning restore CA1711
+#pragma warning disable CA1720 // Identifier contains type name — intentional SQL type naming
+
 public sealed partial record TestType(
     int Int,
     int? NullableInt,
@@ -77,6 +82,8 @@ public sealed partial record TestType(
     LongEnum LongEnum,
     DateTimeOffset CreatedAt
     ) : ISqlBulkModel, INpgsqlBulkModel;
+
+#pragma warning restore CA1720
 
 public sealed class TestTypeProfile : SqlProfile<TestType>
 {

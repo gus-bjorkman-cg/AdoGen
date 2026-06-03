@@ -10,7 +10,7 @@ public abstract class TestBase : IAsyncLifetime
     protected string ConnectionString { get; }
     protected List<User> DefaultUsers { get; }
     protected List<Order> DefaultOrders { get; }
-    protected readonly SqlConnection Connection;
+    protected SqlConnection Connection { get; }
     protected static CancellationToken CancellationToken => TestContext.CancellationToken;
 
     protected static readonly Faker<User> UserFaker = Fakers.UserFaker;
