@@ -1,8 +1,10 @@
 # AGENTS.md — AdoGen Codebase Guide
 
+> **Operational guide for agents.** For the non-negotiable rule set (performance, runtime constraints, provider boundaries, SQL generation scope), read `.github/copilot-instructions.md` first. This file covers *how to work in the repo*, not *what the rules are*.
+
 ## What Is AdoGen
 
-AdoGen is a **reflection-free, Native AOT-compatible micro-ORM** for .NET that uses Roslyn source generation to produce all mapping and SQL code at compile time. The generator reads `partial` DTOs + profile classes and emits `*.g.cs` files — no runtime IL, no `AddWithValue`, no expression trees.
+AdoGen is a **reflection-free, Native AOT-compatible micro-ORM** for .NET. A Roslyn source generator reads `partial` DTOs + profile classes and emits `*.g.cs` files — no runtime IL, no reflection, no `AddWithValue`. Two stable providers: SQL Server (`AdoGen.SqlServer`) and PostgreSQL (`AdoGen.PostgreSql`).
 
 ---
 
@@ -74,48 +76,26 @@ Integration tests spin up a real database container per test collection. `TestCo
 1. Declare a `partial` record implementing one or more marker interfaces per provider:
    - SQL Server: `ISqlMapper`, `ISqlDomainModel`, `ISqlBulkModel`
    - PostgreSQL: `INpgsqlMapper`, `INpgsqlDomainModel`, `INpgsqlBulkModel`
-   - A single DTO can implement interfaces for **both** providers simultaneously
-2. Create a provider-specific profile subclass for **each** provider the DTO targets:
-   - `SqlProfile<T>` for SQL Server
-   - `NpgsqlProfile<T>` for PostgreSQL
-   - A profile is **always required**, even when all members would map automatically
+   - A single DTO may implement interfaces for **both** providers simultaneously.
+2. Create a provider-specific profile per provider the DTO targets — `SqlProfile<T>` and/or `NpgsqlProfile<T>`. A profile is **always required**, even when every member would map by default.
 3. The generator emits separate `*.g.cs` files per provider.
 
 ```csharp
-// DTO targeting both providers
 public sealed partial record Order(Guid Id, string ProductName, Guid UserId)
     : ISqlDomainModel, INpgsqlDomainModel;
 
-// One profile per provider
 public sealed class OrderProfile : SqlProfile<Order>
 {
-    public OrderProfile()
-    {
-        RuleFor(x => x.ProductName).VarChar(50);
-    }
+    public OrderProfile() => RuleFor(x => x.ProductName).VarChar(50);
 }
 
 public sealed class OrderNpgsqlProfile : NpgsqlProfile<Order>
 {
-    public OrderNpgsqlProfile()
-    {
-        RuleFor(x => x.ProductName).VarChar(50);
-    }
+    public OrderNpgsqlProfile() => RuleFor(x => x.ProductName).VarChar(50);
 }
 ```
 
-### Mandatory Configurations (fail at generation time if missing)
-- `string` → must call `.VarChar(n)`, `.NVarChar(n)`, `.Char(n)`, or `.NChar(n)` (SQL Server); `.VarChar(n)` or equivalent (PostgreSQL)
-- `decimal` → must call `.Decimal(precision, scale)`
-- `Guid`, numeric types, `bool`, `DateTime` → default mappings, no config needed
-- `Id` property → treated as PK by convention; override with `Key(x => x.MyKey)`
-- **A profile is always required** — even when all members have default mappings
-
-### CancellationToken — Non-Negotiable
-Every public async method requires an explicit `CancellationToken`. No overloads that omit it. Callers pass `CancellationToken.None` if cancellation is not needed.
-
-### No `AddWithValue` — Ever
-Use generated typed factory methods: `UserSql.CreateParameterId(id)`, `UserSql.CreateParameterEmail(email)`.
+For mandatory column configuration, generated SQL scope, concurrency tokens, and read-only columns, see `.github/copilot-instructions.md` §5–§6.
 
 ---
 
@@ -144,18 +124,6 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 
 ---
 
-## Absolute Rules (Runtime Code)
-
-- No `System.Reflection`
-- No expression trees, dynamic, or runtime IL
-- No LINQ in hot paths
-- No `AddWithValue`
-- Async-only public I/O APIs with mandatory `CancellationToken`
-- SQL Server types (`SqlConnection`, `SqlParameter`, `SqlDbType`) stay in `AdoGen.SqlServer`
-- PostgreSQL types (`NpgsqlConnection`, `NpgsqlParameter`, `NpgsqlDbType`) stay in `AdoGen.PostgreSql`
-- No cross-provider abstractions
-
----
 
 ## Agent Working Rules
 
@@ -180,11 +148,10 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - **Bogus `StrictMode` requires every property to have a rule.** When adding a new property to a DTO used in Faker-based tests, add a corresponding `.RuleFor(x => x.NewProp, ...)` or tests will throw at runtime.
 - **Concurrency token (int/long): same parameter used in both SET and WHERE.** `[Token] = @Token + 1` (SET) and `AND [Token] = @Token` (WHERE) share one parameter. For Guid tokens, only WHERE is augmented; the value is set by the caller as a normal writable column.
 - **`AdoGenConcurrencyException` thrown with fully-qualified `global::` prefix** to avoid ambiguity in projects referencing both `AdoGen.SqlServer` and `AdoGen.PostgreSql`.
-- **Test method naming follows `Subject_ShouldVerb_WhenCondition`.** e.g. `Exists_ShouldReturnTrue_WhenUserExists`. Never use `_Returns`, `_Respects`, or free-form names — always `_Should_When_`.
-- **AAA comments are mandatory when a test has more than one logical step.** Single-action tests (`Act` + `Assert` only) may omit `// Arrange`. Multi-step tests (`Arrange`, `Act`, `Assert`) must have all three comments.
+- **Test method naming: prefer `Subject_ShouldVerb_WhenCondition`** (e.g. `Exists_ShouldReturnTrue_WhenUserExists`) for new tests. The codebase still contains older free-form names (`InsertUser_ShouldInsertUser`); when extending an existing file, match the surrounding style rather than mixing conventions.
+- **AAA comments are mandatory when a test has more than one logical step.** Single-action tests (`Act` + `Assert` only) may omit `// Arrange`. Multi-step tests must have all three comments.
 - **`SELECT EXISTS`-style queries must use `TOP(1)` (SQL Server) or `LIMIT 1` (PostgreSQL)** to stop the engine from scanning past the first matching row.
-- **`InsertAndReturnAsync` uses `Map(reader)` on the DTO partial class, not on the `*Sql`/`*Npgsql` static helper class.** The generated `Map` method lives on the DTO itself (from `ISqlMapper<T>`), so call `DtoName.Map(reader)` not `DtoNameSql.Map(reader)`.
-- **Test naming convention note: existing tests in this codebase mix free-form names (e.g. `InsertUser_ShouldInsertUser`) and `Subject_ShouldVerb_WhenCondition`.** Both patterns exist in the codebase; follow whichever style is already used in the surrounding file.
+- **`InsertAndReturnAsync` uses `Map(reader)` on the DTO partial class, not on the `*Sql`/`*Npgsql` static helper class.** The generated `Map` lives on the DTO itself (from `ISqlMapper<T>`), so call `DtoName.Map(reader)`, not `DtoNameSql.Map(reader)`.
 
 ---
 
