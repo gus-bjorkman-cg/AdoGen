@@ -398,9 +398,10 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             ? $$"""
                       var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                       if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
+                      
                       return affected;
               """
-            : "      return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
 
         var patchClassBody = ctx.ShouldGeneratePatchClass
             ? $$""""

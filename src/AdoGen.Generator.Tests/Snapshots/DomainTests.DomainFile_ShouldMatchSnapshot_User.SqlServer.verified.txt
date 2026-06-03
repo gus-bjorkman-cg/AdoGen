@@ -265,6 +265,8 @@ public partial class UserPatch
 }
 public sealed partial record User
 {
+#pragma warning disable CS0219 // generated code, will trigger warn when single property on class
+
     public static async ValueTask<int> PatchAsync(SqlConnection connection, UserPatch patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (patch.Mask == 0UL) return 0;
@@ -286,6 +288,8 @@ public sealed partial record User
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+#pragma warning restore CS0219
 }
 
 /// <summary>Extension methods for patching <see cref="User"/> via <see cref="SqlConnection"/>.</summary>

@@ -625,6 +625,8 @@ public sealed partial class TestTypePatch
 }
 public sealed partial record TestType
 {
+#pragma warning disable CS0219 // generated code, will trigger warn when single property on class
+
     public static async ValueTask<int> PatchAsync(NpgsqlConnection connection, TestTypePatch patch, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (patch.Mask == 0UL) return 0;
@@ -670,6 +672,8 @@ public sealed partial record TestType
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
+
+#pragma warning restore CS0219
 }
 
 /// <summary>Extension methods for patching <see cref="TestType"/> via <see cref="NpgsqlConnection"/>.</summary>

@@ -270,6 +270,8 @@ public partial class VersionedOrderGuidPatch
 }
 public sealed partial record VersionedOrderGuid
 {
+#pragma warning disable CS0219 // generated code, will trigger warn when single property on class
+
     public static async ValueTask<int> PatchAsync(SqlConnection connection, VersionedOrderGuidPatch patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (patch.Mask == 0UL) return 0;
@@ -284,15 +286,18 @@ public sealed partial record VersionedOrderGuid
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("[ProductName] = @ProductName"); separator = ", "; cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName((string)patch.ProductNameValue!)); }
 
         sb.Append(" WHERE [Id] = @Id");
-            cmd.CommandText += " AND [RowVersion] = @RowVersion";
-            cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(patch.RowVersionValue));
+        cmd.CommandText += " AND [RowVersion] = @RowVersion";
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(patch.RowVersionValue));
         cmd.CommandText = sb.ToString();
         cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(patch.Id));
         
-          var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-          if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrderGuids");
-          return affected;
+        var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrderGuids");
+        
+        return affected;
     }
+
+#pragma warning restore CS0219
 }
 
 /// <summary>Extension methods for patching <see cref="VersionedOrderGuid"/> via <see cref="SqlConnection"/>.</summary>

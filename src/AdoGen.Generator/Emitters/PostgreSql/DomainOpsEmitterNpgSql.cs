@@ -345,15 +345,16 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         }
 
         var concurrencyWhere = ctx.ConcurrencyToken is { } token
-            ? $"            cmd.CommandText += \" AND \\\"{token.ParameterName}\\\" = @{token.ParameterName}\";\n" +
-              $"            cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}(patch.{token.Name}Value));\n"
+            ? $"        cmd.CommandText += \" AND \\\"{token.ParameterName}\\\" = @{token.ParameterName}\";\n" +
+              $"        cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}(patch.{token.Name}Value));\n"
             : "";
 
         var concurrencyThrow = ctx.ConcurrencyToken is not null
             ? $$"""
-                        var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                        if (affected == 0) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                        return affected;
+                      var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                      if (affected == 0) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
+                        
+                      return affected;
               """
             : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
 
