@@ -140,6 +140,7 @@ class Build : NukeBuild
     Target Pack => x => x
         .Description("Packs the provider and generator projects")
         .DependsOn(Test)
+        .OnlyWhenDynamic(() => IsTagBuild || !IsServerBuild)
         .Executes(() =>
         {
             var version = ResolveVersion();
