@@ -12,9 +12,9 @@ and **doing parameter binding correctly** — without magic, reflection, or runt
 
 ## Supported providers
 
-| Provider | Package | Status |
-|----------|---------|--------|
-| SQL Server | `AdoGen.SqlServer` | ✅ Stable |
+| Provider   | Package             | Status    |
+|------------|---------------------|-----------|
+| SQL Server | `AdoGen.SqlServer`  | ✅ Stable |
 | PostgreSQL | `AdoGen.PostgreSql` | ✅ Stable |
 
 ---
@@ -43,11 +43,11 @@ dotnet add package AdoGen.Generator
 public sealed partial record User(Guid Id, string Name, string Email) : ISqlBulkModel, INpgsqlBulkModel;
 ```
 
-| Interface | Generates | SQL Server | PostgreSQL |
-|-----------|-----------|-----------|-----------|
-| Mapper only | Mapper + typed parameter factories | `ISqlMapper` | `INpgsqlMapper` |
-| Full CRUD | Everything above + Insert/Update/Upsert/Delete/Patch/CreateTable | `ISqlDomainModel` | `INpgsqlDomainModel` |
-| Bulk ops | Everything above + bulk insert/update/delete | `ISqlBulkModel` | `INpgsqlBulkModel` |
+| Interface   | Generates                                                        | SQL Server        | PostgreSQL           |
+|-------------|------------------------------------------------------------------|-------------------|----------------------|
+| Mapper only | Mapper + typed parameter factories                               | `ISqlMapper`      | `INpgsqlMapper`      |
+| Full CRUD   | Everything above + Insert/Update/Upsert/Delete/Patch/CreateTable | `ISqlDomainModel` | `INpgsqlDomainModel` |
+| Bulk ops    | Everything above + bulk insert/update/delete                     | `ISqlBulkModel`   | `INpgsqlBulkModel`   |
 
 ### 2. Create a profile
 
@@ -113,12 +113,12 @@ AdoGen's primary advantage is **memory allocation** — consistently the lowest 
 
 **SQL Server highlights** _(.NET 10, Apple M4, BenchmarkDotNet v0.15.8)_
 
-| Operation | AdoGen | Dapper | EF Core | AdoGen Alloc | Dapper Alloc | EF Core Alloc |
-|-----------|-------:|-------:|--------:|-------------:|-------------:|--------------:|
-| QueryFirstOrDefault | 389 µs | 397 µs | 418 µs | 2.82 KB | 6.05 KB | 15.08 KB |
-| QueryToList | 38.8 µs | 40.1 µs | 40.0 µs | 453 B | 825 B | 1,705 B |
-| Insert | 1.83 ms | 1.99 ms | 2.64 ms | 5.3 KB | 6.48 KB | 20.09 KB |
-| BulkInsert 10K | 84.0 ms | — | 337 ms | 1,412 KB | — | 60,924 KB |
+| Operation           | AdoGen  | Dapper  | EF Core  | AdoGen Alloc | Dapper Alloc | EF Core Alloc |
+|---------------------|--------:|--------:|---------:|-------------:|-------------:|--------------:|
+| QueryFirstOrDefault |  389 µs |  397 µs |   418 µs |      2.82 KB |      6.05 KB |      15.08 KB |
+| QueryToList         | 38.8 µs | 40.1 µs |  40.0 µs |        453 B |        825 B |       1,705 B |
+| Insert              | 1.83 ms | 1.99 ms |  2.64 ms |       5.3 KB |      6.48 KB |      20.09 KB |
+| BulkInsert 10K      | 84.0 ms |       — |   337 ms |     1,412 KB |            — |     60,924 KB |
 
 📊 [SQL Server benchmarks](docs/benchmarks-sqlserver.md) · [PostgreSQL benchmarks](docs/benchmarks-postgresql.md)
 

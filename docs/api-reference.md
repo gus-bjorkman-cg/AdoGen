@@ -31,11 +31,11 @@ Complete reference for all AdoGen capabilities, configuration options, and known
 
 Models must be `partial` and implement one or more of the following interfaces to trigger code generation.
 
-| SQL Server | PostgreSQL | Generates |
-|------------|-----------|-----------|
-| `ISqlMapper` | `INpgsqlMapper` | Reader mapper (`Map(reader)`) + typed parameter factory methods |
-| `ISqlDomainModel` | `INpgsqlDomainModel` | Everything above + CRUD operations + batch commands |
-| `ISqlBulkModel` | `INpgsqlBulkModel` | Everything above + bulk insert/update/delete |
+| SQL Server        | PostgreSQL           | Generates                                                       |
+|-------------------|----------------------|-----------------------------------------------------------------|
+| `ISqlMapper`      | `INpgsqlMapper`      | Reader mapper (`Map(reader)`) + typed parameter factory methods |
+| `ISqlDomainModel` | `INpgsqlDomainModel` | Everything above + CRUD operations + batch commands             |
+| `ISqlBulkModel`   | `INpgsqlBulkModel`   | Everything above + bulk insert/update/delete                    |
 
 Each interface inherits from the one above. A single DTO can implement interfaces for both providers simultaneously.
 
@@ -65,12 +65,12 @@ public sealed class UserProfile : SqlProfile<User>      // or NpgsqlProfile<User
 
 ### Profile-level settings
 
-| Method | Default | Notes |
-|--------|---------|-------|
-| `Table("name")` | Class name pluralized | Custom table name |
-| `Schema("name")` | `dbo` (SQL Server) / `public` (PostgreSQL) | Custom schema |
-| `Key(x => x.Prop)` | Property named `Id` | Primary key override |
-| `Identity(x => x.Prop)` | — | Identity / SERIAL column; excluded from INSERT |
+| Method                  | Default                                    | Notes                                          |
+|-------------------------|--------------------------------------------|------------------------------------------------|
+| `Table("name")`         | Class name pluralized                      | Custom table name                              |
+| `Schema("name")`        | `dbo` (SQL Server) / `public` (PostgreSQL) | Custom schema                                  |
+| `Key(x => x.Prop)`      | Property named `Id`                        | Primary key override                           |
+| `Identity(x => x.Prop)` | —                                          | Identity / SERIAL column; excluded from INSERT |
 
 ### Property configuration
 
@@ -85,40 +85,40 @@ RuleFor(x => x.PropertyName)
 
 Common modifiers available on all properties:
 
-| Method | Notes |
-|--------|-------|
-| `.Name(string)` | Override DB column name (default: property name) |
-| `.Nullable()` / `.NotNull()` | Explicit nullability (inferred from `?` by default) |
-| `.ReadOnly()` | Excluded from INSERT/UPDATE/bulk writes; included in DDL and mapper |
-| `.DefaultValue(sqlExpr)` | SQL expression for DDL `DEFAULT` clause |
-| `.ConcurrencyToken()` | See [Concurrency tokens](#concurrency-tokens) |
+| Method                       | Notes                                                               |
+|------------------------------|---------------------------------------------------------------------|
+| `.Name(string)`              | Override DB column name (default: property name)                    |
+| `.Nullable()` / `.NotNull()` | Explicit nullability (inferred from `?` by default)                 |
+| `.ReadOnly()`                | Excluded from INSERT/UPDATE/bulk writes; included in DDL and mapper |
+| `.DefaultValue(sqlExpr)`     | SQL expression for DDL `DEFAULT` clause                             |
+| `.ConcurrencyToken()`        | See [Concurrency tokens](#concurrency-tokens)                       |
 
 ### SQL Server types
 
-| Shorthand | Equivalent | Use for |
-|-----------|----------|---------|
-| `VarChar(n)` | `SqlDbType.VarChar` | ASCII strings |
-| `NVarChar(n)` | `SqlDbType.NVarChar` | Unicode strings |
-| `Char(n)` | `SqlDbType.Char` | Fixed-length ASCII |
-| `NChar(n)` | `SqlDbType.NChar` | Fixed-length Unicode |
-| `VarBinary(n)` | `SqlDbType.VarBinary` | Binary data |
-| `Decimal(p, s)` | `SqlDbType.Decimal` | Decimal with precision/scale |
-| `Type(SqlDbType.X)` + `.Size(n)` | — | Escape hatch for any type |
+| Shorthand                        | Equivalent            | Use for                      |
+|----------------------------------|-----------------------|------------------------------|
+| `VarChar(n)`                     | `SqlDbType.VarChar`   | ASCII strings                |
+| `NVarChar(n)`                    | `SqlDbType.NVarChar`  | Unicode strings              |
+| `Char(n)`                        | `SqlDbType.Char`      | Fixed-length ASCII           |
+| `NChar(n)`                       | `SqlDbType.NChar`     | Fixed-length Unicode         |
+| `VarBinary(n)`                   | `SqlDbType.VarBinary` | Binary data                  |
+| `Decimal(p, s)`                  | `SqlDbType.Decimal`   | Decimal with precision/scale |
+| `Type(SqlDbType.X)` + `.Size(n)` | —                     | Escape hatch for any type    |
 
 `Guid`, `bool`, numeric types, `DateTime`, `DateTimeOffset` have default mappings — no configuration needed.  
 **Strings and `decimal` always require explicit configuration.**
 
 ### PostgreSQL types
 
-| Shorthand | Equivalent | Use for |
-|-----------|----------|---------|
-| `VarChar(n)` | `NpgsqlDbType.Varchar` | Variable-length strings with limit |
-| `Text()` | `NpgsqlDbType.Text` | Unbounded strings |
-| `Char(n)` | `NpgsqlDbType.Char` | Fixed-length strings |
-| `Bytea()` | `NpgsqlDbType.Bytea` | Binary data |
-| `Varbit(n)` | `NpgsqlDbType.Varbit` | Bit strings |
-| `Decimal(p, s)` | `NpgsqlDbType.Numeric` | Numeric with precision/scale |
-| `Type(NpgsqlDbType.X)` + `.Size(n)` | — | Escape hatch for any type |
+| Shorthand                           | Equivalent             | Use for                            |
+|-------------------------------------|------------------------|------------------------------------|
+| `VarChar(n)`                        | `NpgsqlDbType.Varchar` | Variable-length strings with limit |
+| `Text()`                            | `NpgsqlDbType.Text`    | Unbounded strings                  |
+| `Char(n)`                           | `NpgsqlDbType.Char`    | Fixed-length strings               |
+| `Bytea()`                           | `NpgsqlDbType.Bytea`   | Binary data                        |
+| `Varbit(n)`                         | `NpgsqlDbType.Varbit`  | Bit strings                        |
+| `Decimal(p, s)`                     | `NpgsqlDbType.Numeric` | Numeric with precision/scale       |
+| `Type(NpgsqlDbType.X)` + `.Size(n)` | —                      | Escape hatch for any type          |
 
 ---
 
@@ -171,16 +171,16 @@ All three query methods accept an optional `CommandType`, `SqlTransaction`, and 
 
 Available when the model implements `ISqlDomainModel` / `INpgsqlDomainModel`.
 
-| Method | Returns | Notes |
-|--------|---------|-------|
-| `InsertAsync(model, ct)` | `int` rows affected | |
-| `InsertAsync(List<T>, ct)` | `int` rows affected | Multi-row, one round-trip |
-| `InsertAndReturnAsync(model, ct)` | `T` | Returns populated row; see [limitations](#limitations) |
-| `UpdateAsync(model, ct)` | `int` rows affected | Throws `AdoGenConcurrencyException` if token mismatch |
-| `UpsertAsync(model, ct)` | `int` rows affected | Does not enforce concurrency token |
-| `DeleteAsync(model, ct)` | `int` rows affected | Throws `AdoGenConcurrencyException` if token mismatch |
-| `TruncateAsync<T>(ct)` | `int` rows affected | |
-| `CreateTableAsync<T>(ct)` | `void` | DDL — creates the table from profile metadata |
+| Method                            | Returns             | Notes                                                  |
+|-----------------------------------|---------------------|--------------------------------------------------------|
+| `InsertAsync(model, ct)`          | `int` rows affected |                                                        |
+| `InsertAsync(List<T>, ct)`        | `int` rows affected | Multi-row, one round-trip                              |
+| `InsertAndReturnAsync(model, ct)` | `T`                 | Returns populated row; see [limitations](#limitations) |
+| `UpdateAsync(model, ct)`          | `int` rows affected | Throws `AdoGenConcurrencyException` if token mismatch  |
+| `UpsertAsync(model, ct)`          | `int` rows affected | Does not enforce concurrency token                     |
+| `DeleteAsync(model, ct)`          | `int` rows affected | Throws `AdoGenConcurrencyException` if token mismatch  |
+| `TruncateAsync<T>(ct)`            | `int` rows affected |                                                        |
+| `CreateTableAsync<T>(ct)`         | `void`              | DDL — creates the table from profile metadata          |
 
 All methods accept an optional `SqlTransaction` / `NpgsqlTransaction` and `commandTimeout`.
 
@@ -365,10 +365,10 @@ RuleFor(x => x.Version).ConcurrencyToken();   // int, long, or Guid
 
 **Behaviour:**
 
-| Token type | UPDATE WHERE clause | UPDATE SET side-effect |
-|-----------|--------------------|-----------------------|
-| `int` / `long` | `AND [Version] = @Version` | `[Version] = @Version + 1` (auto-bump) |
-| `Guid` | `AND [Version] = @Version` | None — caller sets new value before calling `UpdateAsync` |
+| Token type     | UPDATE WHERE clause        | UPDATE SET side-effect                                    |
+|----------------|----------------------------|-----------------------------------------------------------|
+| `int` / `long` | `AND [Version] = @Version` | `[Version] = @Version + 1` (auto-bump)                    |
+| `Guid`         | `AND [Version] = @Version` | None — caller sets new value before calling `UpdateAsync` |
 
 - `DeleteAsync` also adds `AND [Version] = @Version` to the WHERE clause.
 - If 0 rows are affected, `AdoGenConcurrencyException` is thrown.
@@ -395,11 +395,11 @@ Typical use cases: database-generated timestamps, computed columns, audit fields
 
 For a model named `User` implementing `ISqlBulkModel`:
 
-| File | Contents |
-|------|---------|
-| `UserMapper.g.cs` | `partial record User` with `static T Map(SqlDataReader)` + `static class UserSql` with `CreateParameter*` factory methods |
+| File                 | Contents                                                                                                                                                                                                                                                   |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `UserMapper.g.cs`    | `partial record User` with `static T Map(SqlDataReader)` + `static class UserSql` with `CreateParameter*` factory methods                                                                                                                                  |
 | `UserDomainOps.g.cs` | `partial record User` with `InsertAsync`, `InsertAsync(List<T>)`, `InsertAndReturnAsync`, `UpdateAsync`, `UpsertAsync`, `DeleteAsync`, `TruncateAsync`, `CreateTableAsync`, `ExistsAsync`, `Add*BatchCommand`; also generates `UserPatch` and `PatchAsync` |
-| `UserBulk.g.cs` | `class UserBulk` — bulk add/update/remove + `SaveChangesAsync` |
+| `UserBulk.g.cs`      | `class UserBulk` — bulk add/update/remove + `SaveChangesAsync`                                                                                                                                                                                             |
 
 For PostgreSQL, the helper class is `UserNpgsql`, bulk class is `UserNpgsqlBulk`.
 
