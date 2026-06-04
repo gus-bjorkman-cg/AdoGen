@@ -1,17 +1,32 @@
-using Microsoft.CodeAnalysis;
-using AdoGen.Generator.Pipelines;
+using System.Collections.Generic;
 using AdoGen.Generator.Emitters;
+using AdoGen.Generator.Emitters.PostgreSql;
+using AdoGen.Generator.Emitters.SqlServer;
+using AdoGen.Generator.Models;
+using AdoGen.Generator.Pipelines;
+using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator;
 
 [Generator]
-public sealed class SqlBuilderGenerator : IIncrementalGenerator
+internal sealed class SqlBuilderGenerator : IIncrementalGenerator
 {
+    private static readonly List<IEmitter> Emitters =
+    [
+        DtoMapperEmitterSqlServer.Instance,
+        DomainOpsEmitterSqlServer.Instance,
+        BulkEmitterSqlServer.Instance,
+        
+        DtoMapperEmitterNpgSql.Instance,
+        DomainOpsEmitterNpgSql.Instance,
+        BulkEmitterNpgSql.Instance
+    ];
+    
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var dtos = Discovery.DiscoverDtos(context);
         var validatedDtos = DiscoveryValidation.ValidateDtos(dtos);
-        
+
         context.RegisterSourceOutput(
             validatedDtos,
             static (spc, validatedDto) =>
@@ -22,11 +37,13 @@ public sealed class SqlBuilderGenerator : IIncrementalGenerator
                 if (validatedDto.Diagnostics.Length != 0) return;
 
                 var dto = validatedDto.Discovery;
+                var ctx = EmitContextBuilder.Build(validatedDto);
 
-                DtoMapperEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
-                SqlParameterHelpersEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
-                DomainOpsEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
-                BulkEmitter.Emit(spc, dto, validatedDto.ProfileInfo);
+                foreach (var emitter in Emitters)
+                {
+                    if (!emitter.IsMatch(dto.Kind, dto.Provider)) continue;
+                    emitter.Handle(spc, validatedDto, ctx);
+                }
             });
     }
 }

@@ -1,5 +1,5 @@
 using System.Data;
-using AdoGen.Abstractions;
+using AdoGen.SqlServer;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Data.SqlClient;
@@ -35,7 +35,7 @@ public class BulkDelete : TestBase
     public void IterationCleanup() => _transaction.Rollback("s");
     
     [Benchmark]
-    public async Task AdoGen() => await Connection.DeleteAsync<User, Guid>(_ids, CancellationToken, _transaction);
+    public async Task AdoGen() => await Connection.DeleteAsync<User>(_ids, CancellationToken, _transaction);
 
     [Benchmark]
     public async Task AdoGenBulk()

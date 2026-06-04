@@ -1,0 +1,180 @@
+using System;
+using System.Data;
+using System.Linq.Expressions;
+
+namespace AdoGen.SqlServer;
+
+#pragma warning disable CA1720 // Identifier contains type name — intentional SQL type naming
+
+/// <summary>
+/// The generator inspects the constructor body and reads calls to RuleFor(...).
+/// It should be used to configure db types and properties.
+/// </summary>
+public abstract class SqlProfile<T>
+{
+    /// <summary>
+    /// Entry-point for configuring a property.
+    /// The generator parses the fluent calls that follow.
+    /// </summary>
+    protected PropertyBuilder<TProp> RuleFor<TProp>(Expression<Func<T, TProp>> selector) => new(selector);
+    
+    /// <summary>
+    /// Allows a custom table name. Default is class name pluralized.
+    /// </summary>
+    /// <param name="name">Your table name</param>
+    /// <returns></returns>
+    protected SqlProfile<T> Table(string name) => this;
+    
+    /// <summary>
+    /// Allows a custom schema. Default is dbo.
+    /// </summary>
+    /// <param name="name">Your schema name</param>
+    /// <returns></returns>
+    protected SqlProfile<T> Schema(string name) => this;
+    
+    /// <summary>
+    /// Allows a custom id field. Default is property named Id.
+    /// </summary>
+    /// <param name="selector"></param>
+    /// <returns></returns>
+    protected SqlProfile<T> Key<TProp>(Expression<Func<T, TProp>> selector) => this;
+    
+    /// <summary>
+    /// Configuration of identity fields.
+    /// </summary>
+    /// <param name="selector"></param>
+    /// <typeparam name="TProp"></typeparam>
+    /// <returns></returns>
+    protected SqlProfile<T> Identity<TProp>(Expression<Func<T, TProp>> selector) => this;
+}
+
+/// <summary>
+/// Fluent builder used purely for compile-time configuration.
+/// All arguments should be literals or consts, so the generator can read them safely.
+/// </summary>
+public sealed class PropertyBuilder<TProp>
+{
+    internal PropertyBuilder(LambdaExpression selector) => Selector = selector;
+    internal LambdaExpression Selector { get; }
+
+    /// <summary>
+    /// Configures the Db type.
+    /// </summary>
+    /// <param name="dbType"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Type(SqlDbType dbType) => this;
+    
+    /// <summary>
+    /// Configures the string size.
+    /// </summary>
+    /// <param name="size"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Size(int size) => this;
+    
+    /// <summary>
+    /// Configures the decimal precision.
+    /// </summary>
+    /// <param name="precision"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Precision(int precision) => this;
+    
+    /// <summary>
+    /// Configures the decimal scale.
+    /// </summary>
+    /// <param name="scale"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Scale(int scale) => this;
+
+    /// <summary>
+    /// Configures the db column name. Default is property name.
+    /// </summary>
+    /// <param name="parameterName"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Name(string parameterName) => this;
+    
+    /// <summary>
+    /// Shorthand config for setting db type as Decimal with its precision and scale.
+    /// </summary>
+    /// <param name="precision"></param>
+    /// <param name="scale"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Decimal(int precision, int scale) => 
+        Type(SqlDbType.Decimal).Precision(precision).Scale(scale);
+    
+    /// <summary>
+    /// Shorthand config for setting db type as NVarChar with its size.
+    /// </summary>
+    /// <param name="size"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> NVarChar(int size) => Type(SqlDbType.NVarChar).Size(size);
+    
+    /// <summary>
+    /// Shorthand config for setting db type as VarChar with its size.
+    /// </summary>
+    /// <param name="size"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> VarChar(int size) => Type(SqlDbType.VarChar).Size(size);
+    
+    /// <summary>
+    /// Shorthand config for setting db type as NChar with its size.
+    /// </summary>
+    /// <param name="size"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> NChar(int size) => Type(SqlDbType.NChar).Size(size);
+    
+    /// <summary>
+    /// Shorthand config for setting db type as Char with its size.
+    /// </summary>
+    /// <param name="size"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Char(int size) => Type(SqlDbType.Char).Size(size);
+    
+    /// <summary>
+    /// Shorthand config for setting db type as VarBinary with its size.
+    /// </summary>
+    /// <param name="size"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> VarBinary(int size) => Type(SqlDbType.VarBinary).Size(size);
+    
+    /// <summary>
+    /// Configures the db type to be nullable.
+    /// </summary>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> Nullable() => this;
+    
+    /// <summary>
+    /// Configures the db type to be not nullable.
+    /// </summary>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> NotNull() => this;
+    
+    /// <summary>
+    /// Marks the column as read-only.
+    /// The column is excluded from INSERT/UPDATE/bulk-write column lists but is still
+    /// included in CREATE TABLE DDL and read back by the mapper.
+    /// Use this for server-managed columns such as computed columns or audit timestamps
+    /// that have a DEFAULT expression set via <see cref="DefaultValue"/>.
+    /// </summary>
+    public PropertyBuilder<TProp> ReadOnly() => this;
+
+    /// <summary>
+    /// Marks this column as the concurrency token for optimistic concurrency control.
+    /// Only one column per profile may be marked as the concurrency token.
+    /// Supported types: <c>int</c>, <c>long</c>, <c>Guid</c>.
+    /// Generated UPDATE and DELETE SQL will include <c>AND [Column] = @Column</c> in the WHERE clause.
+    /// For <c>int</c>/<c>long</c> tokens the UPDATE SET list also includes <c>[Column] = @Column + 1</c>
+    /// so the token is bumped automatically. For <c>Guid</c> tokens the caller is responsible
+    /// for setting a new value on the model before calling <c>UpdateAsync</c>.
+    /// When 0 rows are affected an <c>AdoGenConcurrencyException</c> is thrown.
+    /// </summary>
+    public PropertyBuilder<TProp> ConcurrencyToken() => this;
+    
+    /// <summary>
+    /// Sets default value.
+    /// </summary>
+    /// <param name="sqlExpression"></param>
+    /// <returns></returns>
+    public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
+}
+
+#pragma warning restore CA1720

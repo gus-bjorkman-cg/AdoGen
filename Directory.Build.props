@@ -1,5 +1,6 @@
 <Project>
     <PropertyGroup>
+        <LangVersion>latest</LangVersion>
         <Deterministic>true</Deterministic>
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -9,5 +10,9 @@
         <RepositoryUrl>https://github.com/gus-bjorkman-cg/AdoGen</RepositoryUrl>
         <PackageProjectUrl>https://github.com/gus-bjorkman-cg/AdoGen</PackageProjectUrl>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
 </Project>

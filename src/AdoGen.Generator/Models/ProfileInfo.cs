@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 
 namespace AdoGen.Generator.Models;
 
@@ -7,7 +8,9 @@ internal sealed record ProfileInfo(
     string Table,
     ImmutableArray<string> Keys,
     ImmutableHashSet<string> IdentityKeys,
-    ImmutableDictionary<string, ParamConfig> ParamsByProperty
+    ImmutableArray<IPropertySymbol> DtoProperties,
+    ImmutableDictionary<string, ParamConfig> ParamsByProperty,
+    string Namespace
 )
 {
     public static readonly ProfileInfo Empty = new(
@@ -15,6 +18,8 @@ internal sealed record ProfileInfo(
         Table: string.Empty,
         Keys: ImmutableArray<string>.Empty,
         IdentityKeys: ImmutableHashSet<string>.Empty,
-        ParamsByProperty: ImmutableDictionary<string, ParamConfig>.Empty
+        DtoProperties: ImmutableArray<IPropertySymbol>.Empty,
+        ParamsByProperty: ImmutableDictionary<string, ParamConfig>.Empty,
+        Namespace: string.Empty
     );
 }

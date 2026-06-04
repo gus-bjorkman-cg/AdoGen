@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using AdoGen.Generator.Models;
@@ -8,123 +9,157 @@ namespace AdoGen.Generator.Pipelines;
 
 internal static class Discovery
 {
-    private const string AbstractionsLib = "AdoGen.Abstractions";
-    private const string SqlResultInterface = $"{AbstractionsLib}.ISqlResult";
-    private const string SqlDomainInterface = $"{AbstractionsLib}.ISqlDomainModel";
-    private const string SqlBulkInterface = $"{AbstractionsLib}.ISqlBulkModel";
-    private const string SqlProfile = nameof(SqlProfile);
+    private const string SqlServerLib = "AdoGen.SqlServer";
+    private const string NpgsqlSqlLib = "AdoGen.PostgreSql";
+
+    private const string SqlServerMapperInterface = $"{SqlServerLib}.ISqlMapper";
+    private const string SqlServerDomainInterface = $"{SqlServerLib}.ISqlDomainModel";
+    private const string SqlServerBulkInterface = $"{SqlServerLib}.ISqlBulkModel";
+    private const string SqlServerProfile = "SqlProfile";
+
+    private const string NpgsqlMapperInterface = $"{NpgsqlSqlLib}.INpgsqlMapper";
+    private const string NpgsqlDomainInterface = $"{NpgsqlSqlLib}.INpgsqlDomainModel";
+    private const string NpgsqlBulkInterface = $"{NpgsqlSqlLib}.INpgsqlBulkModel";
+    private const string NpgsqlProfile = "NpgsqlProfile";
     
     public static IncrementalValuesProvider<DiscoveryDto> DiscoverDtos(
         IncrementalGeneratorInitializationContext context)
         => FilterTypes(
             context,
             CreateDtoCandidates(context),
-            BuildProfilesIndex(FindSqlProfiles(context)));
-    
-    private static IncrementalValuesProvider<INamedTypeSymbol> CreateDtoCandidates(IncrementalGeneratorInitializationContext context)
+            BuildProfilesIndex(context));
+
+    private static IncrementalValueProvider<ImmutableArray<INamedTypeSymbol>> CreateDtoCandidates(
+        IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax,
-                static (ctx, ct) => ctx.SemanticModel.GetDeclaredSymbol((TypeDeclarationSyntax)ctx.Node, ct) as INamedTypeSymbol)
+                static (ctx, ct) =>
+                    ctx.SemanticModel.GetDeclaredSymbol((TypeDeclarationSyntax)ctx.Node, ct) as INamedTypeSymbol)
             .Where(static x => x is not null)
-            .Where(static x => x!.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal)
-            .Where(static x => !x!.IsStatic)
             .Select(static (x, _) => x!)
-            .WithComparer(SymbolEqualityComparer.Default);
-    
+            .WithComparer(SymbolEqualityComparer.Default)
+            .Collect();
+
     private static IncrementalValuesProvider<DiscoveryDto> FilterTypes(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<INamedTypeSymbol> candidates,
-        IncrementalValueProvider<ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)>> profilesIndex) =>
+        IncrementalValueProvider<ImmutableArray<INamedTypeSymbol>> candidates,
+        IncrementalValueProvider<ImmutableArray<DiscoveryModel>> profilesIndex) =>
         candidates
-            .Collect()
             .Combine(profilesIndex)
             .Combine(context.CompilationProvider)
             .SelectMany(static (input, ct) =>
             {
                 var ((types, profiles), compilation) = input;
 
-                var sqlResultInterface = compilation.GetTypeByMetadataName(SqlResultInterface);
-                var sqlDomainInterface = compilation.GetTypeByMetadataName(SqlDomainInterface);
-                var sqlBulkInterface = compilation.GetTypeByMetadataName(SqlBulkInterface);
-
-                if (sqlResultInterface is null || sqlDomainInterface is null || sqlBulkInterface is null)
-                    return ImmutableArray<DiscoveryDto>.Empty;
-                
+                var distinctTypes = types.Distinct<INamedTypeSymbol>(SymbolEqualityComparer.Default);
                 var builder = ImmutableArray.CreateBuilder<DiscoveryDto>(types.Length);
+                var adoGenInterfaces = GetAdoGenInterfaces(compilation);
 
-                foreach (var typeSymbol in types)
+                foreach (var type in distinctTypes)
                 {
-                    var kind =
-                        typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlBulkInterface)) ? SqlModelKind.Bulk :
-                        typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlDomainInterface)) ? SqlModelKind.Domain :
-                        typeSymbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, sqlResultInterface)) ? SqlModelKind.Result :
-                        SqlModelKind.None;
+                    var typeProfiles = profiles.Where(y => SymbolEqualityComparer.Default.Equals(y.Dto, type)).ToImmutableArray();
+                    var typeDiscoveries = type.AllInterfaces
+                        .Select(i => adoGenInterfaces.FirstOrDefault(x => SymbolEqualityComparer.Default.Equals(i, x.Interface)))
+                        .Where(static x => x.Interface is not null)
+                        .GroupBy(static x => x.Provider)
+                        .OrderByDescending(static x => x.Key)
+                        .Select(static x => new
+                        {
+                            Provider = x.Key, Kind = x.Select(y => y.Kind).FirstOrDefault(),
+                            Interface = x.Select(y => y.Interface).FirstOrDefault()
+                        })
+                        .ToArray();
 
-                    if (kind == SqlModelKind.None) continue;
+                    // Determine which provider (the lowest-value one with Domain-or-higher) owns the shared {Dto}Patch class
+                    var patchOwner = typeDiscoveries
+                        .Where(x => x.Kind >= SqlModelKind.Domain)
+                        .OrderBy(x => (int)x.Provider)
+                        .Select(x => (SqlProviderKind?)x.Provider)
+                        .FirstOrDefault();
 
-                    INamedTypeSymbol? profile = null;
-                    SemanticModel? model = null;
-                    
-                    for (var i = 0; i < profiles.Length; i++)
+                    foreach (var typeDiscovery in typeDiscoveries)
                     {
-                        if (!SymbolEqualityComparer.Default.Equals(profiles[i].Dto, typeSymbol))
-                            continue;
+                        var discoveryModel = DiscoveryModel.Empty;
+                        foreach (var typeProfile in typeProfiles.Where(typeProfile => typeProfile.Provider == typeDiscovery.Provider))
+                        {
+                            discoveryModel = typeProfile;
+                            break;
+                        }
 
-                        profile = profiles[i].Profile;
-                        model = profiles[i].Model;
-                        break;
+                        builder.Add(new DiscoveryDto(type, typeDiscovery.Kind, discoveryModel.Profile, discoveryModel.Model, typeDiscovery.Provider,
+                            ShouldGeneratePatchClass: typeDiscovery.Kind >= SqlModelKind.Domain && typeDiscovery.Provider == patchOwner));
                     }
-
-                    builder.Add(new DiscoveryDto(typeSymbol, kind, profile, model));
                 }
-                
+
                 return builder.ToImmutable();
             });
-    
-    private static IncrementalValuesProvider<(INamedTypeSymbol Profile, SemanticModel Model)>
-        FindSqlProfiles(IncrementalGeneratorInitializationContext context)
+
+    private static IncrementalValueProvider<ImmutableArray<DiscoveryModel>> BuildProfilesIndex(
+        IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, ct) =>
                 {
-                    if (ctx.SemanticModel.GetDeclaredSymbol((ClassDeclarationSyntax)ctx.Node, ct) is not INamedTypeSymbol symbol) 
-                        return (null!, ctx.SemanticModel);
+                    if (ctx.SemanticModel.GetDeclaredSymbol((ClassDeclarationSyntax)ctx.Node, ct) is not
+                        INamedTypeSymbol symbol)
+                        return (symbol: null!, ctx.SemanticModel, Provider: SqlProviderKind.None);
 
                     var baseType = symbol.BaseType;
-                    
-                    if (baseType is null || 
-                        baseType.Name != SqlProfile || 
-                        baseType.TypeArguments.Length != 1 || 
-                        baseType.ContainingNamespace?.ToDisplayString() != AbstractionsLib) 
-                        return (null!, ctx.SemanticModel);
+                    if (baseType is null || baseType.TypeArguments.Length != 1)
+                        return (symbol, ctx.SemanticModel, Provider: SqlProviderKind.None);
 
-                    return (symbol, ctx.SemanticModel);
+                    var provider = baseType.Name switch
+                    {
+                        SqlServerProfile => SqlProviderKind.SqlServer,
+                        NpgsqlProfile => SqlProviderKind.PostgreSql,
+                        _ => SqlProviderKind.None
+                    };
+
+                    return (symbol, ctx.SemanticModel, Provider: provider);
                 })
             .Where(static x => x.symbol is not null)
-            .Select(static (x, _) => (x.symbol!, x.SemanticModel));
-
-    private static IncrementalValueProvider<ImmutableArray<(INamedTypeSymbol Dto, INamedTypeSymbol Profile, SemanticModel Model)>>
-        BuildProfilesIndex(IncrementalValuesProvider<(INamedTypeSymbol Profile, SemanticModel Model)> profiles)
-        => profiles
-            .Select(static (p, _) => (Dto: (INamedTypeSymbol)p.Profile.BaseType!.TypeArguments[0], p.Profile, p.Model))
+            .Where(static x => x.Provider is not SqlProviderKind.None)
+            .Select(static (p, _) => new DiscoveryModel(
+                (INamedTypeSymbol)p.symbol.BaseType!.TypeArguments[0],
+                p.symbol, 
+                p.SemanticModel, 
+                p.Provider))
             .Collect();
-}
 
-internal enum SqlModelKind : byte
-{
-    None = 0,
-    Result = 1,
-    Domain = 2,
-    Bulk = 3
-}
-
-internal readonly record struct DiscoveryDto(
-    INamedTypeSymbol Dto,
-    SqlModelKind Kind,
-    INamedTypeSymbol? Profile,
-    SemanticModel? ProfileSemanticModel);
+    private static ImmutableArray<AdoGenInterfaceInfo> GetAdoGenInterfaces(Compilation compilation) =>
+         AdoGenInterfaces
+            .Select(x =>
+            {
+                var interfaceSymbol = compilation.GetTypeByMetadataName(x.@interface);
+                return interfaceSymbol is null ? AdoGenInterfaceInfo.Empty : new AdoGenInterfaceInfo(interfaceSymbol, x.kind, x.provider);
+            })
+            .Where(static x => x != AdoGenInterfaceInfo.Empty)
+            .ToImmutableArray();
     
-internal readonly record struct ValidatedDiscoveryDto(
-    DiscoveryDto Discovery,
-    ProfileInfo ProfileInfo,
-    ImmutableArray<Diagnostic> Diagnostics);
+    private static readonly List<(string @interface, SqlModelKind kind, SqlProviderKind provider)> AdoGenInterfaces =
+    [
+        (SqlServerMapperInterface, SqlModelKind.Mapper, SqlProviderKind.SqlServer),
+        (SqlServerDomainInterface, SqlModelKind.Domain, SqlProviderKind.SqlServer),
+        (SqlServerBulkInterface, SqlModelKind.Bulk, SqlProviderKind.SqlServer),
+        (NpgsqlMapperInterface, SqlModelKind.Mapper, SqlProviderKind.PostgreSql),
+        (NpgsqlDomainInterface, SqlModelKind.Domain, SqlProviderKind.PostgreSql),
+        (NpgsqlBulkInterface, SqlModelKind.Bulk, SqlProviderKind.PostgreSql)
+    ];
+
+    private readonly record struct AdoGenInterfaceInfo(
+        INamedTypeSymbol Interface,
+        SqlModelKind Kind,
+        SqlProviderKind Provider)
+    {
+        public static AdoGenInterfaceInfo Empty => new(null!, SqlModelKind.None, SqlProviderKind.None);
+    }
+
+    private readonly record struct DiscoveryModel(
+        INamedTypeSymbol Dto,
+        INamedTypeSymbol Profile,
+        SemanticModel Model,
+        SqlProviderKind Provider)
+    {
+        public static DiscoveryModel Empty => new(null!, null!, null!, SqlProviderKind.None);
+    }
+}

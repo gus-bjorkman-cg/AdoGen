@@ -13,33 +13,37 @@ internal static class RoslynSymbolExtensions
     
     extension(ITypeSymbol t)
     {
-        public bool IsString() => t.SpecialType == SpecialType.System_String;
-        public bool IsDecimal() => t.SpecialType == SpecialType.System_Decimal;
-        public bool IsByteArray() => t is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte };
-        public string GetGetterKey() => t.ToDisplayString(GetterKeyFormat);
-        
-        public bool IsGuidType()
-        {
-            // unwrap Nullable<T>
-            if (t is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nt)
-                t = nt.TypeArguments[0];
+        public bool IsString => t.SpecialType == SpecialType.System_String;
+        public bool IsDecimal => t.SpecialType == SpecialType.System_Decimal;
+        public bool IsByteArray => t is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte };
 
-            return t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System.Guid";
+        public bool IsGuidType
+        {
+            get
+            {
+                // unwrap Nullable<T>
+                if (t is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nt)
+                    t = nt.TypeArguments[0];
+
+                if (t.Name == "Guid") return true;
+                
+                return t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::System.Guid";
+            }
         }
-        
+
         public (ITypeSymbol Underlying, bool IsNullable) UnwrapNullable() =>
             t is INamedTypeSymbol 
                 { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T, TypeArguments.Length: 1 } named
                 ? (named.TypeArguments[0], true)
                 : (t, false);
 
-        public SqlDbType MapDefaultSqlDbType()
+        public DbTypeRef MapDefaultSqlDbType()
         {
             var (underlying, _) = t.UnwrapNullable();
-            
+
             if (underlying.TypeKind == TypeKind.Enum && underlying is INamedTypeSymbol enumType)
             {
-                return enumType.EnumUnderlyingType?.SpecialType switch
+                var dbt = enumType.EnumUnderlyingType?.SpecialType switch
                 {
                     SpecialType.System_Byte => SqlDbType.TinyInt,
                     SpecialType.System_SByte => SqlDbType.SmallInt,
@@ -51,9 +55,11 @@ internal static class RoslynSymbolExtensions
                     SpecialType.System_UInt64 => SqlDbType.Decimal,
                     _ => SqlDbType.Variant
                 };
-            }
 
-            return underlying.SpecialType switch
+                return DbTypeRef.SqlServer(dbt.ToString());
+            }
+            
+            var mapped = underlying.SpecialType switch
             {
                 SpecialType.System_Boolean => SqlDbType.Bit,
                 SpecialType.System_Byte => SqlDbType.TinyInt,
@@ -62,21 +68,69 @@ internal static class RoslynSymbolExtensions
                 SpecialType.System_Int64 => SqlDbType.BigInt,
                 SpecialType.System_Single => SqlDbType.Real,
                 SpecialType.System_Double => SqlDbType.Float,
-                SpecialType.System_Decimal => SqlDbType.Decimal // requires precision/scale
-                ,
-                SpecialType.System_String => SqlDbType.NVarChar // requires size
-                ,
+                SpecialType.System_Decimal => SqlDbType.Decimal,
+                SpecialType.System_String => SqlDbType.NVarChar,
                 _ => underlying.ToDisplayString(GetterKeyFormat) switch
                 {
-                    "global::System.Guid" => SqlDbType.UniqueIdentifier,
-                    "global::System.DateTime" => SqlDbType.DateTime2,
-                    "global::System.DateTimeOffset" => SqlDbType.DateTimeOffset,
+                    "global::System.Guid" or "Guid" => SqlDbType.UniqueIdentifier,
+                    "global::System.DateTime" or "DateTime" => SqlDbType.DateTime2,
+                    "global::System.DateTimeOffset" or "DateTimeOffset" => SqlDbType.DateTimeOffset,
                     "global::System.DateOnly" => SqlDbType.Date,
                     "global::System.TimeOnly" => SqlDbType.Time,
-                    "global::System.Byte[]" => SqlDbType.VarBinary, // requires size
+                    "global::System.Byte[]" => SqlDbType.VarBinary,
                     _ => SqlDbType.Variant
                 }
             };
+
+            return DbTypeRef.SqlServer(mapped.ToString());
+        }
+
+        public DbTypeRef MapDefaultNpgsqlDbType()
+        {
+            var (underlying, _) = t.UnwrapNullable();
+
+            if (underlying.TypeKind == TypeKind.Enum && underlying is INamedTypeSymbol enumType)
+            {
+                var npg = enumType.EnumUnderlyingType?.SpecialType switch
+                {
+                    SpecialType.System_Byte => "Smallint",
+                    SpecialType.System_SByte => "Smallint",
+                    SpecialType.System_Int16 => "Smallint",
+                    SpecialType.System_UInt16 => "Integer",
+                    SpecialType.System_Int32 => "Integer",
+                    SpecialType.System_UInt32 => "Bigint",
+                    SpecialType.System_Int64 => "Bigint",
+                    SpecialType.System_UInt64 => "Numeric",
+                    _ => "Integer"
+                };
+                return DbTypeRef.PostgreSql(npg);
+            }
+
+            var mapped = underlying.SpecialType switch
+            {
+                SpecialType.System_Boolean => "Boolean",
+                SpecialType.System_Byte => "Smallint",
+                SpecialType.System_Int16 => "Smallint",
+                SpecialType.System_Int32 => "Integer",
+                SpecialType.System_Int64 => "Bigint",
+                SpecialType.System_Single => "Real",
+                SpecialType.System_Double => "Double",
+                SpecialType.System_Decimal => "Numeric",
+                SpecialType.System_String => "Text",
+                SpecialType.System_Char => "Char",
+                _ => underlying.ToDisplayString(GetterKeyFormat) switch
+                {
+                    "global::System.Guid" or "Guid" => "Uuid",
+                    "global::System.DateTime" or "DateTime" => "Timestamp",
+                    "global::System.DateTimeOffset" or "DateTimeOffset" => "TimestampTz",
+                    "global::System.DateOnly" => "Date",
+                    "global::System.TimeOnly" => "Time",
+                    "global::System.Byte[]" => "Bytea",
+                    _ => "Unknown"
+                }
+            };
+
+            return DbTypeRef.PostgreSql(mapped);
         }
     }
 
@@ -101,13 +155,13 @@ internal static class RoslynSymbolExtensions
         }
 
         
-        public string? ResolveDefaultSql(ParamConfig cfg)
+        public string? ResolveDefaultSql(ParamConfig cfg, SqlProviderKind provider = SqlProviderKind.SqlServer)
         {
             if (!string.IsNullOrWhiteSpace(cfg.DefaultSqlExpression))
                 return cfg.DefaultSqlExpression;
 
-            if (string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase) && cfg.PropertyType.IsGuidType())
-                return "DEFAULT NEWID()";
+            if (string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase) && cfg.PropertyType.IsGuidType)
+                return provider == SqlProviderKind.PostgreSql ? "DEFAULT gen_random_uuid()" : "DEFAULT NEWID()";
 
             return null;
         }

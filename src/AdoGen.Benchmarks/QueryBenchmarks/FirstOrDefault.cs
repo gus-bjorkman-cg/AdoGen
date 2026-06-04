@@ -1,5 +1,6 @@
 using System.Data;
-using AdoGen.Abstractions;
+using System.Globalization;
+using AdoGen.SqlServer;
 using AdoGen.Sample.Features.Users;
 using BenchmarkDotNet.Attributes;
 using Dapper;
@@ -16,7 +17,7 @@ public class FirstOrDefault : TestBase
 
     protected override ValueTask Initialize()
     {
-        _names = Enumerable.Range(0, OperationCount).Select(x => x.ToString()).ToArray();
+        _names = Enumerable.Range(0, OperationCount).Select(x => x.ToString(CultureInfo.InvariantCulture)).ToArray();
         return ValueTask.CompletedTask;
     }
 

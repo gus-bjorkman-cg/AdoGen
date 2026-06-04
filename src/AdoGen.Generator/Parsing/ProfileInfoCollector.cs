@@ -4,25 +4,31 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using AdoGen.Generator.Diagnostics;
+using AdoGen.Generator.Emitters;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using AdoGen.Generator.Extensions;
 using AdoGen.Generator.Models;
-using AdoGen.Generator.Pipelines;
 
 namespace AdoGen.Generator.Parsing;
 
 internal static class ProfileInfoCollector
 {
     private const string RuleFor = nameof(RuleFor);
+
+    private static readonly List<ISqlTypeLiterals> SqlTypeLiterals =
+    [
+        SqlTypeLiteralsSqlServer.Instance, SqlTypeLiteralsPostgreSql.Instance
+    ];
     
     internal static ProfileInfo Resolve(
         DiscoveryDto discoveryDto, 
         ImmutableArray<Diagnostic>.Builder diagnostics,
+        ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var (dto, _, profile, model) = discoveryDto;
-        var collected = Collect(profile!, dto, model!, diagnostics, ct);
+        var (dto, _, profile, model, provider, _) = discoveryDto;
+        var collected = Collect(profile!, dto, model!, diagnostics, provider, props, ct);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
         {
@@ -43,126 +49,147 @@ internal static class ProfileInfoCollector
         INamedTypeSymbol dtoType,
         SemanticModel model,
         ImmutableArray<Diagnostic>.Builder diagnostics,
+        SqlProviderKind provider,
+        ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var dtoProps = dtoType
-            .GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !p.IsStatic)
-            .OrderBy(x =>
-            {
-                var loc = x.Locations.FirstOrDefault(l => l.IsInSource);
-                return loc is null ? int.MaxValue : loc.SourceSpan.Start;
-            })
-            .ThenBy(x => x.Name, StringComparer.Ordinal)
-            .ToDictionary(p => p.Name, p => p, StringComparer.Ordinal);
-
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
-        string? schema = null;
-        string? table = null;
-        var keys = new List<string>();
         var identityKeys = new HashSet<string>(StringComparer.Ordinal);
+        var keys = new List<string>();
         
-        foreach (var syntaxRef in profileSymbol.DeclaringSyntaxReferences)
+        var dtoProps = props.ToImmutableDictionary(static p => p.Name, p => p, StringComparer.Ordinal);
+        var schema = provider.DefaultSchema();
+        var table = dtoType.Name.PluralizeSimple();
+        var expressionSyntaxes = profileSymbol.GetProfileExpressions();
+
+        foreach (var expressionSyntax in expressionSyntaxes)
         {
-            if (syntaxRef.GetSyntax() is not ClassDeclarationSyntax cls) continue;
+            if (expressionSyntax.Expression is not IdentifierNameSyntax id) continue;
 
-            foreach (var ctor in cls.Members.OfType<ConstructorDeclarationSyntax>())
+            switch (id.Identifier.Text)
             {
-                IEnumerable<SyntaxNode> nodes = [];
-                if (ctor.Body is { } body) nodes = nodes.Concat(body.DescendantNodes());
-                if (ctor.ExpressionBody is { } exprBody) nodes = nodes.Concat(exprBody.DescendantNodes());
+                case "Table":
+                    if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } al &&
+                        model.TryGetConstString(al[0].Expression, default, out var tn) && !string.IsNullOrWhiteSpace(tn))
+                        table = tn!;
+                    break;
 
-                foreach (var inv in nodes.OfType<InvocationExpressionSyntax>())
-                {
-                    if (inv.Expression is IdentifierNameSyntax id)
+                case "Schema":
+                    if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } asl &&
+                        model.TryGetConstString(asl[0].Expression, default, out var sc) && !string.IsNullOrWhiteSpace(sc))
+                        schema = sc!;
+                    break;
+
+                case "Key":
+                case "Identity":
+                    if (expressionSyntax.ArgumentList.Arguments.Count != 1) break;
+                    
+                    var lambda = (LambdaExpressionSyntax)expressionSyntax.ArgumentList.Arguments[0].Expression;
+                    var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
+
+                    if (propName is null || !dtoProps.ContainsKey(propName)) break;
+                    
+                    switch (id.Identifier.Text)
                     {
-                        switch (id.Identifier.Text)
-                        {
-                            case "Table":
-                                if (inv.ArgumentList.Arguments is { Count: 1 } al &&
-                                    model.TryGetConstString(al[0].Expression, default, out var tn) && !string.IsNullOrWhiteSpace(tn))
-                                    table = tn!;
-                                break;
-
-                            case "Schema":
-                                if (inv.ArgumentList.Arguments is { Count: 1 } asl &&
-                                    model.TryGetConstString(asl[0].Expression, default, out var sc) && !string.IsNullOrWhiteSpace(sc))
-                                    schema = sc!;
-                                break;
-
-                            case "Key":
-                            case "Identity":
-                                if (inv.ArgumentList.Arguments is { Count: 1 } kal &&
-                                    kal[0].Expression is LambdaExpressionSyntax lambda)
-                                {
-                                    var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
-                                    if (propName is { } pn && dtoProps.ContainsKey(pn))
-                                    {
-                                        if (id.Identifier.Text == "Key" && !keys.Contains(pn, StringComparer.Ordinal)) keys.Add(pn);
-                                        if (id.Identifier.Text == "Identity") identityKeys.Add(pn);
-                                    }
-                                }
-                                break;
-                        }
+                        case "Key":
+                            keys.Add(propName);
+                            break;
+                        case "Identity":
+                            identityKeys.Add(propName);
+                            break;
                     }
-
-                    // Property chains starting with RuleFor(...)
-                    var isConfigureCall =
-                        (inv.Expression is IdentifierNameSyntax cid && cid.Identifier.Text == RuleFor) ||
-                        (inv.Expression is MemberAccessExpressionSyntax mae && mae.Name.Identifier.Text == RuleFor);
-
-                    if (isConfigureCall)
-                    {
-                        ConfigureChainParser.ParseConfigureRootAndForwardChain(
-                            model, 
-                            dtoType, 
-                            dtoProps, 
-                            inv, 
-                            configs,
-                            diagnostics, 
-                            ct);
-                    }
-                }
+                    break;
+                case RuleFor:
+                    ConfigureChainParser.ParseConfigureRootAndForwardChain(
+                        model, 
+                        dtoType, 
+                        dtoProps, 
+                        expressionSyntax, 
+                        configs,
+                        provider,
+                        diagnostics, 
+                        ct);
+                    break;
             }
         }
-
-        // Defaults
-        schema ??= "dbo";
-        table ??= dtoType.Name.PluralizeSimple();
-
+        
         if (keys.Count == 0)
         {
-            var idProp = dtoProps.Keys.FirstOrDefault(n => string.Equals(n, "Id", StringComparison.OrdinalIgnoreCase));
+            var idProp = dtoProps.Keys.FirstOrDefault(static n => string.Equals(n, "Id", StringComparison.OrdinalIgnoreCase));
             if (idProp is not null) keys.Add(idProp);
         }
 
         // Ensure configs exist for all props (conventions)
         foreach (var prop in dtoProps.Values)
         {
-            if (!configs.ContainsKey(prop.Name))
+            if (!configs.TryGetValue(prop.Name, out var config))
             {
                 configs[prop.Name] = new ParamConfig
                 {
                     PropertyName = prop.Name,
                     PropertyType = prop.Type,
                     ParameterName = prop.Name,
-                    DbType = prop.Type.MapDefaultSqlDbType()   
+                    DbType = prop.MapDefaultDbType(provider)
                 };
             }
-            else if (configs[prop.Name].DbType is null)
+            else if (config.DbType is null)
             {
-                var config = configs[prop.Name];
-                config.DbType = config.PropertyType.MapDefaultSqlDbType();
+                config.DbType = prop.MapDefaultDbType(provider);
             }
         }
-
+        
+        foreach (var cfg in configs.Values)
+            if (cfg.SqlTypeLiteral is "") 
+                cfg.SqlTypeLiteral = SqlTypeLiterals.First(x => x.IsMatch(cfg)).Get(cfg);
+        
         return new ProfileInfo(
             Schema: schema,
             Table: table,
-            Keys: [.. keys],
-            IdentityKeys: identityKeys.ToImmutableHashSet(StringComparer.Ordinal),
-            ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal)
+            Keys: keys.Distinct().ToImmutableArray(),
+            IdentityKeys: identityKeys.Distinct().ToImmutableHashSet(StringComparer.Ordinal),
+            DtoProperties: props,
+            ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal),
+            Namespace: dtoType.GetNamespace()
         );
+    }
+    
+    private static string DefaultSchema(this SqlProviderKind provider) =>
+        provider switch
+        {
+            SqlProviderKind.SqlServer => "dbo",
+            SqlProviderKind.PostgreSql => "public",
+            _ => throw new NotSupportedException($"Unsupported provider: {provider}")
+        };
+    
+    private static DbTypeRef MapDefaultDbType(this IPropertySymbol propertySymbol, SqlProviderKind provider) =>
+        provider switch
+        {
+            SqlProviderKind.SqlServer => propertySymbol.Type.MapDefaultSqlDbType(),
+            SqlProviderKind.PostgreSql => propertySymbol.Type.MapDefaultNpgsqlDbType(),
+            _ => throw new NotSupportedException($"Unsupported provider: {provider}")
+        };
+    
+    extension(INamedTypeSymbol profileSymbol)
+    {
+        private ImmutableArray<InvocationExpressionSyntax> GetProfileExpressions() =>
+            profileSymbol.DeclaringSyntaxReferences
+                .Select(static x => x.GetSyntax())
+                .OfType<ClassDeclarationSyntax>()
+                .SelectMany(static x => x.Members.OfType<ConstructorDeclarationSyntax>())
+                .SelectMany(static x =>
+                {
+                    var nodes = new List<SyntaxNode>();
+                    if (x.Body is { } body) nodes.AddRange(body.DescendantNodes());
+                    if (x.ExpressionBody is { } exprBody) nodes.AddRange(exprBody.DescendantNodes());
+                    return nodes;
+                })
+                .OfType<InvocationExpressionSyntax>()
+                .Where(static x => x.Expression is IdentifierNameSyntax)
+                .ToImmutableArray();
+
+        private string GetNamespace() =>
+            profileSymbol.ContainingNamespace.IsGlobalNamespace
+                ? "GlobalNamespace"
+                : profileSymbol.ContainingNamespace.ToDisplayString();
     }
 }

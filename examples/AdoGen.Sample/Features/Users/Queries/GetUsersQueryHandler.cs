@@ -8,11 +8,17 @@ public sealed record GetUsersQuery
 
 public sealed class GetUsersQueryHandler(string connectionString)
 {
-    private const string Sql = "SELECT * FROM Users";
-
-    public async ValueTask<List<User>> Handle(GetUsersQuery query, CancellationToken ct)
+    public async ValueTask<List<User>> SqlServer(GetUsersQuery query, CancellationToken ct)
     {
+        const string sql = "SELECT * FROM Users";
         await using var connection = new SqlConnection(connectionString);
-        return await connection.QueryAsync<User>(Sql, ct);
+        return await connection.QueryAsync<User>(sql, ct);
+    }
+    
+    public async ValueTask<List<User>> NpgSql(GetUsersQuery query, CancellationToken ct)
+    {
+        const string sql = """SELECT * FROM "public"."Users" """;
+        await using var connection = new NpgsqlConnection(connectionString);
+        return await connection.QueryAsync<User>(sql, ct);
     }
 }

@@ -1,0 +1,125 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Npgsql;
+
+namespace AdoGen.PostgreSql;
+
+/// <summary>
+/// Interface used to generate AdoGen mapper and SQL helper class for PostgreSQL.
+/// </summary>
+public interface INpgsqlMapper;
+
+/// <summary>
+/// Interface used by AdoGen to make mapping extensions work for PostgreSQL.
+/// </summary>
+public interface INpgsqlMapper<out T> where T : INpgsqlMapper<T>
+{
+    /// <summary>
+    /// Maps the objects by using the source generated mapper.
+    /// </summary>
+    static abstract T Map(NpgsqlDataReader reader);
+}
+
+/// <summary>
+/// Interface used to generate AdoGen domain operations class for PostgreSQL.
+/// </summary>
+public interface INpgsqlDomainModel : INpgsqlMapper;
+
+/// <summary>
+/// Interface used by AdoGen to make domain operations class work for PostgreSQL.
+/// </summary>
+public interface INpgsqlDomainModel<T> where T : INpgsqlDomainModel<T>
+{
+    /// <summary>
+    /// Creates the database table.
+    /// </summary>
+    static abstract ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Inserts a database record.
+    /// </summary>
+    static abstract ValueTask<int> InsertAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Inserts multiple database records in one roundtrip.
+    /// </summary>
+    static abstract ValueTask<int> InsertAsync(List<T> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Updates a database record.
+    /// </summary>
+    static abstract ValueTask<int> UpdateAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Inserts or updates a database record.
+    /// </summary>
+    static abstract ValueTask<int> UpsertAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Deletes a database record.
+    /// </summary>
+    static abstract ValueTask<int> DeleteAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Truncates a database table.
+    /// </summary>
+    static abstract ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Inserts a database record and returns the inserted row with server-generated values
+    /// (identity columns, database defaults, computed columns) populated via RETURNING *.
+    /// </summary>
+    /// <remarks>
+    /// Single-row only. For bulk inserts see bulk copy operations.
+    /// </remarks>
+    /// <param name="model"></param>
+    /// <param name="connection"></param>
+    /// <param name="ct"></param>
+    /// <param name="transaction"></param>
+    /// <param name="commandTimeout"></param>
+    /// <returns>The inserted row with all server-populated columns filled in.</returns>
+    static abstract ValueTask<T> InsertAndReturnAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>Adds an INSERT command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddInsertBatchCommand(NpgsqlBatch batch, T model);
+
+    /// <summary>Adds an UPDATE command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddUpdateBatchCommand(NpgsqlBatch batch, T model);
+
+    /// <summary>Adds a DELETE command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddDeleteBatchCommand(NpgsqlBatch batch, T model);
+
+    /// <summary>Adds an INSERT OR UPDATE (upsert) command for <typeparamref name="T"/> to the batch.</summary>
+    static abstract void AddUpsertBatchCommand(NpgsqlBatch batch, T model);
+
+    /// <summary>
+    /// Adds an INSERT … RETURNING * command for <typeparamref name="T"/> to the batch.
+    /// Read the inserted row back by calling <c>T.Map(reader)</c> on the corresponding result set
+    /// after executing the batch with <see cref="NpgsqlBatch.ExecuteReaderAsync(CancellationToken)"/>.
+    /// </summary>
+    static abstract void AddInsertAndReturnBatchCommand(NpgsqlBatch batch, T model);
+}
+
+/// <summary>
+/// Struct that represents the result of a bulk apply operation,
+/// containing the number of inserted, updated, and deleted records.
+/// </summary>
+public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted)
+{
+    /// <summary>
+    /// Static property that represents an empty result.
+    /// </summary>
+    public static BulkApplyResult Empty { get; } = new(0, 0, 0);
+}
+
+/// <summary>
+/// Interface used to generate AdoGen bulk operations class for PostgreSQL.
+/// </summary>
+public interface INpgsqlBulkModel : INpgsqlDomainModel;
+
+/// <summary>
+/// Interface used by AdoGen to make bulk operations class work for PostgreSQL.
+/// </summary>
+public interface INpgsqlBulkModel<T> : INpgsqlBulkModel, INpgsqlDomainModel<T> where T : INpgsqlBulkModel<T>;
+

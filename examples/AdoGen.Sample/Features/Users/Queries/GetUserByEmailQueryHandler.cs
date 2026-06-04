@@ -4,11 +4,17 @@ public sealed record GetUserByEmailQuery(string Email);
 
 public sealed class GetUserByEmailQueryHandler(string connectionString)
 {
-    private const string Sql = "SELECT * FROM Users WHERE Email = @Email";
-    
-    public async ValueTask<User?> Handle(GetUserByEmailQuery query, CancellationToken ct)
+    public async ValueTask<User?> SqlServer(GetUserByEmailQuery query, CancellationToken ct)
     {
+        const string sql = "SELECT * FROM Users WHERE Email = @Email";
         await using var connection = new SqlConnection(connectionString);
-        return await connection.QueryFirstOrDefaultAsync<User>(Sql, UserSql.CreateParameterEmail(query.Email), ct);
+        return await connection.QueryFirstOrDefaultAsync<User>(sql, UserSql.CreateParameterEmail(query.Email), ct);
+    }
+
+    public async ValueTask<User?> NpgSql(GetUserByEmailQuery query, CancellationToken ct)
+    {
+        const string sql = """SELECT * FROM "public"."Users" WHERE "Email" = @Email""";
+        await using var connection = new NpgsqlConnection(connectionString);
+        return await connection.QueryFirstOrDefaultAsync<User>(sql, UserNpgsql.CreateParameterEmail(query.Email), ct);
     }
 }

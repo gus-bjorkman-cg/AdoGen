@@ -1,0 +1,637 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Npgsql;
+
+namespace AdoGen.PostgreSql;
+
+/// <summary>
+/// Extensions class for NpgsqlConnection.
+/// </summary>
+public static class NpgsqlConnectionExtensions
+{
+    extension(NpgsqlConnection connection)
+    {
+        /// <summary>
+        /// Creates the database table.
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask CreateTableAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.CreateTableAsync(connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Inserts a database record.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<int> InsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.InsertAsync(model, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Inserts multiple database records in one roundtrip.
+        /// </summary>
+        /// <param name="models"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<int> InsertAsync<T>(List<T> models, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.InsertAsync(models, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Updates a database record.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        /// <exception cref="AdoGenConcurrencyException">
+        /// Thrown when the DTO has a concurrency token configured and 0 rows were affected,
+        /// indicating the row was modified or deleted by another process.
+        /// </exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<int> UpdateAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.UpdateAsync(model, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Inserts or updates a database record.
+        /// </summary>
+        /// <remarks>
+        /// When the DTO has a concurrency token configured, <c>UpsertAsync</c> does <b>not</b>
+        /// enforce the concurrency check — it performs an unconditional INSERT ON CONFLICT DO UPDATE.
+        /// Use <c>UpdateAsync</c> instead if you require optimistic concurrency protection.
+        /// </remarks>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<int> UpsertAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.UpsertAsync(model, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Deletes a database record.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        /// <exception cref="AdoGenConcurrencyException">
+        /// Thrown when the DTO has a concurrency token configured and 0 rows were affected,
+        /// indicating the row was modified or deleted by another process.
+        /// </exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<int> DeleteAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.DeleteAsync(model, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Truncates a database table.
+        /// </summary>
+        /// <param name="ct"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<int> TruncateAsync<T>(CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.TruncateAsync(connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Inserts a database record and returns the inserted row with server-generated values populated.
+        /// PostgreSQL uses RETURNING * to retrieve the row after insertion.
+        /// </summary>
+        /// <remarks>
+        /// Single-row only. For bulk inserts see bulk copy operations.
+        /// </remarks>
+        /// <exception cref="InvalidOperationException"> Thrown when affected rows are 0. </exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<T> InsertAndReturnAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.InsertAndReturnAsync(model, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<List<T>> QueryAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            return await command.QueryAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<List<T>> QueryAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return await command.QueryAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<List<T>> QueryAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
+            return await command.QueryAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            return await command.QueryFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return await command.QueryFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
+            return await command.QueryFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the reader.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<NpgsqlDataReader> QueryMultiAsync(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            return await command.QueryMultiAsync(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the reader.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<NpgsqlDataReader> QueryMultiAsync(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return await command.QueryMultiAsync(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the reader.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<NpgsqlDataReader> QueryMultiAsync(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
+            return await command.QueryMultiAsync(ct);
+        }
+
+        /// <summary>
+        /// Creates an NpgsqlCommand.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public NpgsqlCommand CreateCommand(
+            string sql,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandType = commandType;
+
+            if (transaction != null) command.Transaction = transaction;
+            if (commandTimeout != null) command.CommandTimeout = commandTimeout.Value;
+
+            return command;
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<int> ExecuteAsync(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
+            return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameter"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <param name="ct"></param>
+        /// <param name="commandType"></param>
+        /// <param name="transaction"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+                        
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            
+            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.QueryScalarAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            return await command.QueryScalarAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            return await command.QueryScalarAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            return await command.QueryScalarFirstOrDefaultAsync<T>(ct);
+        }
+    }
+}
+

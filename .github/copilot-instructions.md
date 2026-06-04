@@ -1,242 +1,156 @@
 # Copilot Instructions for AdoGen
 
-You are assisting in the development of **AdoGen**, a high‑performance micro ORM for .NET built around **source‑generated mappings** and **explicit parameter configuration**.
+AdoGen is a high-performance, reflection-free, Native AOT–compatible micro-ORM for .NET. All mapping and SQL is produced at compile time by a Roslyn source generator. Two providers are stable: **SQL Server** (`AdoGen.SqlServer`) and **PostgreSQL** (`AdoGen.PostgreSql`).
 
-These instructions are **non‑negotiable rules**. If a suggestion conflicts with them, it is wrong.
-
----
-
-## 1. Core Purpose (Order of Importance)
-
-1. **Runtime performance is the primary goal**
-    - If a feature is not at least as fast as Dapper, it has no reason to exist.
-    - Micro‑optimizations are encouraged when benchmark‑proven.
-2. **API ergonomics are secondary**
-    - Familiar APIs are acceptable only if they do not cost performance.
-3. **Extensibility to other providers is future work**
-    - Do not introduce abstractions prematurely.
-4. **Compile‑time safety via source generation is a means, not an end**
-    - Correctness is primarily enforced by tests and generation‑time validation.
+These rules are **non-negotiable**. If a suggestion conflicts with them, it is wrong.
+For build/test workflow, project layout, and operational lessons, see `AGENTS.md`.
 
 ---
 
-## 2. Non‑Goals
+## 1. Priorities (in order)
 
-AdoGen intentionally does **not** aim to provide:
+1. **Runtime performance** — must be at least as fast as Dapper. Memory allocation is AdoGen's primary edge; never regress it.
+2. **Compile-time correctness** — invalid config fails at generation time, never at runtime.
+3. **API ergonomics** — only when free of performance cost.
+4. **Provider extensibility** — future work. Do not pre-abstract.
 
-- Dapper compatibility beyond surface familiarity
-- Reflection‑based mapping
-- Dynamic mapping or runtime inspection
-- Repository, Unit‑of‑Work, or IQueryable patterns
-- Convenience APIs that hide performance costs
-
----
-
-## 3. Runtime Constraints (Generated Code & Abstractions)
-
-### Absolute Rules
-
-- **No reflection** in runtime code, ever
-- Must be **Native AOT compatible**
-- No expression trees, dynamic, or runtime IL generation
-- Prefer explicit, specialized code over abstractions
-
-### Performance Rules
-
-- Allocations matter; avoid unnecessary allocations
-- LINQ is forbidden in hot paths
-- Exceptions are exceptional; do not use them for normal flow
-- Unsafe code, `stackalloc`, `Span<T>`, and `ref struct` are allowed when benchmark‑justified
-
-### Provider Boundaries
-
-- SQL Server–specific types and behavior are allowed **only** in clearly named, localized areas
-- Provider-specific assumptions must not silently spread across the runtime
-- Do not introduce generic provider abstractions until at least one additional provider exists
-
-Future provider support must be intentional, explicit, and benchmark‑validated.
+Benchmarks (`AdoGen.Benchmarks`) are authoritative. Performance claims require benchmark evidence.
 
 ---
 
-## 4. Language & Runtime
+## 2. Runtime — Absolute Never-Ever (generated + hand-written)
 
-- Target framework: **.NET 10** (all projects except Generator)
+- No `System.Reflection`
+- No `dynamic`, expression trees, or runtime IL/code generation
+- No LINQ in hot paths
+- No `AddWithValue` — use generated typed factories (e.g. `UserSql.CreateParameterEmail(x)`)
+- No exceptions for normal control flow
+- Must remain Native AOT compatible
+
+`stackalloc`, `Span<T>`, `ref struct`, and unsafe code are allowed **when benchmark-justified**.
+
+---
+
+## 3. Language & API Surface
+
+- Target framework: **.NET 10** (all projects except the generator)
+- Generator targets `netstandard2.0`, C# `latest` via PolySharp
 - Nullable reference types enabled
-- Async‑only APIs
-- `Async` suffix is mandatory
+- Public I/O is **async-only**, `Async` suffix mandatory
+- Verb-based method names
+
+### CancellationToken (strict)
+
+- Every public async I/O method **must require** an explicit `CancellationToken`
+- No defaults, no convenience overloads omitting it
+- Callers pass `CancellationToken.None` explicitly when not needed
+- Token must propagate to every ADO.NET call: `OpenAsync`, `ExecuteReaderAsync`, `ExecuteNonQueryAsync`, `ReadAsync`, etc.
+- Missing `CancellationToken` in a public signature is a design bug.
 
 ---
 
-## 5. Cancellation Tokens (Strict Policy)
+## 4. Provider Boundaries
 
-- All public I/O APIs **must require** a `CancellationToken`
-- No implicit defaults
-- If the caller does not want cancellation, they must explicitly pass `CancellationToken.None`
-- Tokens must be propagated to all ADO.NET calls:
-    - `OpenAsync(ct)`
-    - `ExecuteReaderAsync(ct)`
-    - `ExecuteNonQueryAsync(ct)`
-    - `ReadAsync(ct)`
-
-Public APIs must not provide convenience overloads that omit CancellationToken.
-
-If a CancellationToken is not present in the method signature, it is a design bug.
+- SQL Server: `SqlConnection`, `SqlCommand`, `SqlParameter`, `SqlDbType` — confined to `AdoGen.SqlServer`
+- PostgreSQL: `NpgsqlConnection`, `NpgsqlCommand`, `NpgsqlParameter`, `NpgsqlDbType` — confined to `AdoGen.PostgreSql`
+- **No cross-provider abstractions.** Do not introduce `IDbProvider`, `ISqlDialect`, strategy patterns, or shared base classes spanning providers.
+- Prefer duplication over abstraction. Generalization requires a third real provider, measured benchmarks, and proven necessity.
+- A single DTO may implement both providers' interfaces; each provider's code is generated independently.
 
 ---
 
-## 6. Mapping & Profiles
+## 5. Mapping & Profiles
 
-### Generator Activation
+### Generator activation
 
-Source generation is triggered only when:
-
-- The DTO is `partial`
-- The DTO implements `ISqlDomainModel` or `ISqlResult`
+- DTO must be `partial`
+- DTO implements at least one marker interface:
+  - SQL Server: `ISqlMapper`, `ISqlDomainModel`, `ISqlBulkModel`
+  - PostgreSQL: `INpgsqlMapper`, `INpgsqlDomainModel`, `INpgsqlBulkModel`
 
 ### Profiles
 
-- Exactly **one profile per DTO**
-- Profiles are required only when configuration is needed
-- No shared or inherited profiles
+- Exactly **one profile per DTO per provider** (`SqlProfile<T>`, `NpgsqlProfile<T>` are separate)
+- A profile is **always required**, even when every member could map by default
+- No shared, inherited, or generic profiles
 
-### Rules
+### Mandatory configuration (fail at generation time)
 
-- **Strings must always be explicitly configured**
-    - Length is mandatory
-    - `varchar` vs `nvarchar` must be explicit
-- Other types requiring metadata (e.g. `decimal`) must also be explicitly configured
-- `Guid` has a default mapping
-- Nullability is inferred from `?`
-- `Id` is treated as the key by convention unless overridden
+- `string` → length + type explicit: `.VarChar(n)` / `.NVarChar(n)` / `.Char(n)` / `.NChar(n)` (SQL Server); `.VarChar(n)` / `.Text()` / `.Char(n)` / `.Bytea()` / `.Varbit(n)` (PostgreSQL)
+- `decimal` → `.Decimal(precision, scale)`
+- `Guid`, numeric types, `bool`, `DateTime` → default mappings, no config required
+- `Id` is the PK by convention; override with `Key(x => x.MyKey)`
+- Nullability inferred from `?`
 
-### Validation
+### Optional column behaviors
 
-- Invalid or incomplete configuration must **fail at generation time**
-- Runtime validation is a last resort
+- `.ConcurrencyToken()` — `int`/`long` (auto-incremented in UPDATE) or `Guid` (caller sets new value). Adds `AND [Col] = @Col` to UPDATE/DELETE WHERE; throws `global::`-qualified `AdoGenConcurrencyException` on 0 affected rows. **Not** enforced by `UpsertAsync` or `PatchAsync`.
+- `.ReadOnly()` — excluded from INSERT/UPDATE/bulk/patch writes; still in DDL and mapper read path. Pair with `.DefaultValue(sqlExpr)` for server-managed columns.
 
----
-
-## 7. SQL Generation Scope (Strictly Limited)
-
-SQL may be generated **only** for the following methods:
-
-- `CreateTableAsync`
-- `InsertAsync`
-- `InsertAsync(List<T>)`
-- `UpdateAsync`
-- `UpsertAsync`
-- `DeleteAsync`
-- `TruncateAsync`
-
-Conditions:
-- DTO implements `ISqlDomainModel`
-- A corresponding `SqlProfile<T>` exists
-
-Do **not** generate SELECT queries or arbitrary SQL.
-
-Any attempt to generate SQL outside the explicitly supported method set
-must fail at generation time with a diagnostic error.
-
-This limitation is intentional and must not be relaxed.
+Validation must produce a diagnostic at generation time. Runtime validation is a last resort.
 
 ---
 
-## 8. Parameters
+## 6. SQL Generation Scope (closed set)
 
-- Correct parameter metadata is mandatory
-    - Type
-    - Length
-    - Precision / scale where applicable
-- No implicit inference
-- **Never use `AddWithValue`**
-- Parameter creation must flow through generated or configured code
+The generator emits SQL **only** for these operations, and only when the DTO implements the corresponding interface and a profile exists:
+
+**Domain (`ISqlDomainModel` / `INpgsqlDomainModel`):**
+`CreateTableAsync`, `InsertAsync`, `InsertAndReturnAsync`, `UpdateAsync`, `UpsertAsync`, `DeleteAsync`, `PatchAsync`, `TruncateAsync`, `ExistsAsync`
+
+**Bulk (`ISqlBulkModel` / `INpgsqlBulkModel`):**
+`InsertAsync(List<T>)` plus the `*Bulk` class with `AddRange` / `UpdateRange` / `UpsertRange` / `RemoveRange` + `SaveChangesAsync`. SQL Server uses `SqlBulkCopy`; PostgreSQL uses binary `COPY`.
+
+**Batching:** `Insert` / `Update` / `Upsert` / `Delete` / `InsertAndReturn` extensions on `SqlBatch` / `NpgsqlBatch`.
+
+**Patch:** generator emits a `{Model}Patch` class per domain model; only fluent-set columns are written, no concurrency check, read-only columns excluded.
+
+**Not generated:** arbitrary `SELECT`, ad-hoc queries, IQueryable, repository/UoW patterns. Callers write their own SQL and use `QueryAsync` / `QueryFirstOrDefaultAsync` / `QueryScalarAsync` / `QueryScalarFirstOrDefaultAsync` / `ExecuteAsync` with generated parameter factories.
+
+Any attempt to widen this set must fail at generation time with a diagnostic. The limit is intentional.
 
 ---
 
-## 9. SQL Server (Current Reality)
+## 7. Parameters
 
-- SQL Server is the only supported provider
-- Usage of `SqlConnection`, `SqlCommand`, `SqlParameter`, and `SqlDbType` is intentional
-- Do not introduce provider abstraction layers yet
+- Type, length, and precision/scale metadata is mandatory and explicit
+- No implicit inference, ever
+- Parameter creation flows through generated factories or profile config — nothing else
+- `AddWithValue` is forbidden in both runtime and generated code
 
 ---
 
-## 10. Tests
+## 8. Tests
 
 - xUnit only
-- Real database only (MSSQL Testcontainers)
-- No mocked ADO.NET
-- No in‑memory providers
-- No hidden SQL behind helpers
-- Table creation is part of the library responsibility
+- Generator unit tests: in-process Roslyn compilation + Verify snapshots, no Docker
+- Integration tests: real databases via Testcontainers (MSSQL + PostgreSQL)
+- No mocked ADO.NET, no in-memory providers, no SQL hidden behind helpers
+- Snapshot approval alone is **not** validation — integration tests must pass for both providers after any generator/runtime change
+
+Test naming: `Subject_ShouldVerb_WhenCondition` for new tests; match surrounding file style when extending existing suites.
 
 ---
 
-## 11. Benchmarks
+## 9. Generator Project (`AdoGen.Generator`)
 
-- Benchmarks are authoritative
-- Performance claims must be backed by benchmark results
-- Benchmark accuracy > readability
-- Regressions are unacceptable
-
----
-
-## 12. Generator Project (`AdoGen.Generator`)
-
-### Target
-
-- `netstandard2.0`
-- C# language version: `latest` (PolySharp is available)
-
-### Rules
-
-- Generator code prioritizes:
-    - Readability
-    - Reusability
-    - Maintainability
-- Generator performance matters, but runtime performance matters more
+- Prioritize readability, reusability, maintainability — generator perf matters less than runtime perf
+- Reflection is allowed **only inside the generator**, never in emitted code
 - Avoid unnecessary allocations during generation
-- Prefer simple Roslyn syntax walking
-
-Reflection is allowed **only** inside the generator, never in generated output.
+- Prefer simple Roslyn syntax walking; incremental pipelines
 
 ---
 
-## 13. Naming & Style
+## 10. Non-Goals
 
-- Verb‑based method names are preferred
-- Names should describe actions, not concepts
-- Follow modern C# style and explicitness
+AdoGen does not provide, and will not accept additions for:
 
----
-
-## 14. Absolute Never‑Ever List (Runtime Code)
-
-- Reflection (`System.Reflection`)
-- Dynamic typing
-- Expression trees
-- Runtime code generation
-
-If performance dictates another approach, it must be benchmark‑proven and explicit.
+- Reflection-based or dynamic mapping
+- Repository, Unit-of-Work, or IQueryable patterns
+- Convenience APIs that hide allocation or round-trip cost
+- Dapper compatibility beyond surface familiarity
+- Cross-provider abstractions
 
 ---
 
-## 15. Provider Expansion Guardrails
-
-When additional database providers are introduced:
-
-- Do not generalize existing SQL Server behavior prematurely
-- Do not add IDbProvider, ISqlDialect, or strategy abstractions “for flexibility”
-- Prefer duplication over abstraction until real divergence exists
-
-Abstractions must be justified by:
-- A second real provider
-- Measured benchmarks
-- Proven necessity
-
----
-
-**Summary:**
-
-AdoGen exists to be *predictably fast*, *explicit*, and *boringly correct*.  
-If a suggestion prioritizes elegance, abstraction, or convenience over measured performance, it is wrong.
+**Summary:** AdoGen is *predictably fast*, *explicit*, and *boringly correct*. If a suggestion prioritizes elegance, abstraction, or convenience over measured performance, it is wrong.

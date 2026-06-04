@@ -79,5 +79,29 @@ internal static class SemanticModelExtensions
             value = null;
             return false;
         }
+
+        public bool TryGetConstEnumMember(ExpressionSyntax arg, CancellationToken ct, out string enumMember)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            enumMember = string.Empty;
+
+            // Prefer symbolic access: NpgsqlDbType.Varchar
+            var sym = model.GetSymbolInfo(arg, ct).Symbol;
+            if (sym is IFieldSymbol field && field.ContainingType is { TypeKind: TypeKind.Enum })
+            {
+                enumMember = field.Name;
+                return enumMember.Length != 0;
+            }
+
+            // Fallback for syntax-only member access
+            if (arg is MemberAccessExpressionSyntax mae)
+            {
+                enumMember = mae.Name.Identifier.Text;
+                return enumMember.Length != 0;
+            }
+
+            return false;
+        }
     }
 }

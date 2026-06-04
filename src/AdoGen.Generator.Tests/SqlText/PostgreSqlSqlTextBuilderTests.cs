@@ -1,0 +1,277 @@
+using AdoGen.Generator.Emitters.PostgreSql;
+using AwesomeAssertions.Execution;
+
+namespace AdoGen.Generator.Tests.SqlText;
+
+public sealed class PostgreSqlSqlTextBuilderTests
+{
+    // ── Insert ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Insert_ShouldIncludeAllNonIdentityColumns()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Insert(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be("""INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email);""");
+    }
+
+    [Fact]
+    public void Insert_ShouldProduceCorrectSql_WhenNoIdentityColumn()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Insert(EmitContextFixtures.PostgreSqlOrder());
+        actual.Should().Be("""INSERT INTO "public"."Orders" ("Id", "ProductName") VALUES (@Id, @ProductName);""");
+    }
+
+    [Fact]
+    public void Insert_ShouldSkipIdentityColumn_WhenTableHasIdentity()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Insert(EmitContextFixtures.PostgreSqlAuditEvent());
+        actual.Should().Be("""INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload);""");
+    }
+
+    [Fact]
+    public void InsertBatchPrefix_ShouldProduceInsertWithoutValues()
+    {
+        var actual = PostgreSqlSqlTextBuilder.InsertBatchPrefix(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be("""INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES""");
+    }
+
+    // ── Update ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Update_ShouldSetNonKeyColumnsAndFilterByKey()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Update(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be("""UPDATE "public"."Users" SET "Name" = @Name, "Email" = @Email WHERE "Id" = @Id;""");
+    }
+
+    [Fact]
+    public void Update_ShouldProduceCorrectSql_When_NoIdentityColumn()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Update(EmitContextFixtures.PostgreSqlOrder());
+        actual.Should().Be("""UPDATE "public"."Orders" SET "ProductName" = @ProductName WHERE "Id" = @Id;""");
+    }
+
+    [Fact]
+    public void Update_ShouldSkipIdentityAndKeyInSetClause_When_TableHasIdentity()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Update(EmitContextFixtures.PostgreSqlAuditEvent());
+        actual.Should().Be("""UPDATE "log"."Audits" SET "CreatedAt" = @CreatedAt, "Type" = @Type, "JsonPayload" = @JsonPayload WHERE "EventId" = @EventId;""");
+    }
+
+    // ── Delete ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Delete_ShouldFilterBySingleKey()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Delete(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be("""DELETE FROM "public"."Users" WHERE "Id" = @Id;""");
+    }
+
+    // ── Truncate ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Truncate_ShouldProduceTruncateStatement()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Truncate(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be("""TRUNCATE TABLE "public"."Users";""");
+    }
+
+    // ── DeleteBatchTemplate (legacy, kept for reference) ─────────────────────
+
+    [Fact]
+    public void DeleteBatchTemplate_ShouldProduceDeleteWithInClauseOpener()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchTemplate(EmitContextFixtures.PostgreSqlUser(), "Id");
+        actual.Should().Be("""DELETE FROM "public"."Users" WHERE "Id" IN (""");
+    }
+
+    // ── DeleteBatchAny ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void DeleteBatchAny_ShouldProduceDeleteWithAnyArrayParam()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchAny(EmitContextFixtures.PostgreSqlUser(), "Id");
+        actual.Should().Be("""DELETE FROM "public"."Users" WHERE "Id" = ANY(@ids);""");
+    }
+
+    // ── DeleteBatchUnnest ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void DeleteBatchUnnest_ShouldProduceDeleteWithUnnestForCompositeKey()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchUnnest(EmitContextFixtures.PostgreSqlCompositeKey());
+        actual.Should().Be("""DELETE FROM "public"."OrderLines" AS t USING unnest(@OrderIds, @ProductIds) AS k("OrderId", "ProductId") WHERE k."OrderId" = t."OrderId" AND k."ProductId" = t."ProductId";""");
+    }
+
+    // ── DeleteBatchJoinValues (legacy) ────────────────────────────────────────
+
+    [Fact]
+    public void DeleteBatchJoinValuesPrefix_ShouldProduceDeleteUsingPrefix()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesPrefix(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be("""DELETE FROM "public"."Users" AS t USING (VALUES """);
+    }
+
+    [Fact]
+    public void DeleteBatchJoinValuesSuffix_SingleKey_ShouldProduceAliasAndWhereClause()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesSuffix(EmitContextFixtures.PostgreSqlUser());
+        actual.Should().Be(") AS ids(\"Id\") WHERE ids.\"Id\"=t.\"Id\"");
+    }
+
+    [Fact]
+    public void DeleteBatchJoinValuesSuffix_CompositeKey_ShouldProduceMultiColumnWhereClause()
+    {
+        var actual = PostgreSqlSqlTextBuilder.DeleteBatchJoinValuesSuffix(EmitContextFixtures.PostgreSqlCompositeKey());
+        actual.Should().Be(") AS ids(\"OrderId\", \"ProductId\") WHERE ids.\"OrderId\"=t.\"OrderId\" AND ids.\"ProductId\"=t.\"ProductId\"");
+    }
+
+    // ── Upsert (ON CONFLICT) ──────────────────────────────────────────────────
+
+    [Fact]
+    public void Upsert_ShouldProduceInsertOnConflictDoUpdate()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Upsert(EmitContextFixtures.PostgreSqlUser());
+
+        actual.Should().Be(
+            """
+            INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email) ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Email" = EXCLUDED."Email";
+            """);
+    }
+
+    [Fact]
+    public void Upsert_ShouldExcludeIdentityKeyFromConflictTarget_WhenKeyIsIdentity()
+    {
+        var actual = PostgreSqlSqlTextBuilder.Upsert(EmitContextFixtures.PostgreSqlAuditEvent());
+        actual.Should().Contain("ON CONFLICT ()");
+    }
+
+    // ── CreateTable ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CreateTable_ShouldIncludeAllColumnsAndPrimaryKeyConstraint()
+    {
+        var actual = PostgreSqlSqlTextBuilder.CreateTable(EmitContextFixtures.PostgreSqlUser());
+        
+        actual.Should().Be(
+            """
+                CREATE TABLE IF NOT EXISTS "public"."Users"(
+                    "Id" UUID DEFAULT gen_random_uuid() NOT NULL,
+                    "Name" VARCHAR(20) NOT NULL,
+                    "Email" VARCHAR(50) NOT NULL
+                ,CONSTRAINT "PK_Users" PRIMARY KEY ("Id"));
+            """);
+    }
+
+    [Fact]
+    public void CreateTable_ShouldIncludeGeneratedIdentityClause_WhenColumnIsIdentity()
+    {
+        var actual = PostgreSqlSqlTextBuilder.CreateTable(EmitContextFixtures.PostgreSqlAuditEvent());
+        
+        actual.Should().Be(
+            """
+                CREATE TABLE IF NOT EXISTS "log"."Audits"(
+                    "EventId" BIGINT GENERATED BY DEFAULT AS IDENTITY NOT NULL,
+                    "CreatedAt" TIMESTAMPTZ NOT NULL,
+                    "Type" VARCHAR(50) NOT NULL,
+                    "JsonPayload" BYTEA NOT NULL
+                ,CONSTRAINT "PK_Audits" PRIMARY KEY ("EventId"));
+            """);
+    }
+
+    // ── BulkCreateTempTable ───────────────────────────────────────────────────
+
+    [Fact]
+    public void BulkCreateTempTable_ShouldIncludeAllColumnsAndOperationColumn()
+    {
+        var actual = PostgreSqlSqlTextBuilder.BulkCreateTempTable(EmitContextFixtures.PostgreSqlUser(), "adogen_users_tmp");
+        
+        actual.Should().Be(
+            """
+            CREATE TEMP TABLE IF NOT EXISTS "adogen_users_tmp"(
+                "Id" UUID NOT NULL,
+                "Name" VARCHAR(20) NOT NULL,
+                "Email" VARCHAR(50) NOT NULL,
+                "operation" CHAR(1) NOT NULL);
+            """);
+    }
+
+    // ── BulkApply ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void BulkApply_ShouldIncludeAllDmlBlocks_WhenAllOperationsPresent()
+    {
+        var stmts = PostgreSqlSqlTextBuilder.BulkApply(
+            EmitContextFixtures.PostgreSqlUser(), "adogen_users_tmp", "\"public\".\"Users\"");
+
+        using var _ = new AssertionScope();
+
+        stmts.UpdateU.Should().Be(
+            """
+            UPDATE "public"."Users" AS T
+                SET "Name" = S."Name",
+                    "Email" = S."Email"
+            FROM "adogen_users_tmp" AS S
+            WHERE S."operation" = 'U' AND S."Id" = T."Id"
+            """);
+
+        stmts.InsertI.Should().Be(
+            """
+            INSERT INTO "public"."Users" ("Id", "Name", "Email")
+                SELECT S."Id", S."Name", S."Email"
+                FROM "adogen_users_tmp" AS S
+                WHERE S."operation" = 'I'
+            """);
+
+        stmts.DeleteD.Should().Be(
+            """
+            DELETE FROM "public"."Users" AS T
+            USING "adogen_users_tmp" AS S
+            WHERE S."operation" = 'D' AND S."Id" = T."Id"
+            """);
+
+        stmts.UpdateM.Should().Be(
+            """
+            UPDATE "public"."Users" AS T
+                SET "Name" = S."Name",
+                    "Email" = S."Email"
+            FROM "adogen_users_tmp" AS S
+            WHERE S."operation" = 'M' AND S."Id" = T."Id"
+            """);
+
+        stmts.InsertM.Should().Be(
+            """
+            INSERT INTO "public"."Users" ("Id", "Name", "Email")
+                SELECT S."Id", S."Name", S."Email"
+                FROM "adogen_users_tmp" AS S
+                WHERE S."operation" = 'M'
+            ON CONFLICT ("Id") DO NOTHING
+            """);
+    }
+
+    [Fact]
+    public void BulkApply_ShouldUseSelectFalseForUpdateBlock_WhenNoNonKeyNonIdentityColumns()
+    {
+        var stmts = PostgreSqlSqlTextBuilder.BulkApply(
+            EmitContextFixtures.PostgreSqlIdentityOnlyKey(), "adogen_counters_tmp", "\"dbo\".\"Counters\"");
+
+        using var _ = new AssertionScope();
+
+        // No non-key writable columns — both update statements are null
+        stmts.UpdateU.Should().BeNull();
+        stmts.UpdateM.Should().BeNull();
+
+        // No writable columns — insert statements are null
+        stmts.InsertI.Should().BeNull();
+        stmts.InsertM.Should().BeNull();
+
+        // Delete is always present
+        stmts.DeleteD.Should().Be(
+            """
+            DELETE FROM "dbo"."Counters" AS T
+            USING "adogen_counters_tmp" AS S
+            WHERE S."operation" = 'D' AND S."CounterId" = T."CounterId"
+            """);
+    }
+}
+

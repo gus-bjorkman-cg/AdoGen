@@ -10,6 +10,8 @@ public enum Fruits
     Orange
 }
 
+#pragma warning disable CA1711 // Dummy names for dummy type
+
 [Flags]
 public enum Flags
 {
@@ -47,6 +49,9 @@ public enum LongEnum : long
     ValueC = 3
 }
 
+#pragma warning restore CA1711
+#pragma warning disable CA1720 // Identifier contains type name — intentional SQL type naming
+
 public sealed partial record TestType(
     int Int,
     int? NullableInt,
@@ -74,8 +79,11 @@ public sealed partial record TestType(
     ByteEnum ByteEnum,
     ShortEnum ShortEnum,
     IntEnum IntEnum,
-    LongEnum LongEnum
-    ) : ISqlBulkModel;
+    LongEnum LongEnum,
+    DateTimeOffset CreatedAt
+    ) : ISqlBulkModel, INpgsqlBulkModel;
+
+#pragma warning restore CA1720
 
 public sealed class TestTypeProfile : SqlProfile<TestType>
 {
@@ -92,10 +100,35 @@ public sealed class TestTypeProfile : SqlProfile<TestType>
         RuleFor(x => x.NullableChar).NChar(1).Nullable();
         RuleFor(x => x.NullableBytes).VarBinary(200).Nullable();
         RuleFor(x => x.Bytes).VarBinary(200);
-        RuleFor(x => x.Decimal).Decimal(4,2);
+        RuleFor(x => x.Decimal).Decimal(4, 2);
         RuleFor(x => x.NullableDecimal).Decimal(6, 3).Nullable();
         RuleFor(x => x.CharString).Char(10);
         RuleFor(x => x.NCharString).NChar(15);
         RuleFor(x => x.NullableDateTime).Type(SqlDbType.DateTime).Nullable();
+        RuleFor(x => x.CreatedAt).DefaultValue("DEFAULT SYSUTCDATETIME()").ReadOnly();
+    }
+}
+
+public sealed class TestTypeNpgsqlProfile : NpgsqlProfile<TestType>
+{
+    public TestTypeNpgsqlProfile()
+    {
+        Key(x => x.Int);
+        Key(x => x.Decimal);
+
+        RuleFor(x => x.NullableStringVarchar).VarChar(100);
+        RuleFor(x => x.NullableStringNVarchar).VarChar(100);
+        RuleFor(x => x.StringVarcharRuledNull).VarChar(100).Nullable();
+        RuleFor(x => x.Char).Char(1);
+        RuleFor(x => x.NChar).Char(1);
+        RuleFor(x => x.NullableChar).Char(1).Nullable();
+        RuleFor(x => x.NullableBytes).Bytea().Nullable();
+        RuleFor(x => x.Bytes).Bytea();
+        RuleFor(x => x.Decimal).Decimal(4, 2);
+        RuleFor(x => x.NullableDecimal).Decimal(6, 3).Nullable();
+        RuleFor(x => x.CharString).Char(10);
+        RuleFor(x => x.NCharString).Char(15);
+        RuleFor(x => x.NullableDateTime).Type(NpgsqlDbType.Timestamp).Nullable();
+        RuleFor(x => x.CreatedAt).DefaultValue("DEFAULT now()").ReadOnly();
     }
 }
