@@ -2,7 +2,7 @@
 
 Full benchmark results for AdoGen vs Dapper and EF Core on SQL Server.
 
-> **DapperNT** = Dapper with untyped parameters and no `CancellationToken`.  
+> **DapperNoType** = Dapper with untyped parameters and no `CancellationToken`.  
 > **Dapper** = Dapper with typed parameters and `CancellationToken`.  
 > **EfCoreComp** = EF Core with compiled queries.
 
@@ -22,61 +22,61 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 
 ## Query
 
-| Type           | Method     | Mean      | Error    | StdDev   | Gen0   | Allocated |
-|----------------|------------|----------:|---------:|---------:|-------:|----------:|
-| FirstOrDefault | AdoGen     |  389.4 µs | 15.36 µs | 45.29 µs |      - |   2.82 KB |
-| FirstOrDefault | Dapper     |  397.3 µs | 13.74 µs | 40.50 µs |      - |   6.05 KB |
-| FirstOrDefault | EfCoreComp |  402.7 µs | 13.57 µs | 40.01 µs |      - |    7.8 KB |
-| FirstOrDefault | EfCore     |  418.2 µs | 15.40 µs | 45.40 µs |      - |  15.08 KB |
-| FirstOrDefault | DapperNT   |  433.8 µs | 13.71 µs | 40.43 µs |      - |   5.89 KB |
-| ToList         | AdoGen     |  38.80 µs |  0.771 µs | 0.825 µs |      - |     453 B |
-| ToList         | EfCore     |  39.98 µs |  0.444 µs | 0.393 µs | 0.1563 |    1705 B |
-| ToList         | DapperNT   |  39.99 µs |  0.691 µs | 0.768 µs | 0.0781 |     778 B |
-| ToList         | EfCoreComp |  39.99 µs |  0.793 µs | 1.187 µs | 0.0781 |     835 B |
-| ToList         | Dapper     |  40.12 µs |  0.787 µs | 1.024 µs | 0.0781 |     825 B |
+| Type           | Method       |      Mean | Error     | StdDev     | Gen0   | Allocated |
+|----------------|--------------|----------:|---------: |----------: |------: |----------:|
+| FirstOrDefault | AdoGen       |  364.5 µs |   6.70 µs |    8.94 µs |      - |   2.75 KB |
+| FirstOrDefault | Dapper       |  378.5 µs |   7.29 µs |   11.77 µs |      - |   6.47 KB |
+| FirstOrDefault | EfCoreComp   |  382.6 µs |   7.46 µs |    8.59 µs |      - |   7.81 KB |
+| FirstOrDefault | EfCore       |  397.5 µs |   7.88 µs |   11.56 µs | 1.0000 |  15.39 KB |
+| FirstOrDefault | DapperNoType |  429.2 µs |   8.45 µs |   16.07 µs |      - |   5.91 KB |
+| ToList         | AdoGen       |  36.26 µs |  0.718 µs |   1.314 µs | 0.0391 |     455 B |
+| ToList         | EfCoreComp   |  37.72 µs |  0.752 µs |   1.502 µs | 0.0781 |     837 B |
+| ToList         | EfCore       |  38.68 µs |  0.706 µs |   0.660 µs | 0.1563 |    1674 B |
+| ToList         | Dapper       |  39.21 µs |  0.776 µs |   1.476 µs | 0.0781 |     824 B |
+| ToList         | DapperNoType |  40.21 µs |  0.802 µs |   1.447 µs | 0.0781 |     778 B |
 
 ## Single-Row Operations
 
-| Type   | Method   | Mean     | Error    | StdDev   | Gen0 | Allocated |
-|--------|----------|--------: |--------: |--------: |-----:|----------:|
-| Insert | AdoGen   | 1.830 ms | 0.118 ms | 0.345 ms |    - |    5.3 KB |
-| Insert | DapperNT | 1.902 ms | 0.109 ms | 0.317 ms |    - |   5.59 KB |
-| Insert | Dapper   | 1.986 ms | 0.113 ms | 0.328 ms |    - |   6.48 KB |
-| Insert | EfCore   | 2.642 ms | 0.191 ms | 0.558 ms |    - |  20.09 KB |
-| Update | AdoGen   | 1.728 ms | 0.131 ms | 0.382 ms |    - |   5.17 KB |
-| Update | Dapper   | 1.777 ms | 0.129 ms | 0.371 ms |    - |   6.32 KB |
-| Update | DapperNT | 1.957 ms | 0.097 ms | 0.276 ms |    - |   5.52 KB |
-| Update | EfCore   | 2.373 ms | 0.199 ms | 0.573 ms |    - | 142.53 KB |
-| Delete | Dapper   | 1.835 ms | 0.178 ms | 0.513 ms |    - |   5.25 KB |
-| Delete | AdoGen   | 1.837 ms | 0.154 ms | 0.448 ms |    - |   4.34 KB |
-| Delete | DapperNT | 1.870 ms | 0.207 ms | 0.609 ms |    - |    4.8 KB |
-| Delete | EfCore   | 2.411 ms | 0.227 ms | 0.669 ms |    - |  19.52 KB |
+| Type   | Method       | Mean     | Error    | StdDev   | Allocated |
+|--------|--------------|--------: |--------: |--------: |----------:|
+| Insert | AdoGen       | 1.671 ms | 0.147 ms | 0.425 ms |   4.93 KB |
+| Insert | DapperNoType | 1.833 ms | 0.162 ms | 0.469 ms |   5.60 KB |
+| Insert | Dapper       | 1.859 ms | 0.165 ms | 0.481 ms |   6.46 KB |
+| Insert | EfCore       | 2.184 ms | 0.201 ms | 0.588 ms |  20.09 KB |
+| Update | Dapper       | 1.749 ms | 0.156 ms | 0.445 ms |   6.32 KB |
+| Update | AdoGen       | 1.808 ms | 0.154 ms | 0.448 ms |   5.03 KB |
+| Update | DapperNoType | 1.885 ms | 0.177 ms | 0.517 ms |   5.52 KB |
+| Update | EfCore       | 2.206 ms | 0.264 ms | 0.774 ms |  20.66 KB |
+| Delete | Dapper       | 1.629 ms | 0.178 ms | 0.515 ms |   5.25 KB |
+| Delete | AdoGen       | 1.638 ms | 0.166 ms | 0.481 ms |   4.20 KB |
+| Delete | DapperNoType | 1.797 ms | 0.151 ms | 0.441 ms |   4.80 KB |
+| Delete | EfCore       | 2.213 ms | 0.236 ms | 0.694 ms |  19.48 KB |
 
 ## Multi-Row Insert (10 records)
 
-| Type       | Method     | Mean     | Error    | StdDev   | Gen0 | Allocated |
-|------------|------------|--------: |--------: |--------: |-----:|----------:|
-| InsertMulti | AdoGen     | 2.012 ms | 0.137 ms | 0.397 ms |    - |   21.2 KB |
-| InsertMulti | AdoGenBulk | 2.030 ms | 0.125 ms | 0.358 ms |    - |  21.63 KB |
-| InsertMulti | EfCore     | 2.964 ms | 0.243 ms | 0.708 ms |    - |  76.87 KB |
-| InsertMulti | DapperNT   | 5.997 ms | 0.371 ms | 1.052 ms |    - |  35.44 KB |
-| InsertMulti | Dapper     | 6.618 ms | 0.618 ms | 1.784 ms |    - |  43.69 KB |
+| Type        | Method       | Mean     | Error    | StdDev   | Allocated |
+|-------------|--------------|--------: |--------: |--------: |----------:|
+| InsertMulti | AdoGen       | 1.756 ms | 0.180 ms | 0.527 ms |  20.99 KB |
+| InsertMulti | AdoGenBulk   | 1.777 ms | 0.199 ms | 0.586 ms |  21.38 KB |
+| InsertMulti | EfCore       | 2.402 ms | 0.243 ms | 0.717 ms |  76.87 KB |
+| InsertMulti | DapperNoType | 5.087 ms | 0.113 ms | 0.327 ms |  35.14 KB |
+| InsertMulti | Dapper       | 5.123 ms | 0.128 ms | 0.364 ms |  43.37 KB |
 
 ## Bulk Operations (1,000 records)
 
-| Type       | Method     | Mean      | Error    | StdDev   | Gen0 | Allocated   |
-|------------|------------|----------:|---------:|---------:|-----:|------------:|
-| BulkInsert | AdoGen     |  20.90 ms | 0.519 ms | 1.481 ms |    - |   161.98 KB |
-| BulkInsert | EfCore     |  37.02 ms | 2.751 ms | 7.893 ms |    - |  6091.48 KB |
-| BulkUpdate | AdoGen     |  22.34 ms | 0.759 ms | 2.154 ms |    - |    143.3 KB |
-| BulkUpdate | EfCore     |  47.15 ms | 3.398 ms | 9.748 ms |    - |  7179.33 KB |
-| BulkDelete | AdoGenBulk |  21.18 ms | 0.422 ms | 1.019 ms |    - |    131.4 KB |
-| BulkDelete | EfCore     |  33.53 ms | 3.090 ms | 8.917 ms |    - |  4829.72 KB |
+| Type       | Method     | Mean      | Error    | StdDev    | Allocated   |
+|------------|------------|----------:|---------:|----------:|------------:|
+| BulkInsert | AdoGen     |  17.48 ms | 0.347 ms |  0.927 ms |  161.09 KB  |
+| BulkInsert | EfCore     |  37.84 ms | 3.645 ms | 10.691 ms | 6092.66 KB  |
+| BulkUpdate | AdoGen     |  27.47 ms | 0.532 ms |  0.711 ms |  142.59 KB  |
+| BulkUpdate | EfCore     |  44.46 ms | 1.044 ms |  2.839 ms | 6854.09 KB  |
+| BulkDelete | AdoGenBulk |  21.41 ms | 0.426 ms |  1.129 ms |  131.43 KB  |
+| BulkDelete | EfCore     |  27.95 ms | 0.646 ms |  1.680 ms | 4830.59 KB  |
+| BulkDelete | AdoGen     |  33.28 ms | 0.657 ms |  0.920 ms |  460.44 KB  |
 
 ## Bulk Operations (10,000 records)
 
-| Type          | Method | Mean      | Error    | StdDev    | Median    | Gen0      | Gen1      | Allocated    |
-|---------------|--------|----------:|---------:|----------:|----------:|----------:|----------:|-------------:|
-| BulkInsert10K | AdoGen |  83.97 ms | 1.648 ms |  3.292 ms |  82.85 ms |         - |         - |   1412.44 KB |
-| BulkInsert10K | EfCore | 337.39 ms | 7.844 ms | 23.004 ms | 329.94 ms | 7000.0000 | 2000.0000 |  60923.84 KB |
-
+| Type          | Method | Mean       | Error    | StdDev   | Gen0      | Gen1      | Allocated    |
+|---------------|--------|----------: |---------:|---------:|----------:|----------:|-------------:|
+| BulkInsert10K | AdoGen |   80.03 ms | 1.419 ms | 2.167 ms |         - |         - |  1413.91 KB  |
+| BulkInsert10K | EfCore |  316.29 ms | 6.054 ms | 5.663 ms | 7000.0000 | 2000.0000 | 60903.52 KB  |

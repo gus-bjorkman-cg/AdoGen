@@ -4,7 +4,7 @@ Full benchmark results for AdoGen vs Dapper and EF Core on PostgreSQL.
 
 > **DapperNoType** = Dapper with untyped parameters and no `CancellationToken`.  
 > **Dapper** = Dapper with typed parameters and `CancellationToken`.  
-> **EfCoreCompiled** = EF Core with compiled queries.
+> **EfCoreComp** = EF Core with compiled queries.
 
 ---
 
@@ -22,61 +22,61 @@ DefaultJob : .NET 10.0.0 (10.0.0, 10.0.25.52411), Arm64 RyuJIT armv8.0-a
 
 ## Query
 
-| Type           | Method         | Mean      | Error     | StdDev    | Gen0   | Allocated |
-|----------------|----------------|----------:|----------:|----------:|-------:|----------:|
-| FirstOrDefault | AdoGen         |  212.8 µs |   5.19 µs |  15.21 µs |      - |     817 B |
-| FirstOrDefault | Dapper         |  246.3 µs |  10.08 µs |  29.09 µs |      - |    1976 B |
-| FirstOrDefault | DapperNoType   |  253.6 µs |  15.19 µs |  43.82 µs |      - |    1592 B |
-| FirstOrDefault | EfCore         |  261.2 µs |  16.11 µs |  47.24 µs | 1.0000 |   10681 B |
-| FirstOrDefault | EfCoreCompiled |  287.3 µs |  15.42 µs |  45.46 µs |      - |    3560 B |
-| ToList         | AdoGen         |  19.74 µs |  0.321 µs |  0.285 µs |      - |     234 B |
-| ToList         | DapperNoType   |  20.39 µs |  0.401 µs |  0.394 µs | 0.0391 |     331 B |
-| ToList         | EfCoreCompiled |  20.63 µs |  0.200 µs |  0.177 µs | 0.0391 |     409 B |
-| ToList         | Dapper         |  20.88 µs |  0.400 µs |  0.374 µs | 0.0391 |     381 B |
-| ToList         | EfCore         |  20.94 µs |  0.336 µs |  0.315 µs | 0.1172 |    1197 B |
+| Type           | Method       |     Mean | Error     | StdDev     | Gen0   | Allocated |
+|----------------|--------------|---------:|----------:|-----------:|------: |----------:|
+| FirstOrDefault | AdoGen       | 189.3 µs |   3.63 µs |    4.19 µs |      - |     817 B |
+| FirstOrDefault | DapperNoType | 203.2 µs |   1.95 µs |    1.63 µs |      - |   1.56 KB |
+| FirstOrDefault | Dapper       | 204.0 µs |   3.21 µs |    2.84 µs |      - |   1.93 KB |
+| FirstOrDefault | EfCore       | 217.5 µs |   4.08 µs |    8.70 µs | 1.0000 |  10.15 KB |
+| FirstOrDefault | EfCoreComp   | 219.5 µs |   2.20 µs |    1.84 µs |      - |   3.48 KB |
+| ToList         | AdoGen       | 19.11 µs |  0.381 µs |   0.356 µs | 0.0195 |     234 B |
+| ToList         | DapperNoType | 20.21 µs |  0.320 µs |   0.284 µs | 0.0391 |     331 B |
+| ToList         | Dapper       | 20.25 µs |  0.372 µs |   0.330 µs | 0.0391 |     381 B |
+| ToList         | EfCoreComp   | 20.88 µs |  0.338 µs |   0.300 µs | 0.0391 |     410 B |
+| ToList         | EfCore       | 21.30 µs |  0.323 µs |   0.269 µs | 0.1172 |    1198 B |
 
 ## Single-Row Operations
 
-| Type   | Method       | Mean     | Error     | StdDev    | Gen0 | Allocated |
-|--------|--------------|--------: |----------:|----------:|-----:|----------:|
-| Insert | AdoGen       | 1.077 ms | 0.0908 ms | 0.2604 ms |    - |   2.71 KB |
-| Insert | DapperNoType | 1.165 ms | 0.0862 ms | 0.2488 ms |    - |   2.77 KB |
-| Insert | Dapper       | 1.200 ms | 0.0853 ms | 0.2476 ms |    - |   3.52 KB |
-| Insert | EfCore       | 2.620 ms | 0.1738 ms | 0.5126 ms |    - |  15.63 KB |
-| Delete | AdoGen       | 1.168 ms | 0.1185 ms | 0.3458 ms |    - |   2.22 KB |
-| Delete | DapperNoType | 1.211 ms | 0.1098 ms | 0.3238 ms |    - |   2.31 KB |
-| Delete | Dapper       | 1.253 ms | 0.0695 ms | 0.2026 ms |    - |   2.79 KB |
-| Delete | EfCore       | 2.583 ms | 0.2285 ms | 0.6630 ms |    - |  14.65 KB |
-| Update | AdoGen       | 1.145 ms | 0.1151 ms | 0.3394 ms |    - |    2.7 KB |
-| Update | DapperNoType | 1.311 ms | 0.1216 ms | 0.3526 ms |    - |   2.77 KB |
-| Update | Dapper       | 1.338 ms | 0.1174 ms | 0.3444 ms |    - |   3.51 KB |
-| Update | EfCore       | 2.373 ms | 0.2232 ms | 0.6511 ms |    - |  15.89 KB |
+| Type   | Method       | Mean     | Error    | StdDev   | Allocated |
+|--------|--------------|--------: |--------: |--------: |----------:|
+| Insert | AdoGen       | 1.037 ms | 0.097 ms | 0.286 ms |   2.71 KB |
+| Insert | DapperNoType | 1.050 ms | 0.116 ms | 0.340 ms |   2.77 KB |
+| Insert | Dapper       | 1.109 ms | 0.079 ms | 0.230 ms |   3.52 KB |
+| Insert | EfCore       | 2.561 ms | 0.193 ms | 0.562 ms |  15.63 KB |
+| Update | DapperNoType | 0.940 ms | 0.146 ms | 0.425 ms |   2.77 KB |
+| Update | AdoGen       | 0.989 ms | 0.099 ms | 0.291 ms |   2.70 KB |
+| Update | Dapper       | 1.046 ms | 0.126 ms | 0.372 ms |   3.51 KB |
+| Update | EfCore       | 2.405 ms | 0.183 ms | 0.533 ms |  15.89 KB |
+| Delete | AdoGen       | 0.998 ms | 0.110 ms | 0.323 ms |   2.22 KB |
+| Delete | Dapper       | 1.112 ms | 0.118 ms | 0.346 ms |   2.79 KB |
+| Delete | DapperNoType | 1.127 ms | 0.085 ms | 0.250 ms |   2.31 KB |
+| Delete | EfCore       | 2.096 ms | 0.188 ms | 0.550 ms |  14.65 KB |
 
 ## Multi-Row Insert (10 records)
 
-| Type        | Method       | Mean       | Error      | StdDev    | Gen0 | Allocated |
-|-------------|--------------|----------: |-----------:|----------:|-----:|----------:|
-| InsertMulti | AdoGen       | 1,086.9 µs | 110.77 µs  |  319.6 µs |    - |  12.84 KB |
-| InsertMulti | AdoGenBulk   | 1,221.7 µs | 103.72 µs  |  305.8 µs |    - |  14.02 KB |
-| InsertMulti | EfCore       | 2,353.7 µs | 148.12 µs  |  432.1 µs |    - |  69.34 KB |
-| InsertMulti | DapperNoType | 3,003.8 µs |  71.77 µs  |  207.1 µs |    - |   18.7 KB |
-| InsertMulti | Dapper       | 3,142.8 µs |  93.52 µs  |  265.3 µs |    - |  25.34 KB |
+| Type        | Method       | Mean     | Error    | StdDev   | Allocated |
+|-------------|--------------|--------: |--------: |--------: |----------:|
+| InsertMulti | AdoGen       | 1.297 ms | 0.119 ms | 0.349 ms |  15.55 KB |
+| InsertMulti | AdoGenBulk   | 1.350 ms | 0.095 ms | 0.278 ms |  16.70 KB |
+| InsertMulti | EfCore       | 2.695 ms | 0.259 ms | 0.762 ms |  69.34 KB |
+| InsertMulti | DapperNoType | 3.107 ms | 0.078 ms | 0.223 ms |  18.70 KB |
+| InsertMulti | Dapper       | 3.143 ms | 0.107 ms | 0.305 ms |  25.34 KB |
 
 ## Bulk Operations (1,000 records)
 
-| Type       | Method     | Mean      | Error     | StdDev    | Gen0 | Allocated   |
-|------------|------------|----------:|----------:|----------:|-----:|------------:|
-| BulkDelete | AdoGen     |  2.772 ms | 0.1595 ms | 0.4679 ms |    - |  381.84 KB  |
-| BulkDelete | AdoGenBulk |  5.681 ms | 0.1113 ms | 0.1596 ms |    - |    6.59 KB  |
-| BulkDelete | EfCore     | 22.564 ms | 2.6056 ms | 7.6418 ms |    - | 4188.48 KB  |
-| BulkUpdate | AdoGen     |  7.653 ms | 0.1519 ms | 0.3668 ms |    - |    6.59 KB  |
-| BulkUpdate | EfCore     | 27.018 ms | 2.2083 ms | 6.4068 ms |    - | 6000.05 KB  |
-| BulkInsert | AdoGen     |  7.846 ms | 0.1561 ms | 0.3188 ms |    - | 1080.26 KB  |
-| BulkInsert | EfCore     | 18.308 ms | 2.9644 ms | 8.7406 ms |    - |  5807.8 KB  |
+| Type       | Method     | Mean      | Error    | StdDev   | Allocated   |
+|------------|------------|----------:|---------:|---------:|------------:|
+| BulkDelete | AdoGen     |  2.206 ms | 0.185 ms | 0.534 ms |   18.21 KB  |
+| BulkDelete | AdoGenBulk |  5.894 ms | 0.241 ms | 0.686 ms |    5.97 KB  |
+| BulkDelete | EfCore     | 22.295 ms | 2.585 ms | 7.623 ms | 4188.48 KB  |
+| BulkInsert | AdoGen     |  7.084 ms | 0.177 ms | 0.506 ms |    6.28 KB  |
+| BulkInsert | EfCore     | 17.863 ms | 2.587 ms | 7.588 ms | 5808.94 KB  |
+| BulkUpdate | AdoGen     |  7.732 ms | 0.155 ms | 0.433 ms |    5.69 KB  |
+| BulkUpdate | EfCore     | 27.451 ms | 2.525 ms | 7.406 ms | 6000.23 KB  |
 
 ## Bulk Operations (10,000 records)
 
-| Type          | Method | Mean      | Error    | StdDev   | Gen0      | Gen1      | Allocated    |
-|---------------|--------|----------:|---------:|---------:|----------:|----------:|-------------:|
-| BulkInsert10K | AdoGen |  32.58 ms | 0.593 ms | 1.290 ms |         - |         - |     9.18 KB  |
-| BulkInsert10K | EfCore | 125.23 ms | 2.486 ms | 2.863 ms | 5000.0000 | 2000.0000 | 56379.15 KB  |
+| Type          | Method | Mean       | Error    | StdDev   | Gen0      | Gen1      | Allocated    |
+|---------------|--------|----------: |---------:|---------:|----------:|----------:|-------------:|
+| BulkInsert10K | AdoGen |   46.01 ms | 0.914 ms | 1.423 ms |         - |         - |     9.82 KB  |
+| BulkInsert10K | EfCore |  129.71 ms | 2.586 ms | 7.584 ms | 5000.0000 | 2000.0000 | 56409.96 KB  |
