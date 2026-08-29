@@ -9,12 +9,14 @@ public sealed class MapperTests
         { AdoGenType.SqlMapper, TestTypes.TestType },
         { AdoGenType.SqlMapper, TestTypes.VersionedOrder },
         { AdoGenType.SqlMapper, TestTypes.VersionedOrderGuid },
+        { AdoGenType.SqlMapper, TestTypes.NoProfileMapper },
 
         { AdoGenType.NpgsqlMapper, TestTypes.User },
         { AdoGenType.NpgsqlMapper, TestTypes.AuditEvent },
         { AdoGenType.NpgsqlMapper, TestTypes.TestType },
         { AdoGenType.NpgsqlMapper, TestTypes.VersionedOrder },
         { AdoGenType.NpgsqlMapper, TestTypes.VersionedOrderGuid },
+        { AdoGenType.NpgsqlMapper, TestTypes.NoProfileMapper },
     };
 
     [Theory]

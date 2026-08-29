@@ -43,7 +43,9 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
             init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{cfg.ParameterName}\");");
             read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr}{(isLast ? "" : ",")}");
             constBuilder.AppendLine(CreateSqlParameterConst(cfg));
-            methodBuilder.AppendLine(CreateSqlParameterMethod(cfg));
+            
+            if (cfg.CanEmitParameterFactory(discoveryDto.Provider))
+                methodBuilder.AppendLine(CreateSqlParameterMethod(cfg));
         }
 
         read.Append(setUsingConstructor ? "        )" : "        }");

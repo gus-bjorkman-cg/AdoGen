@@ -8,7 +8,8 @@ internal static class TestSource
         TestTypeSourceHandler.Instance,
         AuditEventSourceHandler.Instance,
         VersionedOrderSourceHandler.Instance,
-        VersionedOrderGuidSourceHandler.Instance
+        VersionedOrderGuidSourceHandler.Instance,
+        NoProfileMapperSourceHandler.Instance
     ];
     
     extension(AdoGenType genType)

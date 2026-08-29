@@ -57,7 +57,11 @@ internal static class DiscoveryValidation
                     dto.Dto.Name));
             }
 
-            if (dto.Profile is null || dto.ProfileSemanticModel is null)
+            // Mapper-only DTOs (ISqlMapper/INpgsqlMapper only — no Domain/Bulk interface) don't need
+            // a profile: Map() and parameter factories can be generated purely by convention.
+            var isMapperOnly = dto.Kind == SqlModelKind.Mapper;
+
+            if ((dto.Profile is null || dto.ProfileSemanticModel is null) && !isMapperOnly)
             {
                 diagnostics.Add(Diagnostic.Create(
                     SqlDiagnostics.MissingProfile,
@@ -75,7 +79,15 @@ internal static class DiscoveryValidation
 
             var dto = vdto.Discovery;
             var dtoProperties = dto.Dto.GetOrderedProperties();
-            
+
+            // Mapper-only DTO with no profile: skip profile parsing, key/config validation, and
+            // concurrency-token checks entirely — build a convention-based ProfileInfo directly.
+            if (dto.Profile is null)
+            {
+                var mapperOnlyProfile = ProfileInfoCollector.ResolveMapperOnly(dto, dtoProperties);
+                return vdto with { ProfileInfo = mapperOnlyProfile, Diagnostics = ImmutableArray<Diagnostic>.Empty };
+            }
+
             var propsNeedingConfig = new Dictionary<IPropertySymbol, PropertyTypeKind>(dtoProperties.Length, SymbolEqualityComparer.Default);
 
             for (var i = 0; i < dtoProperties.Length; i++)

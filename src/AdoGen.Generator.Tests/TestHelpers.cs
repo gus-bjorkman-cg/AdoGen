@@ -145,6 +145,7 @@ public readonly record struct TestTypes : IXunitSerializable
     public static readonly TestTypes TestType = new(nameof(TestType));
     public static readonly TestTypes VersionedOrder = new(nameof(VersionedOrder));
     public static readonly TestTypes VersionedOrderGuid = new(nameof(VersionedOrderGuid));
+    public static readonly TestTypes NoProfileMapper = new(nameof(NoProfileMapper));
 
     public void Deserialize(IXunitSerializationInfo info) => 
         Unsafe.AsRef(in this) = Items.First(x => x.Name == info.GetValue<string>(nameof(Name)));
@@ -472,3 +473,33 @@ internal sealed class VersionedOrderGuidSourceHandler : ITestTypeSource
               """;
 }
 
+internal sealed class NoProfileMapperSourceHandler : ITestTypeSource
+{
+    private NoProfileMapperSourceHandler() {}
+    public static NoProfileMapperSourceHandler Instance { get; } = new();
+
+    // Mapper-only DTO (no ISqlDomainModel/ISqlBulkModel) with NO SqlProfile/NpgsqlProfile at all.
+    // CanEmitParameterFactory gates factory emission on whether the missing metadata can actually
+    // cause a WHERE-clause query-performance regression (plan-cache bloat/sargability), not on
+    // DDL-style mandatory config: for SqlServer, Name/Data need a profile-supplied Size and are
+    // omitted; for PostgreSql, DbType alone is enough for string/decimal (Numeric doesn't need
+    // Precision/Scale and Text doesn't need Size on the wire), and bytea has no length modifier at
+    // all, so Name/Amount/Data all get factories there.
+    public bool IsMatch(TestTypes type) => type == TestTypes.NoProfileMapper;
+
+    public string Handle(AdoGenType genType) =>
+        $$"""
+          using {{genType.Namespace}};
+
+          namespace AdoGen.Generator.Tests;
+
+          public sealed partial record NoProfileMapper(
+              Guid Id,
+              int Count,
+              bool Active,
+              DateTime CreatedAt,
+              string Name,
+              decimal Amount,
+              byte[] Data) : {{genType.Interface}};
+          """;
+}

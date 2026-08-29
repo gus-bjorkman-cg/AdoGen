@@ -43,7 +43,48 @@ internal static class ProfileInfoCollector
 
         return collected;
     }
-    
+
+    /// <summary>
+    /// Builds a ProfileInfo for a mapper-only DTO (ISqlMapper/INpgsqlMapper only, no Domain/Bulk
+    /// interface) that has no SqlProfile/NpgsqlProfile. Only Map()/parameter-factory generation is
+    /// needed in this path, so Table/Schema/Keys are irrelevant and no profile syntax is parsed —
+    /// every property gets a default DbType convention. Properties requiring mandatory config
+    /// (string/decimal/byte[]) simply end up with a ParamConfig lacking Size/Precision/Scale; the
+    /// mapper emitters skip generating a CreateParameter* factory for those specific properties.
+    /// </summary>
+    internal static ProfileInfo ResolveMapperOnly(
+        DiscoveryDto discoveryDto,
+        ImmutableArray<IPropertySymbol> props)
+    {
+        var provider = discoveryDto.Provider;
+        var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
+
+        foreach (var prop in props)
+        {
+            configs[prop.Name] = new ParamConfig
+            {
+                PropertyName = prop.Name,
+                PropertyType = prop.Type,
+                ParameterName = prop.Name,
+                DbType = prop.MapDefaultDbType(provider)
+            };
+        }
+
+        foreach (var cfg in configs.Values)
+            if (cfg.SqlTypeLiteral is "")
+                cfg.SqlTypeLiteral = SqlTypeLiterals.First(x => x.IsMatch(cfg)).Get(cfg);
+
+        return new ProfileInfo(
+            Schema: string.Empty,
+            Table: string.Empty,
+            Keys: ImmutableArray<string>.Empty,
+            IdentityKeys: ImmutableHashSet<string>.Empty,
+            DtoProperties: props,
+            ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal),
+            Namespace: discoveryDto.Dto.GetNamespace()
+        );
+    }
+
     private static ProfileInfo Collect(
         INamedTypeSymbol profileSymbol,
         INamedTypeSymbol dtoType,

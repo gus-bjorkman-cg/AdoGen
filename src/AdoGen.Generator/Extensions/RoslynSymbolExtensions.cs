@@ -70,6 +70,7 @@ internal static class RoslynSymbolExtensions
                 SpecialType.System_Double => SqlDbType.Float,
                 SpecialType.System_Decimal => SqlDbType.Decimal,
                 SpecialType.System_String => SqlDbType.NVarChar,
+                _ when underlying.IsByteArray => SqlDbType.VarBinary,
                 _ => underlying.ToDisplayString(GetterKeyFormat) switch
                 {
                     "global::System.Guid" or "Guid" => SqlDbType.UniqueIdentifier,
@@ -77,7 +78,6 @@ internal static class RoslynSymbolExtensions
                     "global::System.DateTimeOffset" or "DateTimeOffset" => SqlDbType.DateTimeOffset,
                     "global::System.DateOnly" => SqlDbType.Date,
                     "global::System.TimeOnly" => SqlDbType.Time,
-                    "global::System.Byte[]" => SqlDbType.VarBinary,
                     _ => SqlDbType.Variant
                 }
             };
@@ -118,6 +118,7 @@ internal static class RoslynSymbolExtensions
                 SpecialType.System_Decimal => "Numeric",
                 SpecialType.System_String => "Text",
                 SpecialType.System_Char => "Char",
+                _ when underlying.IsByteArray => "Bytea",
                 _ => underlying.ToDisplayString(GetterKeyFormat) switch
                 {
                     "global::System.Guid" or "Guid" => "Uuid",
@@ -125,7 +126,6 @@ internal static class RoslynSymbolExtensions
                     "global::System.DateTimeOffset" or "DateTimeOffset" => "TimestampTz",
                     "global::System.DateOnly" => "Date",
                     "global::System.TimeOnly" => "Time",
-                    "global::System.Byte[]" => "Bytea",
                     _ => "Unknown"
                 }
             };

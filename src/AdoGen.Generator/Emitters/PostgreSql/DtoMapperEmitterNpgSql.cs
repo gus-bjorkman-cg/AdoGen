@@ -46,7 +46,9 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
             init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{cfg.ParameterName}\");");
             read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr}{(isLast ? "" : ",")}");
             constBuilder.AppendLine(CreateSqlParameterConst(cfg));
-            methodBuilder.AppendLine(CreateNpgsqlParameterMethod(cfg));
+            
+            if (cfg.CanEmitParameterFactory(discoveryDto.Provider))
+                methodBuilder.AppendLine(CreateNpgsqlParameterMethod(cfg));
         }
 
         read.Append(setUsingConstructor ? "        )" : "        }");
