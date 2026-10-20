@@ -68,7 +68,9 @@ Unfair benchmarks are worse than no benchmarks.
 
 ## Methodology
 
-- Use real SQL Server instances via Testcontainers
+- Use real SQL Server and PostgreSQL instances via Testcontainers (Docker required)
+  - SQL Server: `QueryBenchmarks/`, `CommandBenchmarks/`
+  - PostgreSQL: `PgQueryBenchmarks/`, `PgCommandBenchmarks/`
 - No in‑memory providers
 - No mocked database layers
 - Schema creation is part of the benchmark lifecycle

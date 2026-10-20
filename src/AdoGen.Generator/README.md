@@ -65,12 +65,13 @@ The generator should feel invisible during normal development.
 
 The generator must enforce:
 
-- Exactly one `SqlProfile<T>` per configured DTO
-- Mandatory configuration for:
-    - `string` (length + varchar/nvarchar)
+- Exactly one `SqlProfile<T>` / `NpgsqlProfile<T>` per configured DTO per provider
+  - Required for Domain/Bulk DTOs; mapper-only DTOs (`ISqlMapper` / `INpgsqlMapper` only) may omit it
+- Mandatory configuration (profiled DTOs) for:
+    - `string` on SQL Server (length + type, e.g. varchar/nvarchar); on PostgreSQL strings default to `text`
     - `decimal` (precision/scale)
     - Any type where provider metadata affects correctness or performance
-- Clear, actionable diagnostics
+- Clear, actionable diagnostics (catalogued in [`docs/diagnostics.md`](../../docs/diagnostics.md))
     - Diagnostics should explain *what* is wrong and *how* to fix it
 
 If something can be validated at generation time, it **must not** be deferred to runtime.
@@ -111,12 +112,12 @@ If a generated construct would be questionable to hand‑write in a hot path, it
 
 ## Extensibility Notes
 
-While SQL Server is the only supported provider today:
+Two providers are supported today: SQL Server and PostgreSQL. Each has its own emitters (`Emitters/SqlServer/`, `Emitters/PostgreSql/`), its own chain-method handlers (`Parsing/SqlServer/`, `Parsing/PostgreSql/`), and its own SQL text builder.
 
-- Avoid baking provider‑specific assumptions into generator internals where unnecessary
-- Keep SQL Server specifics localized so future providers can be added intentionally
+- Keep provider specifics localized in those folders
+- Duplication between the two providers is preferred over shared abstractions
 
-Do **not** introduce abstractions until a second provider actually exists.
+Do **not** introduce cross-provider abstractions until a third provider exists and benchmarks prove the need (see `.github/copilot-instructions.md` §4).
 Provider seams should be named and localized, not abstracted.
 
 ---

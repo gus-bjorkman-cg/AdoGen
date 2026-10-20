@@ -77,7 +77,8 @@ Benchmarks (`AdoGen.Benchmarks`) are authoritative. Performance claims require b
 
 ### Mandatory configuration (fail at generation time — profiled DTOs only)
 
-- `string` → length + type explicit: `.VarChar(n)` / `.NVarChar(n)` / `.Char(n)` / `.NChar(n)` (SQL Server); `.VarChar(n)` / `.Text()` / `.Char(n)` / `.Bytea()` / `.Varbit(n)` (PostgreSQL)
+- `string` (SQL Server) → length + type explicit: `.VarChar(n)` / `.NVarChar(n)` / `.Char(n)` / `.NChar(n)`
+- `string` (PostgreSQL) → defaults to `text` (PostgreSQL best practice; `varchar`/`text` are binary-coercible, so no plan or perf impact). `.VarChar(n)` / `.Char(n)` are optional; `.VarChar` without a size is an error
 - `decimal` → `.Decimal(precision, scale)`
 - `Guid`, numeric types, `bool`, `DateTime` → default mappings, no config required
 - `Id` is the PK by convention; override with `Key(x => x.MyKey)`

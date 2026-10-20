@@ -51,7 +51,7 @@ public sealed partial record User(Guid Id, string Name, string Email) : ISqlBulk
 
 ### 2. Create a profile
 
-One per model per provider — always required.
+One per model per provider. A profile is required for domain and bulk models. Mapper-only models (`ISqlMapper` / `INpgsqlMapper`) can skip it; see [Profiles](docs/api-reference.md#profiles).
 
 ```csharp
 public sealed class UserProfile : SqlProfile<User>
@@ -126,7 +126,11 @@ AdoGen's primary advantage is **memory allocation** — consistently the lowest 
 
 ## Documentation
 
-📖 [Full API reference](docs/api-reference.md) — all methods, profile options, concurrency tokens, read-only columns, batching, scalar helpers, and known limitations.
+📖 [Full API reference](docs/api-reference.md) — all methods, profile options, concurrency tokens, read-only columns, batching, scalar helpers, runtime behaviour (column order, limits), and known limitations.
+
+🩺 [Diagnostics](docs/diagnostics.md) — every `AGxxx` compile-time diagnostic, what triggers it, and how to fix it.
+
+📊 Benchmark results: [SQL Server](docs/benchmarks-sqlserver.md) · [PostgreSQL](docs/benchmarks-postgresql.md)
 
 ---
 

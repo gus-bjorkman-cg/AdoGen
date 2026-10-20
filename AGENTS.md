@@ -21,6 +21,9 @@ AdoGen is a **reflection-free, Native AOT-compatible micro-ORM** for .NET. A Ros
 | `src/AdoGen.Benchmarks/` | BenchmarkDotNet project; benchmarks are authoritative on performance |
 | `examples/AdoGen.Sample/` | Sample models and profiles used by integration tests |
 | `build/Build.cs` | Nuke build script; all CI targets defined here |
+| `docs/api-reference.md` | User-facing API reference, including runtime behaviour and limitations |
+| `docs/diagnostics.md` | Catalogue of every `AGxxx` generator diagnostic — update when adding/changing a descriptor |
+| `docs/analysis/` | Review reports: `BUGS.md`, `PERFORMANCE.md`, `FEATURES.md` (known issues and backlog with IDs B#/P#/F#) |
 
 ---
 
@@ -153,6 +156,12 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - **`SELECT EXISTS`-style queries must use `TOP(1)` (SQL Server) or `LIMIT 1` (PostgreSQL)** to stop the engine from scanning past the first matching row.
 - **`InsertAndReturnAsync` uses `Map(reader)` on the DTO partial class, not on the `*Sql`/`*Npgsql` static helper class.** The generated `Map` lives on the DTO itself (from `ISqlMapper<T>`), so call `DtoName.Map(reader)`, not `DtoNameSql.Map(reader)`.
 - **Mapper-only DTOs (`ISqlMapper`/`INpgsqlMapper` only, no Domain/Bulk interface) don't require a profile.** `DiscoveryValidation` skips `MissingProfile`/mandatory-config diagnostics for these; `ProfileInfoCollector.ResolveMapperOnly` builds a convention-based `ProfileInfo`. `ParamConfigExtensions.CanEmitParameterFactory` decides per-property whether a `CreateParameter*` factory can be emitted, gated specifically on whether missing metadata can cause a WHERE-clause query-performance regression (not on DDL-style mandatory config): SQL Server stays strict on Size (string/binary) and Precision+Scale (decimal) because ADO.NET infers these per-value like `AddWithValue` does, causing plan-cache bloat/recompiles per distinct value shape, and string DbType additionally affects index-seek sargability via Unicode-ness; PostgreSQL only requires DbType to be present for string/decimal since numeric is self-describing on the wire and varchar/text/char are binary-coercible, so Size/Precision/Scale don't affect performance there (Map() is unaffected either way).
+- **Inspect real generator output with `dotnet build examples/AdoGen.Sample -p:EmitCompilerGeneratedFiles=true -p:CompilerGeneratedFilesOutputPath=/tmp/adogen-gen`.** Files are named `{Dto}.{Mapper|Domain|Bulk}.{Sql|Npgsql}.g.cs`; never point the output path inside a project folder (the `.g.cs` files get compiled twice).
+- **Generated `Map(reader)` caches column ordinals statically and reads under `SequentialAccess`.** Any SQL you write for tests/docs must select columns in DTO declaration order (see `docs/analysis/BUGS.md` B1).
+- **Reader extensions `QueryAsync<T>`/`QueryFirstOrDefaultAsync<T>` on a `DbDataReader` already call `NextResultAsync`.** Never add a manual `NextResultAsync` between them; calling `Dto.Map(reader)` directly requires a prior `ReadAsync`.
+- **`DefaultValue(...)` is emitted verbatim into DDL.** The string must contain the `DEFAULT` keyword (`"DEFAULT now()"`) until B29 is fixed.
+- **Adding or changing a diagnostic requires three edits:** `Diagnostics/SqlDiagnostics.cs`, `AnalyzerReleases.Unshipped.md`, and `docs/diagnostics.md`; also add a generator test asserting the diagnostic ID.
+- **Before documenting a profile method, confirm a chain handler exists for it** in `Parsing/SharedChainHandlers.cs` or `Parsing/{SqlServer,PostgreSql}/ChainMethodHandler*.cs`; methods without a handler are silently ignored (e.g. PostgreSQL `Char`/`Varbit`, B7).
 
 ---
 
@@ -165,4 +174,6 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - `src/AdoGen.PostgreSql/NpgsqlProfile.cs` — PostgreSQL profile fluent API
 - `examples/AdoGen.Sample/` — real models and profiles used by all tests (includes dual-provider examples)
 - `src/AdoGen.Generator/Pipelines/Discovery.cs` — generator entry point
+- `docs/diagnostics.md` — what each `AGxxx` diagnostic means and how to fix it
+- `docs/analysis/BUGS.md` — known bugs; check here before "fixing" surprising behaviour
 
