@@ -93,7 +93,7 @@ RuleFor(x => x.PropertyName)
     .Name("ColumnName")        // optional column name override
     .ReadOnly()                // optional — exclude from writes
     .ConcurrencyToken()        // optional — optimistic concurrency
-    .DefaultValue("DEFAULT GETUTCDATE()"); // optional — DDL DEFAULT clause (include the DEFAULT keyword)
+    .DefaultValue("GETUTCDATE()");     // optional — DDL DEFAULT clause
 ```
 
 Common modifiers available on all properties:
@@ -103,7 +103,7 @@ Common modifiers available on all properties:
 | `.Name(string)`              | Override DB column name (default: property name)                    |
 | `.Nullable()` / `.NotNull()` | Explicit nullability (inferred from `?` by default)                 |
 | `.ReadOnly()`                | Excluded from INSERT/UPDATE/bulk writes; included in DDL and mapper |
-| `.DefaultValue(sqlClause)`   | Appended verbatim to the column DDL. **Include the keyword**: `"DEFAULT GETUTCDATE()"` / `"DEFAULT now()"` |
+| `.DefaultValue(sqlExpr)`     | Emitted as `DEFAULT {sqlExpr}` in the column DDL (`"GETUTCDATE()"` / `"now()"`). A leading `DEFAULT` keyword is accepted for backward compatibility |
 | `.ConcurrencyToken()`        | See [Concurrency tokens](#concurrency-tokens)                       |
 
 ### SQL Server types
@@ -127,13 +127,11 @@ Common modifiers available on all properties:
 |-------------------------------------|------------------------|------------------------------------|
 | `VarChar(n)`                        | `NpgsqlDbType.Varchar` | Variable-length strings with limit |
 | `Text()`                            | `NpgsqlDbType.Text`    | Unbounded strings                  |
-| `Char(n)` ⚠️                        | `NpgsqlDbType.Char`    | Fixed-length strings               |
+| `Char(n)`                           | `NpgsqlDbType.Char`    | Fixed-length strings               |
 | `Bytea()`                           | `NpgsqlDbType.Bytea`   | Binary data                        |
-| `Varbit(n)` ⚠️                      | `NpgsqlDbType.Varbit`  | Bit strings                        |
+| `Varbit(n)`                         | `NpgsqlDbType.Varbit`  | Bit strings                        |
 | `Decimal(p, s)`                     | `NpgsqlDbType.Numeric` | Numeric with precision/scale       |
 | `Type(NpgsqlDbType.X)` + `.Size(n)` | —                      | Escape hatch for any type          |
-
-> ⚠️ **Known issue:** the generator does not yet honour the `Char(n)` and `Varbit(n)` shorthands. They are silently ignored, and the column falls back to `text`. Until this is fixed, use the escape hatch: `RuleFor(x => x.Code).Type(NpgsqlDbType.Char).Size(10)`. See `docs/analysis/BUGS.md` (B7).
 
 **Required configuration on PostgreSQL:**
 - `string` needs no rule. It defaults to `text`, which is PostgreSQL best practice; `varchar` and `text` are binary-coercible, so there is no performance difference. Use `VarChar(n)` only when you want a length constraint, and give it a size (AG004).
@@ -146,7 +144,7 @@ Common modifiers available on all properties:
 
 All query methods auto-open the connection if it is not already open (and leave it open — see [Runtime behaviour](#runtime-behaviour)).
 
-> **Column order matters.** The generated mapper reads columns in property-declaration order under `CommandBehavior.SequentialAccess`, and caches ordinals from the first result it sees. Always select columns in the DTO's declaration order — `SELECT *` from the generated table is safe. See [Runtime behaviour](#runtime-behaviour).
+> Columns are matched **by name**, once per result set, so column order does not matter and extra columns are ignored. See [Runtime behaviour](#column-order-and-the-generated-mapper).
 
 ### `QueryAsync<T>`
 
@@ -197,7 +195,7 @@ Available when the model implements `ISqlDomainModel` / `INpgsqlDomainModel`.
 | Method                            | Returns             | Notes                                                  |
 |-----------------------------------|---------------------|--------------------------------------------------------|
 | `InsertAsync(model, ct)`          | `int` rows affected |                                                        |
-| `InsertAsync(List<T>, ct)`        | `int` rows affected | Multi-row, one round-trip — see [limits](#runtime-behaviour) |
+| `InsertAsync(List<T>, ct)`        | `int` rows affected | Multi-row; SQL Server splits into chunks — see [limits](#parameter-and-row-limits-sql-server) |
 | `InsertAndReturnAsync(model, ct)` | `T`                 | Returns populated row; see [limitations](#limitations) |
 | `UpdateAsync(model, ct)`          | `int` rows affected | Throws `AdoGenConcurrencyException` if token mismatch  |
 | `UpsertAsync(model, ct)`          | `int` rows affected | Does not enforce concurrency token                     |
@@ -212,10 +210,10 @@ All methods accept an optional `SqlTransaction` / `NpgsqlTransaction` and `comma
 - PostgreSQL: `INSERT … RETURNING *`
 
 `UpsertAsync` internals:
-- SQL Server: `UPDATE … WHERE pk = @pk; IF @@ROWCOUNT = 0 INSERT …`. Concurrent upserts of the same new key can race and cause a PK violation.
-- PostgreSQL: `INSERT … ON CONFLICT (pk) DO UPDATE SET …`. Identity key columns are excluded from the conflict target.
+- SQL Server: `INSERT … SELECT … WHERE NOT EXISTS (SELECT 1 … WITH (UPDLOCK, HOLDLOCK) WHERE pk = @pk); IF @@ROWCOUNT = 0 UPDATE …`. The key-range lock makes concurrent upserts of the same key safe. For an identity key, the INSERT path lets the database generate a new key.
+- PostgreSQL: `INSERT … ON CONFLICT (pk) DO UPDATE SET …`. When the key includes an `Identity(...)` column, `MERGE` is used instead (**requires PostgreSQL 15+**); the INSERT path lets the database generate the key.
 
-> Models whose every column is part of the key (e.g. a join table) currently generate invalid UPDATE/UPSERT SQL. Avoid `UpdateAsync`/`UpsertAsync` on them. See `docs/analysis/BUGS.md` (B6).
+Models whose every column is part of the key (e.g. a join table) are supported: `UpdateAsync` is an existence-checking no-op that returns the matched row count, and `UpsertAsync` only inserts when the row is missing.
 
 ---
 
@@ -238,9 +236,17 @@ int affected = await connection.PatchAsync(noop, ct);   // 0
 
 `PatchAsync` accepts an optional transaction and `commandTimeout`.
 
-**Limitation:** Patch does not support concurrency tokens — it targets the row by primary key only. The generated `{Model}Patch` exposes the token property, but setting it has no effect and the token is not bumped.
+**Optimistic concurrency (opt-in):** for a model with a concurrency token, the patch class exposes `WithExpected{Token}(...)` instead of a setter for the token:
 
-> ⚠️ **Known issue:** on SQL Server, `PatchAsync` for a model **with** a concurrency token throws `AdoGenConcurrencyException` when no row matches the key. See `docs/analysis/BUGS.md` (B4).
+```csharp
+// int / long token: only applies if Version is still 3, and bumps it to 4
+await connection.PatchAsync(new OrderPatch(id).WithProductName("X").WithExpectedVersion(3), ct);
+
+// Guid token: caller supplies the expected and the new value
+await connection.PatchAsync(new Order2Patch(id).WithProductName("X").WithExpectedVersion(current, Guid.NewGuid()), ct);
+```
+
+With `WithExpected…` set, 0 affected rows throws `AdoGenConcurrencyException`. Without it, the patch targets the key only, the token is left untouched, and a missing row simply returns 0.
 
 ---
 
@@ -370,7 +376,7 @@ int count = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Users
 long pgCount = await connection.ExecuteScalarAsync<long>("SELECT count(*) FROM \"Users\"", ct);  // PostgreSQL: count(*) is bigint
 ```
 
-The value is **cast** (unboxed), not converted. `T` must exactly match the provider's CLR type for the column. For example, PostgreSQL `count(*)` returns `long`, so `ExecuteScalarAsync<int>` throws `InvalidCastException`. A `NULL` / `DBNull` result also throws for value types. Use `QueryScalarFirstOrDefaultAsync<T>` when the result may be missing or `NULL`.
+The value is **cast** (unboxed), not converted. `T` must exactly match the provider's CLR type for the column. For example, PostgreSQL `count(*)` returns `long`, so `ExecuteScalarAsync<int>` throws `InvalidCastException`. A missing row or a `NULL` / `DBNull` result returns `default(T)`.
 
 ### `QueryScalarAsync<T>`
 
@@ -412,17 +418,15 @@ RuleFor(x => x.Version).ConcurrencyToken();   // int, long, or Guid
 - `DeleteAsync` also adds `AND [Version] = @Version` to the WHERE clause.
 - If 0 rows are affected, `AdoGenConcurrencyException` is thrown.
 - `UpsertAsync` does **not** enforce the concurrency token — use `UpdateAsync` if you need optimistic locking.
-- `PatchAsync` does **not** enforce the concurrency token.
+- `PatchAsync` enforces it only when `WithExpected{Token}(...)` is called — see [Patch](#patch-partial-update).
 
 ---
 
 ## Read-only columns
 
 ```csharp
-RuleFor(x => x.CreatedAt).ReadOnly().DefaultValue("DEFAULT GETUTCDATE()");   // PostgreSQL: "DEFAULT now()"
+RuleFor(x => x.CreatedAt).ReadOnly().DefaultValue("GETUTCDATE()");   // PostgreSQL: "now()"
 ```
-
-> The `DefaultValue` string is appended verbatim to the column definition in `CREATE TABLE`, so it must include the `DEFAULT` keyword. See `docs/analysis/BUGS.md` (B29).
 
 - Excluded from INSERT, UPDATE, `PatchAsync`, and bulk-write column lists.
 - Still emitted in `CREATE TABLE` DDL.
@@ -463,14 +467,9 @@ Behaviour that is not obvious from the method signatures.
 
 ### Column order and the generated mapper
 
-`Map(reader)` resolves column ordinals **once per process**, from the first reader it sees, and caches them in static fields. Readers are opened with `CommandBehavior.SequentialAccess`, so columns must also be read in ascending ordinal order.
+`QueryAsync<T>` / `QueryFirstOrDefaultAsync<T>` resolve column ordinals **by name, once per result set** (`T.GetOrdinals(reader)`), then call `T.Map(reader, ordinals)` per row. Column order is therefore irrelevant, extra columns are ignored, and different queries may select columns in different orders.
 
-Rules:
-- Select columns in the **same order as the DTO's properties** (constructor parameter order for positional records).
-- Use the **same column set and order for every query** that maps to a given DTO.
-- `SELECT *` against a table created by `CreateTableAsync<T>` satisfies both rules.
-
-Violating these rules can produce `InvalidOperationException` ("Invalid attempt to read from column ordinal…") or, worse, silently map the wrong columns. See `docs/analysis/BUGS.md` (B1).
+When calling the generated mapper yourself, resolve the ordinals once per reader and reuse them: `var ord = User.GetOrdinals(reader); while (await reader.ReadAsync(ct)) list.Add(User.Map(reader, ord));`. The single-argument `Map(reader)` resolves ordinals on every call.
 
 ### Connection lifetime
 
@@ -478,14 +477,14 @@ Every extension method opens a closed connection automatically and **never close
 
 ### Parameter and row limits (SQL Server)
 
-`InsertAsync(List<T>)` and `DeleteAsync(List<TKey>)` send one parameter per value, in a single statement:
+`InsertAsync(List<T>)` and `DeleteAsync(List<TKey>)` send one parameter per value. SQL Server limits a command to:
 
 | Limit                                                 | Value |
 |-------------------------------------------------------|-------|
 | Parameters per command                                | 2 100 |
 | Rows in a single `VALUES` table-value constructor     | 1 000 |
 
-Neither method splits the list. Chunk large lists yourself, or use the `*Bulk` class (`SqlBulkCopy`), which has no limit. PostgreSQL `InsertAsync(List<T>)` is limited to 65 535 parameters. PostgreSQL `DeleteAsync(List<TKey>)` uses one array parameter and has no practical limit.
+Both methods split the list into chunks that respect these limits and return the summed row count. The chunks are separate statements, so **wrap the call in a transaction** if you need all-or-nothing behaviour. For very large lists, the `*Bulk` class (`SqlBulkCopy`) is faster. PostgreSQL `InsertAsync(List<T>)` is limited to 65 535 parameters. PostgreSQL `DeleteAsync(List<TKey>)` uses one array parameter and has no practical limit.
 
 ### Default type mappings
 
@@ -498,10 +497,11 @@ Neither method splits the list. Chunk large lists yourself, or use the `*Bulk` c
 | `DateTime`                     | `datetime2`        | `timestamp`                  |
 | `DateTimeOffset`               | `datetimeoffset`   | `timestamptz`                |
 | `DateOnly` / `TimeOnly`        | `date` / `time`    | `date` / `time`              |
+| `TimeSpan`                     | `time`             | `interval`                   |
 | `enum`                         | underlying integer type | underlying integer type |
 | `string`, `decimal`, `byte[]`  | rule required      | `string` → `text` (by design); `decimal` rule required; `byte[]` → `bytea` |
 
-`uint`, `ulong`, `ushort`, `sbyte`, `TimeSpan` and (on SQL Server) `char` have no default mapping. Configure them with `.Type(...)` or use a supported type.
+`uint`, `ulong`, `ushort`, `sbyte` and (on SQL Server) `char` have no default mapping. On Domain/Bulk models they are rejected with AG017 unless configured with `.Type(...)`. SQL Server `time` holds at most 24 hours; use `bigint` ticks for longer durations.
 
 ### Table naming
 
@@ -531,14 +531,15 @@ using NpgsqlConcurrencyException = AdoGen.PostgreSql.AdoGenConcurrencyException;
 
 - **No arbitrary SELECT generation.** AdoGen never generates arbitrary SELECT queries. `ExistsAsync` is the one exception — it emits a `SELECT TOP(1) 1` / `SELECT 1 … LIMIT 1` query. All other reads use hand-written SQL via `QueryAsync` / `QueryFirstOrDefaultAsync`.
 - **`InsertAndReturnAsync` fails with certain SQL Server triggers** that cascade inserts to other tables (`OUTPUT INSERTED.*` is not supported in that scenario). Use `InsertAsync` + a subsequent `QueryFirstOrDefaultAsync` instead.
-- **`PatchAsync` targets by primary key only** — it does not participate in optimistic concurrency.
+- **`PatchAsync` checks the concurrency token only when `WithExpected{Token}(...)` is called.**
+- **PostgreSQL `UpsertAsync` on identity-keyed models uses `MERGE`** and requires PostgreSQL 15+.
 - **Bulk operations require an explicit transaction.** `SaveChangesAsync` does not create one internally.
 - **One concurrency token per model.** Only one property may be marked `.ConcurrencyToken()`.
 - **Profiles are required for Domain/Bulk models.** Even if every property has a default mapping, a profile class must exist in the compilation. Mapper-only DTOs are exempt (see [Profiles](#profiles)).
 - **Required profile configuration.** SQL Server needs explicit configuration for `string`, `decimal` and `byte[]`. PostgreSQL needs it only for `decimal`; strings default to `text` (see [PostgreSQL types](#postgresql-types)). Missing configuration is a compile-time error (see [diagnostics](diagnostics.md)).
-- **DTO shape.** DTOs must be top-level (not nested), `partial`, non-static, and at least `internal`. Generated code declares `sealed partial`, so DTOs used as base classes or declared `abstract` are not supported.
-- **Every instance property is a column.** There is no `Ignore()` yet. A computed get-only property (e.g. `FullName => $"{First} {Last}"`) breaks the generated code. Move it to an extension method.
-- **Column names must be valid identifiers.** `.Name("...")` values are used in both C# member names and SQL parameter names. Spaces and punctuation are not supported.
-- **Unsupported CLR types.** `uint`, `ulong`, `ushort`, `sbyte`, `char` and `TimeSpan` have no mapping and produce invalid DDL. Use a supported type or a custom `Type(...)`.
+- **DTO shape.** DTOs must be top-level (AG015), `partial`, non-static, non-abstract (AG014), and at least `internal`. They may be non-sealed and used as base classes; subclasses are not DTOs unless they implement a marker interface themselves.
+- **Columns are settable properties.** A property is a column if it has a setter/`init` or a matching constructor parameter. Computed get-only properties (e.g. `FullName => …`) and indexers are ignored. There is no `Ignore()` for settable properties.
+- **Column names must be valid identifiers** (AG016). `.Name("...")` values are used in both C# member names and SQL parameter names.
+- **Unsupported CLR types** (AG017). `uint`, `ulong`, `ushort`, `sbyte` and SQL Server `char` need an explicit `.Type(...)`.
 - **`ExecuteScalarAsync<T>` casts, it does not convert.** See [Scalar & execute helpers](#executescalarasynct).
 

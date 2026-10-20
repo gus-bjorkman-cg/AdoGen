@@ -10,7 +10,7 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record AuditEvent : ISqlBulkModel<global::AdoGen.Generator.Tests.AuditEvent>;
+public partial record AuditEvent : ISqlBulkModel<global::AdoGen.Generator.Tests.AuditEvent>;
 
 public sealed class AuditEventBulk : BulkBatchSql<global::AdoGen.Generator.Tests.AuditEvent>
 {

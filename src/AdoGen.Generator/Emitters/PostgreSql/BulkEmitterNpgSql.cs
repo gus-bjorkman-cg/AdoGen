@@ -69,7 +69,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
 
                 namespace {{{{ns}}}};
 
-                {{{{accessibility}}}} sealed partial {{{{typeKeyword}}}} {{{{dto.Name}}}} : INpgsqlBulkModel<{{{{dtoTypeName}}}}>;
+                {{{{accessibility}}}} partial {{{{typeKeyword}}}} {{{{dto.Name}}}} : INpgsqlBulkModel<{{{{dtoTypeName}}}}>;
 
                 {{{{accessibility}}}} sealed class {{{{bulkTypeName}}}} : BulkBatchNpg<{{{{dtoTypeName}}}}>
                 {

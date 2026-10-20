@@ -13,7 +13,7 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record User : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.User, Guid>
+public partial record User : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.User, Guid>
 {
     private const string Pg_SqlDeleteBatchAny = """DELETE FROM "public"."Users" WHERE "Id" = ANY(@ids);""";
     private const string Pg_SqlExists = """SELECT 1 FROM "public"."Users" WHERE "Id" = @Id LIMIT 1;""";
@@ -48,7 +48,7 @@ public sealed partial record User : INpgsqlSingleIdModel<global::AdoGen.Generato
     }
 }
 
-public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.Tests.User>
+public partial record User : INpgsqlDomainModel<global::AdoGen.Generator.Tests.User>
 {
     private const string Pg_SqlCreateTable = 
     """
@@ -132,7 +132,7 @@ public sealed partial record User : INpgsqlDomainModel<global::AdoGen.Generator.
         cmd.Parameters.Add(UserNpgsql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserNpgsql.CreateParameterEmail(model.Email));
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return User.Map(reader);
         
@@ -253,7 +253,7 @@ public sealed partial class UserPatch
 
     public UserPatch(Guid id) { Id = id; }
 }
-public sealed partial record User
+public partial record User
 {
 #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
 

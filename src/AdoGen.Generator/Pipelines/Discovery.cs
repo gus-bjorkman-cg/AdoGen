@@ -58,15 +58,16 @@ internal static class Discovery
                 foreach (var type in distinctTypes)
                 {
                     var typeProfiles = profiles.Where(y => SymbolEqualityComparer.Default.Equals(y.Dto, type)).ToImmutableArray();
-                    var typeDiscoveries = type.AllInterfaces
+                    // Only markers declared on the type itself (directly or via a user interface) count.
+                    // Markers inherited from a base class belong to the base DTO, not to the derived type.
+                    var typeDiscoveries = GetOwnInterfaces(type)
                         .Select(i => adoGenInterfaces.FirstOrDefault(x => SymbolEqualityComparer.Default.Equals(i, x.Interface)))
                         .Where(static x => x.Interface is not null)
                         .GroupBy(static x => x.Provider)
                         .OrderByDescending(static x => x.Key)
                         .Select(static x => new
                         {
-                            Provider = x.Key, Kind = x.Select(y => y.Kind).FirstOrDefault(),
-                            Interface = x.Select(y => y.Interface).FirstOrDefault()
+                            Provider = x.Key, Kind = x.Max(y => y.Kind)
                         })
                         .ToArray();
 
@@ -80,19 +81,33 @@ internal static class Discovery
                     foreach (var typeDiscovery in typeDiscoveries)
                     {
                         var discoveryModel = DiscoveryModel.Empty;
+                        var profileCount = 0;
                         foreach (var typeProfile in typeProfiles.Where(typeProfile => typeProfile.Provider == typeDiscovery.Provider))
                         {
-                            discoveryModel = typeProfile;
-                            break;
+                            if (profileCount++ == 0) discoveryModel = typeProfile;
                         }
 
                         builder.Add(new DiscoveryDto(type, typeDiscovery.Kind, discoveryModel.Profile, discoveryModel.Model, typeDiscovery.Provider,
-                            ShouldGeneratePatchClass: typeDiscovery.Kind >= SqlModelKind.Domain && typeDiscovery.Provider == patchOwner));
+                            ShouldGeneratePatchClass: typeDiscovery.Kind >= SqlModelKind.Domain && typeDiscovery.Provider == patchOwner,
+                            ProfileCount: profileCount));
                     }
                 }
 
                 return builder.ToImmutable();
             });
+
+    private static IEnumerable<INamedTypeSymbol> GetOwnInterfaces(INamedTypeSymbol type)
+    {
+        var seen = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        foreach (var direct in type.Interfaces)
+        {
+            if (seen.Add(direct)) yield return direct;
+            foreach (var inherited in direct.AllInterfaces)
+            {
+                if (seen.Add(inherited)) yield return inherited;
+            }
+        }
+    }
 
     private static IncrementalValueProvider<ImmutableArray<DiscoveryModel>> BuildProfilesIndex(
         IncrementalGeneratorInitializationContext context)

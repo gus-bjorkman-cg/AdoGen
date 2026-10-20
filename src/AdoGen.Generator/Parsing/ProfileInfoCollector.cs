@@ -27,7 +27,7 @@ internal static class ProfileInfoCollector
         ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var (dto, _, profile, model, provider, _) = discoveryDto;
+        var (dto, _, profile, model, provider, _, _) = discoveryDto;
         var collected = Collect(profile!, dto, model!, diagnostics, provider, props, ct);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
@@ -105,32 +105,37 @@ internal static class ProfileInfoCollector
 
         foreach (var expressionSyntax in expressionSyntaxes)
         {
-            if (expressionSyntax.Expression is not IdentifierNameSyntax id) continue;
+            var methodName = expressionSyntax.GetProfileMethodName();
+            if (methodName is null) continue;
 
-            switch (id.Identifier.Text)
+            switch (methodName)
             {
                 case "Table":
                     if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } al &&
-                        model.TryGetConstString(al[0].Expression, default, out var tn) && !string.IsNullOrWhiteSpace(tn))
+                        model.TryGetConstString(al[0].Expression, ct, out var tn) && !string.IsNullOrWhiteSpace(tn))
                         table = tn!;
+                    else
+                        diagnostics.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, expressionSyntax.GetLocation(), dtoType.Name, methodName));
                     break;
 
                 case "Schema":
                     if (expressionSyntax.ArgumentList.Arguments is { Count: 1 } asl &&
-                        model.TryGetConstString(asl[0].Expression, default, out var sc) && !string.IsNullOrWhiteSpace(sc))
+                        model.TryGetConstString(asl[0].Expression, ct, out var sc) && !string.IsNullOrWhiteSpace(sc))
                         schema = sc!;
+                    else
+                        diagnostics.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, expressionSyntax.GetLocation(), dtoType.Name, methodName));
                     break;
 
                 case "Key":
                 case "Identity":
-                    if (expressionSyntax.ArgumentList.Arguments.Count != 1) break;
+                    var propName = TryGetSelectedProperty(expressionSyntax, model, dtoProps);
+                    if (propName is null)
+                    {
+                        diagnostics.Add(Diagnostic.Create(SqlDiagnostics.UnsupportedProfileExpression, expressionSyntax.GetLocation(), dtoType.Name, methodName));
+                        break;
+                    }
                     
-                    var lambda = (LambdaExpressionSyntax)expressionSyntax.ArgumentList.Arguments[0].Expression;
-                    var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
-
-                    if (propName is null || !dtoProps.ContainsKey(propName)) break;
-                    
-                    switch (id.Identifier.Text)
+                    switch (methodName)
                     {
                         case "Key":
                             keys.Add(propName);
@@ -141,6 +146,12 @@ internal static class ProfileInfoCollector
                     }
                     break;
                 case RuleFor:
+                    if (TryGetSelectedProperty(expressionSyntax, model, dtoProps) is null)
+                    {
+                        diagnostics.Add(Diagnostic.Create(SqlDiagnostics.UnsupportedProfileExpression, expressionSyntax.GetLocation(), dtoType.Name, methodName));
+                        break;
+                    }
+
                     ConfigureChainParser.ParseConfigureRootAndForwardChain(
                         model, 
                         dtoType, 
@@ -194,6 +205,34 @@ internal static class ProfileInfoCollector
         );
     }
     
+    /// <summary>
+    /// Resolves the property selected by a single inline-lambda argument (<c>x => x.Prop</c>), or null when
+    /// the argument has another shape (method group, variable, nested member, unmapped property).
+    /// </summary>
+    internal static string? TryGetSelectedProperty(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        IReadOnlyDictionary<string, IPropertySymbol> dtoProps)
+    {
+        if (invocation.ArgumentList.Arguments is not { Count: 1 } args) return null;
+        if (args[0].Expression is not LambdaExpressionSyntax lambda) return null;
+
+        var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
+        return propName is not null && dtoProps.ContainsKey(propName) ? propName : null;
+    }
+
+    /// <summary>
+    /// Returns the profile method name for <c>Method(...)</c> and <c>this.Method(...)</c> calls, otherwise null
+    /// (chained calls such as <c>.VarChar(50)</c> are reached through their root <c>RuleFor</c>).
+    /// </summary>
+    private static string? GetProfileMethodName(this InvocationExpressionSyntax invocation) =>
+        invocation.Expression switch
+        {
+            IdentifierNameSyntax id => id.Identifier.Text,
+            MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax, Name: IdentifierNameSyntax name } => name.Identifier.Text,
+            _ => null
+        };
+
     private static string DefaultSchema(this SqlProviderKind provider) =>
         provider switch
         {
@@ -225,7 +264,7 @@ internal static class ProfileInfoCollector
                     return nodes;
                 })
                 .OfType<InvocationExpressionSyntax>()
-                .Where(static x => x.Expression is IdentifierNameSyntax)
+                .Where(static x => x.GetProfileMethodName() is not null)
                 .ToImmutableArray();
 
         private string GetNamespace() =>

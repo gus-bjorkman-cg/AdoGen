@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Threading;
@@ -25,12 +26,13 @@ public static class SqlCommandExtensions
             if (command.Connection.State != ConnectionState.Open) await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 
             await using var reader = await command
-                .ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+                .ExecuteReaderAsync(CommandBehavior.SingleResult, ct).ConfigureAwait(false);
         
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return [];
             
+            var ordinals = T.GetOrdinals(reader);
             var items = new List<T>();
-            do items.Add(reader.Map<T>()); while (await reader.ReadAsync(ct).ConfigureAwait(false));
+            do items.Add(T.Map(reader, ordinals)); while (await reader.ReadAsync(ct).ConfigureAwait(false));
 
             return items;
         }
@@ -48,12 +50,12 @@ public static class SqlCommandExtensions
 
             await using var reader = await command
                 .ExecuteReaderAsync(
-                    CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
+                    CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
                 .ConfigureAwait(false);
         
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return default;
         
-            return reader.Map<T>();
+            return T.Map(reader);
         }
 
         /// <summary>
@@ -133,7 +135,7 @@ public static class SqlCommandExtensions
             var p = command.CreateParameter();
             p.ParameterName = name;
             p.SqlDbType = type;
-            p.SqlValue = value;
+            p.Value = value ?? DBNull.Value;
         
             if (size > 0) p.Size = size;
         

@@ -55,14 +55,14 @@ public static class SqlConnectionSingleIdExtensions
     /// <typeparam name="TModel"></typeparam>
     /// <typeparam name="TKey"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel, TKey>(
+    public static ValueTask<int> DeleteAsync<TModel, TKey>(
         this SqlConnection connection,
         List<TKey> ids,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, TKey>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
     
     /// <summary>
     /// Deletes the records with the given ids.
@@ -75,14 +75,14 @@ public static class SqlConnectionSingleIdExtensions
     /// <param name="commandTimeout"></param>
     /// <typeparam name="TModel"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel>(
+    public static ValueTask<int> DeleteAsync<TModel>(
         this SqlConnection connection,
         List<Guid> ids,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, Guid>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
     
     /// <summary>
     /// Deletes the records with the given ids.
@@ -95,14 +95,14 @@ public static class SqlConnectionSingleIdExtensions
     /// <param name="commandTimeout"></param>
     /// <typeparam name="TModel"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel>(
+    public static ValueTask<int> DeleteAsync<TModel>(
         this SqlConnection connection,
         List<long> ids,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, long>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
     
     /// <summary>
     /// Deletes the records with the given ids.
@@ -115,14 +115,14 @@ public static class SqlConnectionSingleIdExtensions
     /// <param name="commandTimeout"></param>
     /// <typeparam name="TModel"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel>(
+    public static ValueTask<int> DeleteAsync<TModel>(
         this SqlConnection connection,
         List<int> ids,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, int>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
     
     /// <summary>
     /// Deletes the records with the given ids.
@@ -135,14 +135,14 @@ public static class SqlConnectionSingleIdExtensions
     /// <param name="commandTimeout"></param>
     /// <typeparam name="TModel"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel>(
+    public static ValueTask<int> DeleteAsync<TModel>(
         this SqlConnection connection,
         List<short> ids,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, short>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
     
     /// <summary>
     /// Deletes the records with the given ids.
@@ -155,14 +155,14 @@ public static class SqlConnectionSingleIdExtensions
     /// <param name="commandTimeout"></param>
     /// <typeparam name="TModel"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel>(
+    public static ValueTask<int> DeleteAsync<TModel>(
         this SqlConnection connection,
         List<decimal> ids,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, decimal>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
     
     /// <summary>
     /// Deletes the records with the given ids.
@@ -175,14 +175,14 @@ public static class SqlConnectionSingleIdExtensions
     /// <param name="commandTimeout"></param>
     /// <typeparam name="TModel"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel>(
+    public static ValueTask<int> DeleteAsync<TModel>(
         this SqlConnection connection,
         List<string> ids,
         CancellationToken ct,
         SqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : ISqlSingleIdModel<TModel, string>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
 
     /// <summary>
     /// Returns true if a record with the given id exists in the database.

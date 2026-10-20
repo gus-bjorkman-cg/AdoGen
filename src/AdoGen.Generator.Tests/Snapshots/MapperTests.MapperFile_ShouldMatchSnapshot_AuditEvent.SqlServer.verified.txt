@@ -5,35 +5,41 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record AuditEvent : ISqlMapper<global::AdoGen.Generator.Tests.AuditEvent>
+public partial record AuditEvent : ISqlMapper<global::AdoGen.Generator.Tests.AuditEvent>
 {
-    private static bool IsInitialized;
-    private static int EventIdOrdinal;
-    private static int CreatedAtOrdinal;
-    private static int TypeOrdinal;
-    private static int JsonPayloadOrdinal;
-
-    public static global::AdoGen.Generator.Tests.AuditEvent Map(SqlDataReader reader)
+    /// <summary>
+    /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+    /// Resolve once per result set and pass the result to <see cref="Map(SqlDataReader, int[])"/>.
+    /// </summary>
+    public static int[] GetOrdinals(SqlDataReader reader)
     {
-        if (!Volatile.Read(ref IsInitialized))
-        {
-            EventIdOrdinal = reader.GetOrdinal("EventId");
-            CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
-            TypeOrdinal = reader.GetOrdinal("Type");
-            JsonPayloadOrdinal = reader.GetOrdinal("JsonPayload");
+        var ordinals = new int[4];
+        ordinals[0] = reader.GetOrdinal("EventId");
+        ordinals[1] = reader.GetOrdinal("CreatedAt");
+        ordinals[2] = reader.GetOrdinal("Type");
+        ordinals[3] = reader.GetOrdinal("JsonPayload");
+        return ordinals;
+    }
 
-            Volatile.Write(ref IsInitialized, true);
-        }
+    /// <summary>
+    /// Maps the current row, resolving column ordinals by name on every call.
+    /// Prefer <see cref="GetOrdinals(SqlDataReader)"/> + <see cref="Map(SqlDataReader, int[])"/> when reading many rows.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.AuditEvent Map(SqlDataReader reader) => Map(reader, GetOrdinals(reader));
 
+    /// <summary>
+    /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(SqlDataReader)"/>.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.AuditEvent Map(SqlDataReader reader, int[] ordinals)
+    {
         return new global::AdoGen.Generator.Tests.AuditEvent(
-            EventId : reader.GetInt64(EventIdOrdinal),
-            CreatedAt : reader.GetFieldValue<global::System.DateTimeOffset>(CreatedAtOrdinal),
-            EventType : reader.GetString(TypeOrdinal),
-            JsonPayload : reader.GetFieldValue<byte[]>(JsonPayloadOrdinal)
+            EventId : reader.GetInt64(ordinals[0]),
+            CreatedAt : reader.GetFieldValue<global::System.DateTimeOffset>(ordinals[1]),
+            EventType : reader.GetString(ordinals[2]),
+            JsonPayload : reader.GetFieldValue<byte[]>(ordinals[3])
         );
     }
 }

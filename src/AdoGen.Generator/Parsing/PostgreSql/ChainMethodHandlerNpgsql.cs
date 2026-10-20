@@ -146,3 +146,42 @@ internal sealed class DecimalChainHandlerNpgsql : IChainMethodHandler
             diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
     }
 }
+
+/// <summary>
+/// Handles shorthand methods that set a fixed <c>NpgsqlDbType</c> plus a constant size, e.g. <c>Char(n)</c> / <c>Varbit(n)</c>.
+/// </summary>
+internal sealed class SizedTypeChainHandlerNpgsql : IChainMethodHandler
+{
+    private readonly string _methodName;
+    private readonly DbTypeRef _dbTypeRef;
+
+    private SizedTypeChainHandlerNpgsql(string methodName, string enumMember)
+    {
+        _methodName = methodName;
+        _dbTypeRef = DbTypeRef.PostgreSql(enumMember);
+    }
+
+    public static SizedTypeChainHandlerNpgsql Char { get; } = new("Char", "Char");
+    public static SizedTypeChainHandlerNpgsql Varbit { get; } = new("Varbit", "Varbit");
+
+    public bool IsMatch(SqlProviderKind provider, string methodName) =>
+        provider is SqlProviderKind.PostgreSql && string.Equals(methodName, _methodName, StringComparison.OrdinalIgnoreCase);
+
+    public void Handle(
+        SemanticModel model, 
+        INamedTypeSymbol dtoType, 
+        string propertyName,
+        ChainMethod chain, 
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder, 
+        CancellationToken ct)
+    {
+        if (chain.Args.Count == 1 && model.TryGetConstInt(chain.Args[0].Expression, ct, out var size))
+        {
+            cfg.DbType = _dbTypeRef;
+            cfg.Size = size;
+        }
+        else
+            diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
+    }
+}

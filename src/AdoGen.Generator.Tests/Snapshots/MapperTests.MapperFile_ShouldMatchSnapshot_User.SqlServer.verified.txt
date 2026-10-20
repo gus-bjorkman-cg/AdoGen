@@ -5,32 +5,39 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record User : ISqlMapper<global::AdoGen.Generator.Tests.User>
+public partial record User : ISqlMapper<global::AdoGen.Generator.Tests.User>
 {
-    private static bool IsInitialized;
-    private static int IdOrdinal;
-    private static int NameOrdinal;
-    private static int EmailOrdinal;
-
-    public static global::AdoGen.Generator.Tests.User Map(SqlDataReader reader)
+    /// <summary>
+    /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+    /// Resolve once per result set and pass the result to <see cref="Map(SqlDataReader, int[])"/>.
+    /// </summary>
+    public static int[] GetOrdinals(SqlDataReader reader)
     {
-        if (!Volatile.Read(ref IsInitialized))
-        {
-            IdOrdinal = reader.GetOrdinal("Id");
-            NameOrdinal = reader.GetOrdinal("Name");
-            EmailOrdinal = reader.GetOrdinal("Email");
+        var ordinals = new int[3];
+        ordinals[0] = reader.GetOrdinal("Id");
+        ordinals[1] = reader.GetOrdinal("Name");
+        ordinals[2] = reader.GetOrdinal("Email");
+        return ordinals;
+    }
 
-            Volatile.Write(ref IsInitialized, true);
-        }
+    /// <summary>
+    /// Maps the current row, resolving column ordinals by name on every call.
+    /// Prefer <see cref="GetOrdinals(SqlDataReader)"/> + <see cref="Map(SqlDataReader, int[])"/> when reading many rows.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.User Map(SqlDataReader reader) => Map(reader, GetOrdinals(reader));
 
+    /// <summary>
+    /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(SqlDataReader)"/>.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.User Map(SqlDataReader reader, int[] ordinals)
+    {
         return new global::AdoGen.Generator.Tests.User(
-            Id : reader.GetFieldValue<Guid>(IdOrdinal),
-            Name : reader.GetString(NameOrdinal),
-            Email : reader.GetString(EmailOrdinal)
+            Id : reader.GetFieldValue<Guid>(ordinals[0]),
+            Name : reader.GetString(ordinals[1]),
+            Email : reader.GetString(ordinals[2])
         );
     }
 }

@@ -10,7 +10,7 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record User : INpgsqlBulkModel<global::AdoGen.Generator.Tests.User>;
+public partial record User : INpgsqlBulkModel<global::AdoGen.Generator.Tests.User>;
 
 public sealed class UserNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.Tests.User>
 {

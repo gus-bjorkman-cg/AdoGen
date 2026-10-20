@@ -1,3 +1,4 @@
+using System.Data;
 namespace AdoGen.SqlServer.Tests.Features;
 
 public sealed class ExecuteScalarTests(TestContext testContext) : TestBase(testContext)
@@ -190,5 +191,43 @@ public sealed class ExecuteScalarTests(TestContext testContext) : TestBase(testC
 
         // Assert
         actual.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldReturnDefault_WhenNoRows()
+    {
+        // Act
+        var actualInt = await Connection.ExecuteScalarAsync<int>("""SELECT 1 WHERE 1 = 0""", CancellationToken);
+        var actualString = await Connection.ExecuteScalarAsync<string>("""SELECT Name FROM Users WHERE 1 = 0""", CancellationToken);
+
+        // Assert
+        actualInt.Should().Be(0);
+        actualString.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldReturnDefault_WhenValueIsDbNull()
+    {
+        // Act
+        var actualString = await Connection.ExecuteScalarAsync<string>("""SELECT MAX(Name) FROM Users WHERE 1 = 0""", CancellationToken);
+        var actualInt = await Connection.ExecuteScalarAsync<int?>("""SELECT CAST(NULL AS INT)""", CancellationToken);
+
+        // Assert
+        actualString.Should().BeNull();
+        actualInt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateParameter_ShouldSendDbNull_WhenValueIsNull()
+    {
+        // Arrange
+        await using var cmd = new SqlCommand("SELECT CASE WHEN @p IS NULL THEN 1 ELSE 0 END", Connection);
+        cmd.CreateParameter("@p", null, SqlDbType.NVarChar, 10);
+
+        // Act
+        var actual = await cmd.QueryScalarFirstOrDefaultAsync<int>(CancellationToken);
+
+        // Assert
+        actual.Should().Be(1);
     }
 }

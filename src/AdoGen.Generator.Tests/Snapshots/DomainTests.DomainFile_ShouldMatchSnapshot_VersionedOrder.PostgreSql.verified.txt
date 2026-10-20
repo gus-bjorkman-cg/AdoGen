@@ -13,7 +13,7 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record VersionedOrder : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.VersionedOrder, Guid>
+public partial record VersionedOrder : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.VersionedOrder, Guid>
 {
     private const string Pg_SqlDeleteBatchAny = """DELETE FROM "public"."VersionedOrders" WHERE "Id" = ANY(@ids);""";
     private const string Pg_SqlExists = """SELECT 1 FROM "public"."VersionedOrders" WHERE "Id" = @Id LIMIT 1;""";
@@ -48,7 +48,7 @@ public sealed partial record VersionedOrder : INpgsqlSingleIdModel<global::AdoGe
     }
 }
 
-public sealed partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.Generator.Tests.VersionedOrder>
+public partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.Generator.Tests.VersionedOrder>
 {
     private const string Pg_SqlCreateTable = 
     """
@@ -132,7 +132,7 @@ public sealed partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName(model.ProductName));
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(model.Version));
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return VersionedOrder.Map(reader);
         
@@ -248,9 +248,10 @@ public sealed partial class VersionedOrderPatch
 {
     private ulong _mask;
     public Guid Id { get; }
-    public int Version { get; set; }
-    public VersionedOrderPatch WithVersion(int value) { Version = value; return this; }
-    internal int VersionValue => Version;
+    /// <summary>Expected current value of <c>Version</c>; when set, the patch only applies if it matches and the token is incremented.</summary>
+    public int? ExpectedVersion { get; private set; }
+    /// <summary>Enables the optimistic-concurrency check: throws <c>AdoGenConcurrencyException</c> if the stored <c>Version</c> differs.</summary>
+    public VersionedOrderPatch WithExpectedVersion(int expected) { ExpectedVersion = expected; return this; }
     public string? ProductName { get; set { field = value; _mask |= 1UL << 0; } }
     public VersionedOrderPatch WithProductName(string value) { ProductName = value; return this; }
     internal string? ProductNameValue => ProductName;
@@ -258,7 +259,7 @@ public sealed partial class VersionedOrderPatch
 
     public VersionedOrderPatch(Guid id) { Id = id; }
 }
-public sealed partial record VersionedOrder
+public partial record VersionedOrder
 {
 #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
 
@@ -274,16 +275,19 @@ public sealed partial record VersionedOrder
         var separator = "";
         
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("\"ProductName\" = @ProductName"); separator = ", "; cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterProductName((string)patch.ProductNameValue!)); }
-
+        if (patch.ExpectedVersion.HasValue) sb.Append(separator + "\"Version\" = @Version + 1");
         sb.Append(" WHERE \"Id\" = @Id");
-        cmd.CommandText += " AND \"Version\" = @Version";
-        cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(patch.VersionValue));
+        if (patch.ExpectedVersion.HasValue)
+        {
+            sb.Append(" AND \"Version\" = @Version");
+            cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterVersion(patch.ExpectedVersion.Value));
+        }
         cmd.CommandText = sb.ToString();
         cmd.Parameters.Add(VersionedOrderNpgsql.CreateParameterId(patch.Id));
         
         var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-        if (affected == 0) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("public.VersionedOrders");
-          
+        if (affected == 0 && patch.ExpectedVersion.HasValue) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("public.VersionedOrders");
+
         return affected;
     }
 

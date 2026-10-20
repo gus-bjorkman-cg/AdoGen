@@ -199,4 +199,28 @@ public sealed class ExecuteScalarTests(TestContext testContext) : TestBase(testC
         // Assert
         actual.Should().Be(0);
     }
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldReturnDefault_WhenNoRows()
+    {
+        // Act
+        var actualInt = await Connection.ExecuteScalarAsync<int>("""SELECT 1 WHERE 1 = 0""", CancellationToken);
+        var actualString = await Connection.ExecuteScalarAsync<string>("""SELECT "Name" FROM "public"."Users" WHERE 1 = 0""", CancellationToken);
+
+        // Assert
+        actualInt.Should().Be(0);
+        actualString.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldReturnDefault_WhenValueIsDbNull()
+    {
+        // Act
+        var actualString = await Connection.ExecuteScalarAsync<string>("""SELECT MAX("Name") FROM "public"."Users" WHERE 1 = 0""", CancellationToken);
+        var actualInt = await Connection.ExecuteScalarAsync<int?>("""SELECT CAST(NULL AS INT)""", CancellationToken);
+
+        // Assert
+        actualString.Should().BeNull();
+        actualInt.Should().BeNull();
+    }
 }

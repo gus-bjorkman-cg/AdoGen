@@ -49,6 +49,23 @@ internal static class DiscoveryValidation
                     dto.Dto.Name));
             }
 
+            if (dto.Dto.IsAbstract && !dto.Dto.IsStatic)
+            {
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.AbstractNotAllowed,
+                    dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name));
+            }
+
+            if (dto.Dto.ContainingType is { } containingType)
+            {
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.NestedTypeNotSupported,
+                    dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name,
+                    containingType.Name));
+            }
+
             if (dto.Dto.DeclaredAccessibility is not (Accessibility.Public or Accessibility.Internal))
             {
                 diagnostics.Add(Diagnostic.Create(
@@ -66,7 +83,18 @@ internal static class DiscoveryValidation
                 diagnostics.Add(Diagnostic.Create(
                     SqlDiagnostics.MissingProfile,
                     dto.Dto.Locations.FirstOrDefault() ?? Location.None,
-                    dto.Dto.Name));
+                    dto.Dto.Name,
+                    ProfileBaseName(dto.Provider)));
+            }
+
+            if (dto.ProfileCount > 1)
+            {
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.MultipleProfiles,
+                    dto.Profile?.Locations.FirstOrDefault() ?? dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name,
+                    dto.ProfileCount,
+                    ProfileBaseName(dto.Provider)));
             }
 
             return new ValidatedDiscoveryDto(dto, ProfileInfo.Empty, diagnostics.ToImmutable());
@@ -101,6 +129,22 @@ internal static class DiscoveryValidation
             
             var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
             var profile = ProfileInfoCollector.Resolve(dto, diagnostics, dtoProperties, ct);
+
+            // Properties whose CLR type has no default provider type would produce invalid DDL and
+            // untyped parameters; require an explicit .Type(...) instead.
+            for (var i = 0; i < dtoProperties.Length; i++)
+            {
+                var property = dtoProperties[i];
+                if (!profile.ParamsByProperty.TryGetValue(property.Name, out var cfg)) continue;
+                if (cfg.DbType is not { } dbType || !dbType.IsUnmappedDefault()) continue;
+
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.UnsupportedPropertyType,
+                    property.Locations.FirstOrDefault() ?? dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name,
+                    property.Name,
+                    property.Type.ToDisplayString()));
+            }
 
             // Validate concurrency tokens
             var concurrencyTokenCount = 0;
@@ -153,6 +197,9 @@ internal static class DiscoveryValidation
         });
     }
     
+    private static string ProfileBaseName(SqlProviderKind provider) =>
+        provider is SqlProviderKind.PostgreSql ? "NpgsqlProfile" : "SqlProfile";
+
     extension(INamedTypeSymbol type)
     {
         private bool IsPartial =>
@@ -161,11 +208,22 @@ internal static class DiscoveryValidation
                 .OfType<TypeDeclarationSyntax>()
                 .Any(static x => x.Modifiers.Any(static m => m.IsKind(SyntaxKind.PartialKeyword)));
 
-        private ImmutableArray<IPropertySymbol> GetOrderedProperties() =>
-            type.GetMembers()
+        private ImmutableArray<IPropertySymbol> GetOrderedProperties()
+        {
+            var ctorParameterNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var ctor in type.InstanceConstructors)
+            {
+                foreach (var parameter in ctor.Parameters) ctorParameterNames.Add(parameter.Name);
+            }
+
+            // A column must be writable by the generated mapper: either settable/init-able or bound
+            // through a constructor parameter of the same name. Computed and get-only properties and
+            // indexers are not columns.
+            return type.GetMembers()
                 .OfType<IPropertySymbol>()
                 .Where(static x => x.DeclaredAccessibility == Accessibility.Public)
-                .Where(static x => !x.IsStatic)
+                .Where(static x => !x.IsStatic && !x.IsIndexer)
+                .Where(x => x.SetMethod is not null || ctorParameterNames.Contains(x.Name))
                 .OrderBy(static x =>
                 {
                     var loc = x.Locations.FirstOrDefault(static l => l.IsInSource);
@@ -173,5 +231,6 @@ internal static class DiscoveryValidation
                 })
                 .ThenBy(static x => x.Name, StringComparer.Ordinal)
                 .ToImmutableArray();
+        }
     }
 }

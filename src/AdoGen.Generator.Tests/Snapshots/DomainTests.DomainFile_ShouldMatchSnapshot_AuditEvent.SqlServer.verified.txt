@@ -12,7 +12,7 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Generator.Tests.AuditEvent, long>
+public partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Generator.Tests.AuditEvent, long>
 {
     private const string SqlDeleteBatchPrefix = "DELETE t FROM [log].[Audits] AS t JOIN (VALUES ";
     private const string SqlDeleteBatchSuffix = ") AS ids([EventId]) ON ids.[EventId]=t.[EventId]";
@@ -23,25 +23,37 @@ public sealed partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Gener
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
-        await using var cmd = new SqlCommand("", connection, transaction);
+        // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+        const int RowsPerCommand = 1000;
+        var affected = 0;
         
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-        
-        cmd.EnableOptimizedParameterBinding = ids.Count > 24;
-        
-        var sb = new StringBuilder(SqlDeleteBatchPrefix);
-        
-        for (var i = 0; i < ids.Count; i++)
+        for (var start = 0; start < ids.Count; start += RowsPerCommand)
         {
-            if (i > 0) sb.Append(',');
-            sb.Append($"(@p{i})");
-            cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(ids[i], $"@p{i}"));
+            var end = Math.Min(start + RowsPerCommand, ids.Count);
+            
+            await using var cmd = new SqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+            
+            cmd.EnableOptimizedParameterBinding = end - start > 24;
+            
+            var sb = new StringBuilder(SqlDeleteBatchPrefix);
+            
+            for (var i = start; i < end; i++)
+            {
+                if (i > start) sb.Append(',');
+                var p = i - start;
+                sb.Append($"(@p{p})");
+                cmd.Parameters.Add(AuditEventSql.CreateParameterEventId(ids[i], $"@p{p}"));
+            }
+            
+            sb.Append(SqlDeleteBatchSuffix);
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
         
-        sb.Append(SqlDeleteBatchSuffix);
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<bool> ExistsAsync(SqlConnection connection, long id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -57,7 +69,7 @@ public sealed partial record AuditEvent : ISqlSingleIdModel<global::AdoGen.Gener
     }
 }
 
-public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generator.Tests.AuditEvent>
+public partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generator.Tests.AuditEvent>
 {
     private const string SqlCreateTable = 
         """
@@ -73,7 +85,7 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
     private const string SqlInsertAndReturn = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) OUTPUT INSERTED.* VALUES (@CreatedAt, @Type, @JsonPayload);";
     private const string SqlUpdate = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId;";
     private const string SqlDelete = "DELETE FROM [log].[Audits] WHERE [EventId] = @EventId;";
-    private const string SqlUpsert = "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId; IF @@ROWCOUNT = 0 INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) VALUES (@CreatedAt, @Type, @JsonPayload);";
+    private const string SqlUpsert = "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) SELECT @CreatedAt, @Type, @JsonPayload WHERE NOT EXISTS (SELECT 1 FROM [log].[Audits] WITH (UPDLOCK, HOLDLOCK) WHERE [EventId] = @EventId); IF @@ROWCOUNT = 0 UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId;";
     private const string SqlTruncate = "TRUNCATE TABLE [log].[Audits];";
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -103,34 +115,46 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-        await using var cmd = new SqlCommand("", connection, transaction);
-        
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-        
-        cmd.EnableOptimizedParameterBinding = (models.Count * 3) > 24;
+        // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+        // Larger lists are split into several commands; use a transaction for atomicity.
+        const int RowsPerCommand = 666;
+        var affected = 0;
 
-        var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * 17);
-        sb.Append(SqlInsertBatchTemplate);
-
-        var paramIndex = 0;
-
-        for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+        for (var start = 0; start < models.Count; start += RowsPerCommand)
         {
-            if (modelIndex > 0) sb.Append(',');
-            sb.Append($"(@p{paramIndex}");
-            cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex}");
-            cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(models[modelIndex].EventType, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex})");
-            cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, $"@p{paramIndex}"));
-            paramIndex++;
+            var end = Math.Min(start + RowsPerCommand, models.Count);
+
+            await using var cmd = new SqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+            
+            cmd.EnableOptimizedParameterBinding = ((end - start) * 3) > 24;
+
+            var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * 17);
+            sb.Append(SqlInsertBatchTemplate);
+
+            var paramIndex = 0;
+
+            for (var modelIndex = start; modelIndex < end; modelIndex++)
+            {
+                if (modelIndex > start) sb.Append(',');
+                sb.Append($"(@p{paramIndex}");
+                cmd.Parameters.Add(AuditEventSql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, $"@p{paramIndex}"));
+                paramIndex++;
+                sb.Append($",@p{paramIndex}");
+                cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(models[modelIndex].EventType, $"@p{paramIndex}"));
+                paramIndex++;
+                sb.Append($",@p{paramIndex})");
+                cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, $"@p{paramIndex}"));
+                paramIndex++;
+            }
+
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.AuditEvent model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -157,7 +181,7 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
         cmd.Parameters.Add(AuditEventSql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventSql.CreateParameterJsonPayload(model.JsonPayload));
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return AuditEvent.Map(reader);
         
@@ -253,7 +277,7 @@ public sealed partial record AuditEvent : ISqlDomainModel<global::AdoGen.Generat
 /// Patch command object for <see cref="AuditEvent"/>.
 /// Set only the properties you want to update; unset properties are not written to the database.
 /// </summary>
-public partial class AuditEventPatch
+public sealed partial class AuditEventPatch
 {
     private ulong _mask;
     public long EventId { get; }
@@ -271,7 +295,7 @@ public partial class AuditEventPatch
 
     public AuditEventPatch(long eventId) { EventId = eventId; }
 }
-public sealed partial record AuditEvent
+public partial record AuditEvent
 {
 #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
 

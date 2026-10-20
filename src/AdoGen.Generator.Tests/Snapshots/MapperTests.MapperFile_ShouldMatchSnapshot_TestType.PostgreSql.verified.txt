@@ -4,107 +4,89 @@ using AdoGen.PostgreSql;
 using Npgsql;
 using NpgsqlTypes;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record TestType : INpgsqlMapper<global::AdoGen.Generator.Tests.TestType>
+public partial record TestType : INpgsqlMapper<global::AdoGen.Generator.Tests.TestType>
 {
-    private static bool Pg_IsInitialized;
-    private static int Pg_IntOrdinal;
-    private static int Pg_NullableIntOrdinal;
-    private static int Pg_DecimalOrdinal;
-    private static int Pg_NullableDecimalOrdinal;
-    private static int Pg_NullableGuidOrdinal;
-    private static int Pg_NullableStringVarcharOrdinal;
-    private static int Pg_NullableStringNVarcharOrdinal;
-    private static int Pg_StringVarcharRuledNullOrdinal;
-    private static int Pg_CharStringOrdinal;
-    private static int Pg_NCharStringOrdinal;
-    private static int Pg_FloatOrdinal;
-    private static int Pg_NullableFloatOrdinal;
-    private static int Pg_DateTimeOrdinal;
-    private static int Pg_NullableDateTimeOrdinal;
-    private static int Pg_DoubleOrdinal;
-    private static int Pg_NullableDoubleOrdinal;
-    private static int Pg_CharOrdinal;
-    private static int Pg_NCharOrdinal;
-    private static int Pg_NullableCharOrdinal;
-    private static int Pg_NullableBytesOrdinal;
-    private static int Pg_BytesOrdinal;
-    private static int Pg_FruitsOrdinal;
-    private static int Pg_FlagsOrdinal;
-    private static int Pg_ByteEnumOrdinal;
-    private static int Pg_ShortEnumOrdinal;
-    private static int Pg_IntEnumOrdinal;
-    private static int Pg_LongEnumOrdinal;
-    private static int Pg_CreatedAtOrdinal;
-
-    public static global::AdoGen.Generator.Tests.TestType Map(NpgsqlDataReader reader)
+    /// <summary>
+    /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+    /// Resolve once per result set and pass the result to <see cref="Map(NpgsqlDataReader, int[])"/>.
+    /// </summary>
+    public static int[] GetOrdinals(NpgsqlDataReader reader)
     {
-        if (!Volatile.Read(ref Pg_IsInitialized))
-        {
-            Pg_IntOrdinal = reader.GetOrdinal("Int");
-            Pg_NullableIntOrdinal = reader.GetOrdinal("NullableInt");
-            Pg_DecimalOrdinal = reader.GetOrdinal("Decimal");
-            Pg_NullableDecimalOrdinal = reader.GetOrdinal("NullableDecimal");
-            Pg_NullableGuidOrdinal = reader.GetOrdinal("NullableGuid");
-            Pg_NullableStringVarcharOrdinal = reader.GetOrdinal("NullableStringVarchar");
-            Pg_NullableStringNVarcharOrdinal = reader.GetOrdinal("NullableStringNVarchar");
-            Pg_StringVarcharRuledNullOrdinal = reader.GetOrdinal("StringVarcharRuledNull");
-            Pg_CharStringOrdinal = reader.GetOrdinal("CharString");
-            Pg_NCharStringOrdinal = reader.GetOrdinal("NCharString");
-            Pg_FloatOrdinal = reader.GetOrdinal("Float");
-            Pg_NullableFloatOrdinal = reader.GetOrdinal("NullableFloat");
-            Pg_DateTimeOrdinal = reader.GetOrdinal("DateTime");
-            Pg_NullableDateTimeOrdinal = reader.GetOrdinal("NullableDateTime");
-            Pg_DoubleOrdinal = reader.GetOrdinal("Double");
-            Pg_NullableDoubleOrdinal = reader.GetOrdinal("NullableDouble");
-            Pg_CharOrdinal = reader.GetOrdinal("Char");
-            Pg_NCharOrdinal = reader.GetOrdinal("NChar");
-            Pg_NullableCharOrdinal = reader.GetOrdinal("NullableChar");
-            Pg_NullableBytesOrdinal = reader.GetOrdinal("NullableBytes");
-            Pg_BytesOrdinal = reader.GetOrdinal("Bytes");
-            Pg_FruitsOrdinal = reader.GetOrdinal("Fruits");
-            Pg_FlagsOrdinal = reader.GetOrdinal("Flags");
-            Pg_ByteEnumOrdinal = reader.GetOrdinal("ByteEnum");
-            Pg_ShortEnumOrdinal = reader.GetOrdinal("ShortEnum");
-            Pg_IntEnumOrdinal = reader.GetOrdinal("IntEnum");
-            Pg_LongEnumOrdinal = reader.GetOrdinal("LongEnum");
-            Pg_CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
+        var ordinals = new int[28];
+        ordinals[0] = reader.GetOrdinal("Int");
+        ordinals[1] = reader.GetOrdinal("NullableInt");
+        ordinals[2] = reader.GetOrdinal("Decimal");
+        ordinals[3] = reader.GetOrdinal("NullableDecimal");
+        ordinals[4] = reader.GetOrdinal("NullableGuid");
+        ordinals[5] = reader.GetOrdinal("NullableStringVarchar");
+        ordinals[6] = reader.GetOrdinal("NullableStringNVarchar");
+        ordinals[7] = reader.GetOrdinal("StringVarcharRuledNull");
+        ordinals[8] = reader.GetOrdinal("CharString");
+        ordinals[9] = reader.GetOrdinal("NCharString");
+        ordinals[10] = reader.GetOrdinal("Float");
+        ordinals[11] = reader.GetOrdinal("NullableFloat");
+        ordinals[12] = reader.GetOrdinal("DateTime");
+        ordinals[13] = reader.GetOrdinal("NullableDateTime");
+        ordinals[14] = reader.GetOrdinal("Double");
+        ordinals[15] = reader.GetOrdinal("NullableDouble");
+        ordinals[16] = reader.GetOrdinal("Char");
+        ordinals[17] = reader.GetOrdinal("NChar");
+        ordinals[18] = reader.GetOrdinal("NullableChar");
+        ordinals[19] = reader.GetOrdinal("NullableBytes");
+        ordinals[20] = reader.GetOrdinal("Bytes");
+        ordinals[21] = reader.GetOrdinal("Fruits");
+        ordinals[22] = reader.GetOrdinal("Flags");
+        ordinals[23] = reader.GetOrdinal("ByteEnum");
+        ordinals[24] = reader.GetOrdinal("ShortEnum");
+        ordinals[25] = reader.GetOrdinal("IntEnum");
+        ordinals[26] = reader.GetOrdinal("LongEnum");
+        ordinals[27] = reader.GetOrdinal("CreatedAt");
+        return ordinals;
+    }
 
-            Volatile.Write(ref Pg_IsInitialized, true);
-        }
+    /// <summary>
+    /// Maps the current row, resolving column ordinals by name on every call.
+    /// Prefer <see cref="GetOrdinals(NpgsqlDataReader)"/> + <see cref="Map(NpgsqlDataReader, int[])"/> when reading many rows.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.TestType Map(NpgsqlDataReader reader) => Map(reader, GetOrdinals(reader));
 
+    /// <summary>
+    /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(NpgsqlDataReader)"/>.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.TestType Map(NpgsqlDataReader reader, int[] ordinals)
+    {
         return new global::AdoGen.Generator.Tests.TestType(
-            Int : reader.GetInt32(Pg_IntOrdinal),
-            NullableInt : reader.IsDBNull(Pg_NullableIntOrdinal) ? (int?)null : reader.GetInt32(Pg_NullableIntOrdinal),
-            Decimal : reader.GetDecimal(Pg_DecimalOrdinal),
-            NullableDecimal : reader.IsDBNull(Pg_NullableDecimalOrdinal) ? (decimal?)null : reader.GetDecimal(Pg_NullableDecimalOrdinal),
-            NullableGuid : reader.IsDBNull(Pg_NullableGuidOrdinal) ? (Guid?)null : reader.GetFieldValue<Guid>(Pg_NullableGuidOrdinal),
-            NullableStringVarchar : reader.IsDBNull(Pg_NullableStringVarcharOrdinal) ? null : reader.GetString(Pg_NullableStringVarcharOrdinal),
-            NullableStringNVarchar : reader.IsDBNull(Pg_NullableStringNVarcharOrdinal) ? null : reader.GetString(Pg_NullableStringNVarcharOrdinal),
-            StringVarcharRuledNull : reader.GetString(Pg_StringVarcharRuledNullOrdinal),
-            CharString : reader.GetString(Pg_CharStringOrdinal),
-            NCharString : reader.GetString(Pg_NCharStringOrdinal),
-            Float : reader.GetFloat(Pg_FloatOrdinal),
-            NullableFloat : reader.IsDBNull(Pg_NullableFloatOrdinal) ? (float?)null : reader.GetFloat(Pg_NullableFloatOrdinal),
-            DateTime : reader.GetFieldValue<DateTime>(Pg_DateTimeOrdinal),
-            NullableDateTime : reader.GetFieldValue<DateTime>(Pg_NullableDateTimeOrdinal),
-            Double : reader.GetDouble(Pg_DoubleOrdinal),
-            NullableDouble : reader.IsDBNull(Pg_NullableDoubleOrdinal) ? (double?)null : reader.GetDouble(Pg_NullableDoubleOrdinal),
-            Char : reader.GetString(Pg_CharOrdinal)[0],
-            NChar : reader.GetString(Pg_NCharOrdinal)[0],
-            NullableChar : reader.IsDBNull(Pg_NullableCharOrdinal) ? (char?)null : reader.GetString(Pg_NullableCharOrdinal)[0],
-            NullableBytes : reader.IsDBNull(Pg_NullableBytesOrdinal) ? null : reader.GetFieldValue<byte[]>(Pg_NullableBytesOrdinal),
-            Bytes : reader.GetFieldValue<byte[]>(Pg_BytesOrdinal),
-            Fruits : (global::AdoGen.Generator.Tests.Fruits)reader.GetInt32(Pg_FruitsOrdinal),
-            Flags : (global::AdoGen.Generator.Tests.Flags)reader.GetInt32(Pg_FlagsOrdinal),
-            ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetByte(Pg_ByteEnumOrdinal),
-            ShortEnum : (global::AdoGen.Generator.Tests.ShortEnum)reader.GetInt16(Pg_ShortEnumOrdinal),
-            IntEnum : (global::AdoGen.Generator.Tests.IntEnum)reader.GetInt32(Pg_IntEnumOrdinal),
-            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(Pg_LongEnumOrdinal),
-            CreatedAt : reader.GetFieldValue<DateTimeOffset>(Pg_CreatedAtOrdinal)
+            Int : reader.GetInt32(ordinals[0]),
+            NullableInt : reader.IsDBNull(ordinals[1]) ? (int?)null : reader.GetInt32(ordinals[1]),
+            Decimal : reader.GetDecimal(ordinals[2]),
+            NullableDecimal : reader.IsDBNull(ordinals[3]) ? (decimal?)null : reader.GetDecimal(ordinals[3]),
+            NullableGuid : reader.IsDBNull(ordinals[4]) ? (Guid?)null : reader.GetFieldValue<Guid>(ordinals[4]),
+            NullableStringVarchar : reader.IsDBNull(ordinals[5]) ? null : reader.GetString(ordinals[5]),
+            NullableStringNVarchar : reader.IsDBNull(ordinals[6]) ? null : reader.GetString(ordinals[6]),
+            StringVarcharRuledNull : reader.GetString(ordinals[7]),
+            CharString : reader.GetString(ordinals[8]),
+            NCharString : reader.GetString(ordinals[9]),
+            Float : reader.GetFloat(ordinals[10]),
+            NullableFloat : reader.IsDBNull(ordinals[11]) ? (float?)null : reader.GetFloat(ordinals[11]),
+            DateTime : reader.GetFieldValue<DateTime>(ordinals[12]),
+            NullableDateTime : reader.GetFieldValue<DateTime>(ordinals[13]),
+            Double : reader.GetDouble(ordinals[14]),
+            NullableDouble : reader.IsDBNull(ordinals[15]) ? (double?)null : reader.GetDouble(ordinals[15]),
+            Char : reader.GetString(ordinals[16])[0],
+            NChar : reader.GetString(ordinals[17])[0],
+            NullableChar : reader.IsDBNull(ordinals[18]) ? (char?)null : reader.GetString(ordinals[18])[0],
+            NullableBytes : reader.IsDBNull(ordinals[19]) ? null : reader.GetFieldValue<byte[]>(ordinals[19]),
+            Bytes : reader.GetFieldValue<byte[]>(ordinals[20]),
+            Fruits : (global::AdoGen.Generator.Tests.Fruits)reader.GetInt32(ordinals[21]),
+            Flags : (global::AdoGen.Generator.Tests.Flags)reader.GetInt32(ordinals[22]),
+            ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetByte(ordinals[23]),
+            ShortEnum : (global::AdoGen.Generator.Tests.ShortEnum)reader.GetInt16(ordinals[24]),
+            IntEnum : (global::AdoGen.Generator.Tests.IntEnum)reader.GetInt32(ordinals[25]),
+            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(ordinals[26]),
+            CreatedAt : reader.GetFieldValue<DateTimeOffset>(ordinals[27])
         );
     }
 }
@@ -245,8 +227,9 @@ public static class TestTypeNpgsql
     public static NpgsqlParameter CreateParameterCharString(string value, string? propertyName = null) => new()
     {
         ParameterName = propertyName ?? ParameterCharString,
-        NpgsqlDbType = NpgsqlDbType.Text,
+        NpgsqlDbType = NpgsqlDbType.Char,
         Value = value is null ? DBNull.Value : value,
+        Size = 10,
     };
     
     /// <summary>
@@ -256,8 +239,9 @@ public static class TestTypeNpgsql
     public static NpgsqlParameter CreateParameterNCharString(string value, string? propertyName = null) => new()
     {
         ParameterName = propertyName ?? ParameterNCharString,
-        NpgsqlDbType = NpgsqlDbType.Text,
+        NpgsqlDbType = NpgsqlDbType.Char,
         Value = value is null ? DBNull.Value : value,
+        Size = 15,
     };
     
     /// <summary>
@@ -335,6 +319,7 @@ public static class TestTypeNpgsql
         ParameterName = propertyName ?? ParameterChar,
         NpgsqlDbType = NpgsqlDbType.Char,
         Value = value,
+        Size = 1,
     };
     
     /// <summary>
@@ -346,6 +331,7 @@ public static class TestTypeNpgsql
         ParameterName = propertyName ?? ParameterNChar,
         NpgsqlDbType = NpgsqlDbType.Char,
         Value = value,
+        Size = 1,
     };
     
     /// <summary>
@@ -357,6 +343,7 @@ public static class TestTypeNpgsql
         ParameterName = propertyName ?? ParameterNullableChar,
         NpgsqlDbType = NpgsqlDbType.Char,
         Value = value is null ? DBNull.Value : value,
+        Size = 1,
     };
     
     /// <summary>

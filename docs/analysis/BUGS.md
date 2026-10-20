@@ -1,5 +1,7 @@
 # AdoGen — Bug Report
 
+> **Status (resolution pass):** all B1–B29 are fixed or documented — see the *Status* column and the **Status:** line under each entry. Descriptions below are kept as written at review time.
+
 Findings from a full review of the runtime (`AdoGen.SqlServer`, `AdoGen.PostgreSql`), the generator (`AdoGen.Generator`), the build (`build/Build.cs`), and the published 2.0.0 NuGet package.
 
 **Verification legend**
@@ -9,43 +11,45 @@ Findings from a full review of the runtime (`AdoGen.SqlServer`, `AdoGen.PostgreS
 
 Severity ranges from **Critical** (silent wrong data or a broken release), through **High** (runtime failure on a supported path) and **Medium** (generator produces uncompilable or invalid output for a plausible input), down to **Low** (cosmetic, misleading, or an edge case).
 
-| #   | Severity | Area                    | Summary                                                                              |
-|-----|----------|-------------------------|--------------------------------------------------------------------------------------|
-| B1  | Critical | Generator / mapper      | Static ordinal cache maps wrong columns when SELECT order differs between queries    |
-| B2  | Critical | Build / release         | Published 2.0.0 DLLs are stamped `0.0.0.0` / `0.0.0-localbuild`                      |
-| B3  | Critical | Build / release         | NuGet release notes are always empty                                                 |
-| B4  | High     | Generator / Patch       | Patch concurrency clause is overwritten; wrong exception on "not found"              |
-| B5  | High     | Generator / PostgreSQL  | `ON CONFLICT ()` for identity-key upsert; AG009 never reported                       |
-| B6  | High     | Generator               | Key-only models: `UPDATE … SET  WHERE` / `DO UPDATE SET ;`                           |
-| B7  | High     | Generator / PostgreSQL  | `.Char(n)` / `.Varbit(n)` silently ignored                                           |
-| B8  | High     | Runtime                 | `ExecuteScalarAsync<T>` throws on NULL/DBNull/numeric mismatch                       |
-| B9  | High     | Runtime / SQL Server    | `CreateParameter` with null value → "parameter not supplied"                         |
-| B10 | Medium   | Generator               | `sealed` forced onto every DTO (breaks inheritance/abstract)                         |
-| B11 | Medium   | Generator               | Nested DTOs generate uncompilable code                                               |
-| B12 | Medium   | Generator / Patch       | `{Dto}Patch` always `public` → CS0051/CS0053 on internal DTOs                        |
-| B13 | Medium   | Generator               | Computed properties treated as columns; no way to ignore                             |
-| B14 | Medium   | Generator               | `.Name("with space")` breaks generated C# and SQL                                    |
-| B15 | Medium   | Generator               | Unsupported CLR types emit `VARIANT` / `unknown` DDL without diagnostic              |
-| B16 | Medium   | Generator               | Duplicate profiles silently first-wins                                               |
-| B17 | Medium   | Generator               | Non-lambda args crash generator; `this.RuleFor` ignored                              |
-| B18 | Medium   | Generator / runtime     | No chunking for SQL Server 2100-param / 1000-row limits                              |
-| B19 | Low      | Diagnostics             | AG002 message inverted; messages always say "SqlProfile"                             |
-| B20 | Low      | Runtime / SQL Server    | `SqlDataReaderExtensions` lacks `ConfigureAwait(false)`                              |
-| B21 | Low      | Runtime                 | Pass-through `async`/`await` wrappers in single-id `DeleteAsync`                     |
-| B22 | Low      | Runtime / docs          | `QueryMultiAsync` untested; doc example skipped a result set (doc fixed)             |
-| B23 | Low      | Generator               | Concurrency exception also thrown when row doesn't exist                             |
-| B24 | Low      | Generator / SQL Server  | `UpsertAsync` not race-safe without `UPDLOCK, SERIALIZABLE`                          |
-| B25 | Low      | Runtime / bulk          | `AddRange(empty)` marks batch dirty                                                  |
-| B26 | Low      | Runtime / API           | Same type names in both providers → CS0104 with both usings                          |
-| B27 | Low      | Generator               | Pipeline model "value equality" comment is false                                     |
-| B28 | Low      | Analyzer release        | AG013 title mismatch in `AnalyzerReleases.Shipped.md`                                |
-| B29 | High     | Generator / DDL / docs  | `DefaultValue(expr)` is emitted verbatim without `DEFAULT`; the documented usage gives invalid DDL |
+| #   | Severity | Area                    | Summary                                                                              | Status |
+|-----|----------|-------------------------|--------------------------------------------------------------------------------------|--------|
+| B1  | Critical | Generator / mapper      | Static ordinal cache maps wrong columns when SELECT order differs between queries    | Fixed — ordinals resolved by name once per result set (`GetOrdinals` + `Map(reader, ordinals)`); no static cache, no `SequentialAccess` for row reads |
+| B2  | Critical | Build / release         | Published 2.0.0 DLLs are stamped `0.0.0.0` / `0.0.0-localbuild`                      | Fixed — `build/Build.cs` stamps version from the git tag |
+| B3  | Critical | Build / release         | NuGet release notes are always empty                                                 | Fixed — release notes extracted from `## [<version>]` |
+| B4  | High     | Generator / Patch       | Patch concurrency clause is overwritten; wrong exception on "not found"              | Fixed — opt-in `WithExpected{Token}(...)`; throws only when an expected token was supplied (breaking: old token setter removed) |
+| B5  | High     | Generator / PostgreSQL  | `ON CONFLICT ()` for identity-key upsert; AG009 never reported                       | Fixed — PostgreSQL uses `MERGE` when the key contains an identity (PG 15+); AG009 removed |
+| B6  | High     | Generator               | Key-only models: `UPDATE … SET  WHERE` / `DO UPDATE SET ;`                           | Fixed — no-op `SET k = k` for UPDATE; upsert skips UPDATE / uses `DO NOTHING` |
+| B7  | High     | Generator / PostgreSQL  | `.Char(n)` / `.Varbit(n)` silently ignored                                           | Fixed — `.Char(n)` / `.Varbit(n)` chain handlers added |
+| B8  | High     | Runtime                 | `ExecuteScalarAsync<T>` throws on NULL/DBNull/numeric mismatch                       | Fixed — null/DBNull return `default`; exact-type cast documented |
+| B9  | High     | Runtime / SQL Server    | `CreateParameter` with null value → "parameter not supplied"                         | Fixed — null sent as `DBNull.Value` |
+| B10 | Medium   | Generator               | `sealed` forced onto every DTO (breaks inheritance/abstract)                         | Fixed — `sealed` no longer emitted; inherited markers ignored; AG014 for abstract |
+| B11 | Medium   | Generator               | Nested DTOs generate uncompilable code                                               | Fixed — AG015 diagnostic |
+| B12 | Medium   | Generator / Patch       | `{Dto}Patch` always `public` → CS0051/CS0053 on internal DTOs                        | Fixed — patch class/extensions use the DTO accessibility |
+| B13 | Medium   | Generator               | Computed properties treated as columns; no way to ignore                             | Fixed — only settable / ctor-bound properties are columns; indexers excluded |
+| B14 | Medium   | Generator               | `.Name("with space")` breaks generated C# and SQL                                    | Fixed — AG016 diagnostic |
+| B15 | Medium   | Generator               | Unsupported CLR types emit `VARIANT` / `unknown` DDL without diagnostic              | Fixed — `TimeSpan` → `time`/`interval`; others AG017 |
+| B16 | Medium   | Generator               | Duplicate profiles silently first-wins                                               | Fixed — AG018 diagnostic |
+| B17 | Medium   | Generator               | Non-lambda args crash generator; `this.RuleFor` ignored                              | Fixed — `this.` calls parsed; AG019 for non-lambda selectors; non-constant `Table`/`Schema` → AG007 |
+| B18 | Medium   | Generator / runtime     | No chunking for SQL Server 2100-param / 1000-row limits                              | Fixed — SQL Server list insert/delete chunked (not atomic without a transaction) |
+| B19 | Low      | Diagnostics             | AG002 message inverted; messages always say "SqlProfile"                             | Fixed — provider-specific, non-inverted messages |
+| B20 | Low      | Runtime / SQL Server    | `SqlDataReaderExtensions` lacks `ConfigureAwait(false)`                              | Fixed |
+| B21 | Low      | Runtime                 | Pass-through `async`/`await` wrappers in single-id `DeleteAsync`                     | Fixed |
+| B22 | Low      | Runtime / docs          | `QueryMultiAsync` untested; doc example skipped a result set (doc fixed)             | Fixed — tests added |
+| B23 | Low      | Generator               | Concurrency exception also thrown when row doesn't exist                             | Documented (api-reference "Optimistic concurrency and missing rows") |
+| B24 | Low      | Generator / SQL Server  | `UpsertAsync` not race-safe without `UPDLOCK, SERIALIZABLE`                          | Fixed — insert-first with `UPDLOCK, HOLDLOCK` |
+| B25 | Low      | Runtime / bulk          | `AddRange(empty)` marks batch dirty                                                  | Fixed |
+| B26 | Low      | Runtime / API           | Same type names in both providers → CS0104 with both usings                          | Documented (aliases); rename deferred to next major |
+| B27 | Low      | Generator               | Pipeline model "value equality" comment is false                                     | Fixed — comment corrected (caching itself tracked as P10) |
+| B28 | Low      | Analyzer release        | AG013 title mismatch in `AnalyzerReleases.Shipped.md`                                | Fixed |
+| B29 | High     | Generator / DDL / docs  | `DefaultValue(expr)` is emitted verbatim without `DEFAULT`; the documented usage gives invalid DDL | Fixed — generator emits `DEFAULT {expr}`, strips a leading `DEFAULT` |
 
 ---
 
 ## Critical
 
 ### B1. Mapper caches column ordinals in `static` fields → wrong data or exceptions when column order differs between queries 🔍
+**Status:** Fixed — ordinals resolved by name once per result set (`GetOrdinals` + `Map(reader, ordinals)`); no static cache, no `SequentialAccess` for row reads.
+
 **Files:**
 - `src/AdoGen.Generator/Emitters/SqlServer/DtoMapperEmitterSqlServer.cs`
 - `src/AdoGen.Generator/Emitters/PostgreSql/DtoMapperEmitterNpgSql.cs`
@@ -102,6 +106,8 @@ await conn.QueryAsync<Order>("SELECT Version, UserId, ProductName, Id FROM Order
 3. Keep the static cache, but key it on the reader's field names or schema hash. This is more complex.
 
 ### B2. Published 2.0.0 assemblies are stamped `0.0.0.0` / `0.0.0-localbuild` ✅
+**Status:** Fixed — `build/Build.cs` stamps version from the git tag.
+
 **File:** `build/Build.cs` (Pack target, lines ~135–187)
 
 `Pack` runs with `SetNoBuild(true)` and passes `Version`/`AssemblyVersion`/`FileVersion` as MSBuild properties. Because nothing is recompiled, those properties only affect the `.nuspec`. The DLLs keep the values from `Directory.Build.props` (`0.0.0-localbuild`).
@@ -115,6 +121,8 @@ Verified by downloading `adogen.sqlserver.2.0.0.nupkg` from nuget.org. `lib/net1
 There is a second, latent problem on the same code path. `numericVersion = version.Split('-', 2)[0] + ".0"` is correct for three-part tags (`v2.0.0` gives `2.0.0.0`). However, a four-part tag such as `v2.0.0.0`, the style the Changelog uses, would produce `2.0.0.0.0`, which is not a valid `AssemblyVersion`. It is harmless today only because of `NoBuild` and three-part tags. Fix it before removing `NoBuild`, e.g. by parsing with `System.Version` and padding to 4 parts.
 
 ### B3. Package release notes are always empty ✅
+**Status:** Fixed — release notes extracted from `## [<version>]`.
+
 **File:** `build/Build.cs` `ExtractReleaseNotes` (lines ~65–90)
 
 The parser looks for `## [{tagVersion}]`, where `tagVersion` is the tag without the `v` (the `v2.0.0` tag gives `2.0.0`). There are two mismatches:
@@ -132,6 +140,8 @@ The extraction returns empty, and the 2.0.0 nuspec has no `<releaseNotes>` eleme
 ## High
 
 ### B4. `PatchAsync` concurrency clause is built and then overwritten; it throws `AdoGenConcurrencyException` on "row not found" 🔍
+**Status:** Fixed — opt-in `WithExpected{Token}(...)`; throws only when an expected token was supplied (breaking: old token setter removed).
+
 **Files:**
 - `src/AdoGen.Generator/Emitters/SqlServer/DomainOpsEmitterSqlServer.cs` (`BuildPatchSrc`, ~line 391)
 - `src/AdoGen.Generator/Emitters/PostgreSql/DomainOpsEmitterNpgSql.cs` (~line 346)
@@ -177,6 +187,8 @@ Semantics:
 Add integration tests for both providers. The current Patch tests use `User`, which has no token.
 
 ### B5. PostgreSQL `UpsertAsync` emits `ON CONFLICT () DO UPDATE` for identity-key models 🔍
+**Status:** Fixed — PostgreSQL uses `MERGE` when the key contains an identity (PG 15+); AG009 removed.
+
 **File:** `src/AdoGen.Generator/Emitters/PostgreSql/PostgreSqlSqlTextBuilder.cs` `Upsert` (line ~87)
 
 `FilterNonIdentityKeys` removes the identity key, leaving an empty conflict target. Generated output for the sample `AuditEvent` (`Identity(x => x.EventId); Key(x => x.EventId)`):
@@ -198,6 +210,8 @@ Diagnostic **AG009 `NoUpsertMatchKeys` exists for exactly this case but is never
 Add an integration test that exercises `UpsertAsync` on `AuditEvent`. There is none today.
 
 ### B6. Key-only models generate invalid `UPDATE … SET  WHERE` and `DO UPDATE SET ;` ✅
+**Status:** Fixed — no-op `SET k = k` for UPDATE; upsert skips UPDATE / uses `DO NOTHING`.
+
 **Files:**
 - `SqlServerSqlTextBuilder.Update/Upsert`
 - `PostgreSqlSqlTextBuilder.Update/Upsert`
@@ -219,6 +233,8 @@ The bulk emitter already handles this case correctly (`ON CONFLICT … DO NOTHIN
 - `{Dto}Patch` is already skipped when there are 0 patch columns.
 
 ### B7. PostgreSQL `.Char(n)` and `.Varbit(n)` are silently ignored ✅
+**Status:** Fixed — `.Char(n)` / `.Varbit(n)` chain handlers added.
+
 **Files:**
 - `src/AdoGen.Generator/Parsing/PostgreSql/ChainMethodHandlerNpgsql.cs`
 - `ConfigureChainParser` handler list
@@ -238,6 +254,8 @@ The `char` (System.Char) properties map to `CHAR(1)` through the default type ma
 - Add an "unknown chain method" diagnostic so future API/handler drift fails loudly (see FEATURES F4).
 
 ### B8. `ExecuteScalarAsync<T>` throws on NULL / DBNull results and on numeric type mismatches 🔍
+**Status:** Fixed — null/DBNull return `default`; exact-type cast documented.
+
 **Files:**
 - `src/AdoGen.SqlServer/SqlConnectionExtensions.cs` (lines ~476, 502, 529)
 - the equivalent in `src/AdoGen.PostgreSql/NpgsqlConnectionExtensions.cs`
@@ -259,6 +277,8 @@ return v is null or DBNull ? default : (T)v;
 Document that `T` must match the provider type exactly.
 
 ### B9. `SqlCommand.CreateParameter(name, value, type, size)` sends a missing parameter when `value` is null 🔍
+**Status:** Fixed — null sent as `DBNull.Value`.
+
 **File:** `src/AdoGen.SqlServer/SqlCommandExtensions.cs:136`
 
 `p.SqlValue = value;` with `value == null` makes SqlClient omit the parameter, which fails with *"The parameterized query expects the parameter '@x', which was not supplied"*. The Npgsql counterpart already does `value ?? DBNull.Value`.
@@ -270,6 +290,8 @@ Document that `T` must match the provider type exactly.
 ## Medium (generator produces uncompilable or invalid output)
 
 ### B10. The generator force-adds `sealed` to every DTO partial ✅
+**Status:** Fixed — `sealed` no longer emitted; inherited markers ignored; AG014 for abstract.
+
 **Files:** every emitter, e.g. `DtoMapperEmitterSqlServer.cs:72` and `DomainOpsEmitterSqlServer.cs:47`
 
 Every emitted partial is `{accessibility} sealed partial {record|class} {Name}`. Because one sealed part seals the whole type:
@@ -287,11 +309,15 @@ public class Dog : Animal { }
 **Fix:** omit `sealed` from generated partials, since the user's declaration decides. Skip discovery for types whose marker interface is inherited only through a base class. If inheritance is intentionally unsupported, report a clear diagnostic and document it.
 
 ### B11. Nested DTOs generate invalid code ✅
+**Status:** Fixed — AG015 diagnostic.
+
 A DTO declared inside another type (`static partial class Outer { partial record Inner : ISqlMapper }`) is emitted as a namespace-level `partial record Inner`. That code then fails with `CS0311`.
 
 **Fix:** emit the containing-type chain, or report a "nested types not supported" diagnostic.
 
 ### B12. `{Dto}Patch` is always `public` → CS0051/CS0053 for internal DTOs with internal member types ✅
+**Status:** Fixed — patch class/extensions use the DTO accessibility.
+
 **Files:** `DomainOpsEmitterSqlServer.BuildPatchSrc`, `DomainOpsEmitterNpgSql.BuildPatchSrc`
 
 For example, `internal record Paint(Guid Id, Color Color)` with `internal enum Color` gives *"Inconsistent accessibility: property type 'Color?' is less accessible than property 'PaintPatch.Color'"*. The `{Dto}SqlPatchExtensions` class is also always public.
@@ -301,6 +327,8 @@ There is also an inconsistency: the SQL Server patch class is `public partial cl
 **Fix:** use `ctx.Accessibility` for the patch class and the extensions class, and pick one modifier set.
 
 ### B13. Computed / get-only properties are treated as columns ✅
+**Status:** Fixed — only settable / ctor-bound properties are columns; indexers excluded.
+
 **File:** `src/AdoGen.Generator/Pipelines/DiscoveryValidation.cs:164` (`GetOrderedProperties`)
 
 The only filters are `public` and `!static`. A computed property (`public decimal Total => Qty * Price;`) ends up in DDL, INSERT, UPDATE and the mapper. The mapper then fails with `CS1739: … does not have a parameter named 'Total'`.
@@ -315,6 +343,8 @@ The same filter also lets indexers through, and does not walk base-type properti
 - Add an `Ignore()` profile method (FEATURES F3).
 
 ### B14. `.Name("…")` values are not validated, so names with spaces or special characters break the generated C# ✅
+**Status:** Fixed — AG016 diagnostic.
+
 For example, `RuleFor(x => x.Count).Name("Item Count")` produces all of the following:
 - `private static int Item CountOrdinal;` → CS1002
 - SQL `VALUES (@Item Count)`
@@ -327,6 +357,8 @@ The column name is reused as the C# identifier and as the SQL parameter name.
 - Escape `]` as `]]` in SQL Server and `"` as `""` in PostgreSQL inside quoted identifiers. Check `SqlServerIdentifierQuoter` and `PostgreSqlIdentifierQuoter`.
 
 ### B15. Unsupported CLR types silently produce invalid DDL ✅
+**Status:** Fixed — `TimeSpan` → `time`/`interval`; others AG017.
+
 `uint`, `ulong`, `ushort`, `sbyte` and `TimeSpan` (and any unknown type) map to SqlDbType `Variant` and NpgsqlDbType `Unknown`. The generated DDL is then:
 - `[U32] VARIANT NOT NULL` on SQL Server. That is invalid: the type is `SQL_VARIANT`, and it is wrong for an integer anyway.
 - `"U32" unknown NOT NULL` on PostgreSQL, which is also invalid.
@@ -341,6 +373,8 @@ This is inconsistent with enums. `MapDefaultSqlDbType` already maps enums whose 
 - For anything else without an explicit `.Type(...)`, report a new "unsupported property type" error.
 
 ### B16. Duplicate profiles for the same DTO and provider are silently first-wins ✅
+**Status:** Fixed — AG018 diagnostic.
+
 **File:** `src/AdoGen.Generator/Pipelines/Discovery.cs:80–85`
 
 With `DupProfileA : SqlProfile<Dup>` (`VarChar(10)`) and `DupProfileB : SqlProfile<Dup>` (`NVarChar(99)`) both present, the generator picks one by declaration order and reports nothing. The rules say "exactly one profile per DTO per provider".
@@ -348,6 +382,8 @@ With `DupProfileA : SqlProfile<Dup>` (`VarChar(10)`) and `DupProfileB : SqlProfi
 **Fix:** add a "multiple profiles" error diagnostic.
 
 ### B17. Malformed profile syntax crashes the generator or is silently ignored ⚠️
+**Status:** Fixed — `this.` calls parsed; AG019 for non-lambda selectors; non-constant `Table`/`Schema` → AG007.
+
 **Files:**
 - `Parsing/ProfileInfoCollector.cs:108,128,228`
 - `Parsing/ConfigureChainParser.cs:53`
@@ -359,6 +395,8 @@ With `DupProfileA : SqlProfile<Dup>` (`VarChar(10)`) and `DupProfileB : SqlProfi
 **Fix:** pattern-match instead of casting, report AG007 or a new diagnostic for unsupported shapes, and accept the `this.` member-access form.
 
 ### B18. SQL Server multi-row `InsertAsync(List<T>)` / `DeleteAsync(ids)` have no chunking, so large lists fail 🔍
+**Status:** Fixed — SQL Server list insert/delete chunked (not atomic without a transaction).
+
 **Files:**
 - `DomainOpsEmitterSqlServer` (InsertAsync list, DeleteAsync ids)
 - `src/AdoGen.SqlServer/BulkBatchSql.cs` (insert-only fast path, ~line 220)
@@ -381,6 +419,8 @@ With `DupProfileA : SqlProfile<Dup>` (`VarChar(10)`) and `DupProfileB : SqlProfi
 ## Low
 
 ### B19. AG002 message is inverted; messages always say "SqlProfile" 🔍
+**Status:** Fixed — provider-specific, non-inverted messages.
+
 `src/AdoGen.Generator/Diagnostics/SqlDiagnostics.cs:19` reads *"Type '{0}' has SqlProfile, create a class with SqlProfile<{0}>"*. It should say "has **no** profile". It also always says `SqlProfile`, even for PostgreSQL DTOs, and the same applies to the AG003–AG006 texts ("in its SqlProfile"). Include the provider-specific base class name. ✅ Reproduced: `error AG002: Type 'Gadget' has SqlProfile, create a class with SqlProfile<Gadget>`.
 
 **AG003 has a format/argument mismatch and is effectively unreachable.** Its message has four placeholders (`{0}`–`{3}`), but every validator passes two arguments (`dto.Dto.Name, property.Name`). It is chosen only when `cfg is null`. However, `ProfileInfoCollector` (lines 166–168) creates a default `ParamConfig` for every property, so profiled DTOs always get AG004, AG005 or AG006 instead. Either remove AG003, or give it a real trigger and pass all four arguments.
@@ -388,36 +428,52 @@ With `DupProfileA : SqlProfile<Dup>` (`VarChar(10)`) and `DupProfileB : SqlProfi
 The diagnostic is reported at the **profile's** location (`dto.Profile!.Locations`), not at the offending property. Pointing at the property, or at the `RuleFor` call if one exists, would make the IDE squiggle more useful.
 
 ### B20. Missing `ConfigureAwait(false)` in `SqlDataReaderExtensions` 🔍
+**Status:** Fixed.
+
 - `src/AdoGen.SqlServer/SqlDataReaderExtensions.cs` has **zero** `ConfigureAwait(false)` calls; every `ReadAsync` and `NextResultAsync` captures the context.
 - The PostgreSQL reader extensions have them.
 
 Library code should not capture the SynchronizationContext. Doing so risks deadlocks in legacy ASP.NET or UI apps that block on async, and it costs extra posts.
 
 ### B21. Pass-through `async … => await` wrappers ⚠️
+**Status:** Fixed.
+
 `SqlConnectionSingleIdExtensions.DeleteAsync` overloads (and one in the Npgsql single-id extensions) add a state machine per call. That goes against the AGENTS.md lesson "return the inner ValueTask directly".
 
 ### B22. `QueryMultiAsync` is untested, and the documented example skipped a result set 🔍
+**Status:** Fixed — tests added.
+
 `reader.QueryAsync<T>()` and `QueryFirstOrDefaultAsync<T>()` already call `NextResultAsync` internally. The old api-reference example also called `await reader.NextResultAsync(ct)` between the two reads, which skips the second result set. It also did not dispose the reader. The doc is now fixed.
 
 The command is disposed (`await using var command`) before the returned reader is consumed. SqlClient tolerates this; Npgsql behaviour should be verified. No integration test covers `QueryMultiAsync` for either provider.
 
 ### B23. Concurrency exception also thrown when the row does not exist ⚠️
+**Status:** Documented (api-reference "Optimistic concurrency and missing rows").
+
 Generated `UpdateAsync`/`DeleteAsync` for token models throw `AdoGenConcurrencyException` on `affected == 0`. That covers both "stale" and "deleted / never existed", so callers cannot distinguish them. Document it, or check existence on the failure path only.
 
 ### B24. SQL Server `UpsertAsync` is not race-safe ⚠️
+**Status:** Fixed — insert-first with `UPDLOCK, HOLDLOCK`.
+
 `UPDATE … WHERE pk; IF @@ROWCOUNT = 0 INSERT …` without `WITH (UPDLOCK, SERIALIZABLE)` (or `HOLDLOCK`) lets two concurrent upserts of the same key both see 0 rows. Both then INSERT, which raises a PK violation.
 
 **Fix:** `UPDATE t WITH (UPDLOCK, SERIALIZABLE) SET … WHERE …`. That is the standard pattern, and its cost is negligible on the happy path.
 
 ### B25. Bulk `AddRange(empty)` marks the batch as dirty ⚠️
+**Status:** Fixed.
+
 `HasInserts` and the other flags are set to `true` even when the enumerable is empty. In `SaveChangesAsync` the "open connection if closed" check is effectively dead, because a non-null transaction implies an open connection.
 
 ### B26. Provider type names collide when both providers are imported ⚠️
+**Status:** Documented (aliases); rename deferred to next major.
+
 `AdoGenConcurrencyException`, `BulkApplyResult`, `BulkOp` and `PropertyBuilder` exist in both `AdoGen.SqlServer` and `AdoGen.PostgreSql`. A project with `global using` for both namespaces, as `examples/AdoGen.Sample` has, gets CS0104 (ambiguous reference) as soon as user code writes `catch (AdoGenConcurrencyException)`.
 
 The generator side-steps this by emitting `global::`-qualified names. User code needs aliases; the pattern is now documented in api-reference. Consider provider-prefixed names in the next major version.
 
 ### B27. Pipeline model equality comment is false ⚠️
+**Status:** Fixed — comment corrected (caching itself tracked as P10).
+
 `Models/EmitContext.cs` comments claim value equality for incremental caching. However:
 - `DiscoveryDto`, `ProfileInfo` and `EmitContext` hold `ISymbol`, `SemanticModel`, `ImmutableArray<T>`, `ImmutableDictionary<,>` and a mutable `ParamConfig`;
 - none of these have structural equality.
@@ -425,6 +481,8 @@ The generator side-steps this by emitting `global::`-qualified names. User code 
 See PERFORMANCE P10.
 
 ### B28. `AnalyzerReleases.Shipped.md` AG013 title mismatch 🔍
+**Status:** Fixed.
+
 The release file says "Multiple concurrency tokens not allowed", while the descriptor title is "Multiple concurrency tokens". This is cosmetic.
 
 ---
@@ -432,6 +490,8 @@ The release file says "Multiple concurrency tokens not allowed", while the descr
 ## Found during the documentation pass (severity per summary table)
 
 ### B29. `DefaultValue(expr)` emitted without the `DEFAULT` keyword 🔍
+**Status:** Fixed — generator emits `DEFAULT {expr}`, strips a leading `DEFAULT`.
+
 **Files:**
 - `src/AdoGen.Generator/Emitters/SqlServer/SqlServerSqlTextBuilder.cs:23`
 - `src/AdoGen.Generator/Emitters/PostgreSql/PostgreSqlSqlTextBuilder.cs:24`

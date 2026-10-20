@@ -16,9 +16,20 @@ public interface INpgsqlMapper;
 public interface INpgsqlMapper<out T> where T : INpgsqlMapper<T>
 {
     /// <summary>
-    /// Maps the objects by using the source generated mapper.
+    /// Maps the current row, resolving column ordinals by name on every call.
     /// </summary>
     static abstract T Map(NpgsqlDataReader reader);
+
+    /// <summary>
+    /// Resolves the column ordinals of <typeparamref name="T"/> for the reader's current result set.
+    /// Ordinals are only valid for the result set they were resolved from.
+    /// </summary>
+    static abstract int[] GetOrdinals(NpgsqlDataReader reader);
+
+    /// <summary>
+    /// Maps the current row using ordinals resolved by <see cref="GetOrdinals"/> for the same result set.
+    /// </summary>
+    static abstract T Map(NpgsqlDataReader reader, int[] ordinals);
 }
 
 /// <summary>

@@ -13,7 +13,7 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.AuditEvent, long>
+public partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests.AuditEvent, long>
 {
     private const string Pg_SqlDeleteBatchAny = """DELETE FROM "log"."Audits" WHERE "EventId" = ANY(@ids);""";
     private const string Pg_SqlExists = """SELECT 1 FROM "log"."Audits" WHERE "EventId" = @EventId LIMIT 1;""";
@@ -48,7 +48,7 @@ public sealed partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Ge
     }
 }
 
-public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.Tests.AuditEvent>
+public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.Tests.AuditEvent>
 {
     private const string Pg_SqlCreateTable = 
     """
@@ -66,7 +66,7 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
     private const string Pg_SqlUpdate = """UPDATE "log"."Audits" SET "CreatedAt" = @CreatedAt, "Type" = @Type, "JsonPayload" = @JsonPayload WHERE "EventId" = @EventId;""";
     private const string Pg_SqlDelete = """DELETE FROM "log"."Audits" WHERE "EventId" = @EventId;""";
     private const string Pg_SqlTruncate = """TRUNCATE TABLE "log"."Audits";""";
-    private const string Pg_SqlUpsert = """INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload) ON CONFLICT () DO UPDATE SET "CreatedAt" = EXCLUDED."CreatedAt", "Type" = EXCLUDED."Type", "JsonPayload" = EXCLUDED."JsonPayload";""";
+    private const string Pg_SqlUpsert = """MERGE INTO "log"."Audits" AS T USING (SELECT @EventId AS "EventId") AS S ON T."EventId" = S."EventId" WHEN MATCHED THEN UPDATE SET "CreatedAt" = @CreatedAt, "Type" = @Type, "JsonPayload" = @JsonPayload WHEN NOT MATCHED THEN INSERT ("CreatedAt", "Type", "JsonPayload") VALUES (@CreatedAt, @Type, @JsonPayload);""";
 
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
@@ -133,7 +133,7 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return AuditEvent.Map(reader);
         
@@ -174,6 +174,7 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
         cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(model.EventId));
 
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -222,6 +223,7 @@ public sealed partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Gene
         batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
         batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
         batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+        batchCmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(model.EventId));
 
         batch.BatchCommands.Add(batchCmd);
     }
@@ -259,7 +261,7 @@ public sealed partial class AuditEventPatch
 
     public AuditEventPatch(long eventId) { EventId = eventId; }
 }
-public sealed partial record AuditEvent
+public partial record AuditEvent
 {
 #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
 

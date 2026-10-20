@@ -86,7 +86,7 @@ Benchmarks (`AdoGen.Benchmarks`) are authoritative. Performance claims require b
 
 ### Optional column behaviors
 
-- `.ConcurrencyToken()` — `int`/`long` (auto-incremented in UPDATE) or `Guid` (caller sets new value). Adds `AND [Col] = @Col` to UPDATE/DELETE WHERE; throws `global::`-qualified `AdoGenConcurrencyException` on 0 affected rows. **Not** enforced by `UpsertAsync` or `PatchAsync`.
+- `.ConcurrencyToken()` — `int`/`long` (auto-incremented in UPDATE) or `Guid` (caller sets new value). Adds `AND [Col] = @Col` to UPDATE/DELETE WHERE; throws `global::`-qualified `AdoGenConcurrencyException` on 0 affected rows. **Not** enforced by `UpsertAsync`; enforced by `PatchAsync` only when `WithExpected{Token}(...)` is called.
 - `.ReadOnly()` — excluded from INSERT/UPDATE/bulk/patch writes; still in DDL and mapper read path. Pair with `.DefaultValue(sqlExpr)` for server-managed columns.
 
 Validation must produce a diagnostic at generation time. Runtime validation is a last resort.
@@ -105,7 +105,7 @@ The generator emits SQL **only** for these operations, and only when the DTO imp
 
 **Batching:** `Insert` / `Update` / `Upsert` / `Delete` / `InsertAndReturn` extensions on `SqlBatch` / `NpgsqlBatch`.
 
-**Patch:** generator emits a `{Model}Patch` class per domain model; only fluent-set columns are written, no concurrency check, read-only columns excluded.
+**Patch:** generator emits a `{Model}Patch` class per domain model; only fluent-set columns are written, concurrency check is opt-in via `WithExpected{Token}(...)`, read-only columns excluded.
 
 **Not generated:** arbitrary `SELECT`, ad-hoc queries, IQueryable, repository/UoW patterns. Callers write their own SQL and use `QueryAsync` / `QueryFirstOrDefaultAsync` / `QueryScalarAsync` / `QueryScalarFirstOrDefaultAsync` / `ExecuteAsync` with generated parameter factories.
 

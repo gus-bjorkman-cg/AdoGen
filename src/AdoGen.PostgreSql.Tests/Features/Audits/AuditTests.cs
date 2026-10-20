@@ -71,5 +71,37 @@ public sealed class AuditTests(TestContext testContext) : TestBase(testContext)
         // Assert
         result.Should().Be(new BulkApplyResult(10, 10, 10));
     }
-}
 
+    [Fact]
+    public async Task Upsert_ShouldUpdate_WhenIdentityKeyExists()
+    {
+        // Arrange
+        var expected = _toUpdate[0];
+
+        // Act
+        var affected = await Connection.UpsertAsync(expected, CancellationToken);
+
+        // Assert
+        affected.Should().Be(1);
+        var actual = await GetAll();
+        actual.Should().HaveCount(20);
+        actual.Single(x => x.EventId == expected.EventId).Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public async Task Upsert_ShouldInsertWithGeneratedKey_WhenIdentityKeyIsUnknown()
+    {
+        // Arrange
+        var maxId = (await GetAll()).Max(x => x.EventId);
+        var model = _toInsert[0] with { EventId = maxId + 1000 };
+
+        // Act
+        var affected = await Connection.UpsertAsync(model, CancellationToken);
+
+        // Assert
+        affected.Should().Be(1);
+        var actual = await GetAll();
+        actual.Should().HaveCount(21);
+        actual[^1].Should().BeEquivalentTo(model, o => o.Excluding(x => x.EventId));
+    }
+}

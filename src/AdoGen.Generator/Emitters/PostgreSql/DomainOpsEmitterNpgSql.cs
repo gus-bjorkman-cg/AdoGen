@@ -60,7 +60,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             idBasedSrc =
                 $$""""
 
-                   {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
+                   {{ctx.Accessibility}} partial {{typeKeyword}} {{dto.Name}} : INpgsqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
                    {
                        private const string Pg_SqlDeleteBatchAny = """{{deleteBatchSql}}""";
                        private const string Pg_SqlExists = """{{existsSql}}""";
@@ -105,7 +105,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             idBasedSrc =
                 $$""""
 
-                  {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlCompositeKeyModel<{{ctx.DtoTypeName}}>, INpgsqlCompositeKeyExistsModel<{{ctx.DtoTypeName}}>
+                  {{ctx.Accessibility}} partial {{typeKeyword}} {{dto.Name}} : INpgsqlCompositeKeyModel<{{ctx.DtoTypeName}}>, INpgsqlCompositeKeyExistsModel<{{ctx.DtoTypeName}}>
                   {
                       private const string Pg_SqlDeleteBatchUnnest = """{{deleteBatchUnnestSql}}""";
                       private const string Pg_SqlExists = """{{existsSql}}""";
@@ -156,7 +156,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
               namespace {{ctx.Namespace}};
               {{idBasedSrc}}
-              {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlDomainModel<{{ctx.DtoTypeName}}>
+              {{ctx.Accessibility}} partial {{typeKeyword}} {{dto.Name}} : INpgsqlDomainModel<{{ctx.DtoTypeName}}>
               {
                   private const string Pg_SqlCreateTable = 
                   """
@@ -222,7 +222,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                       await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
                       
               {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}
-                      await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+                      await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
                       
                       if (await reader.ReadAsync(ct).ConfigureAwait(false)) return {{dto.Name}}.Map(reader);
                       
@@ -255,7 +255,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlUpsert, CommandType.Text, transaction, commandTimeout);
                       
-              {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}
+              {{ParameterBindingEmitter.BindForUpsert(ctx, "model", 8)}}
                       return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                   }
     
@@ -292,7 +292,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   public static void AddUpsertBatchCommand(NpgsqlBatch batch, {{ctx.DtoTypeName}} model)
                   {
                       var batchCmd = new NpgsqlBatchCommand(Pg_SqlUpsert);
-              {{ParameterBindingEmitter.BindAll(ctx, "model", 8, "batchCmd")}}
+              {{ParameterBindingEmitter.BindForUpsert(ctx, "model", 8, "batchCmd")}}
                       batch.BatchCommands.Add(batchCmd);
                   }
 
@@ -344,19 +344,9 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             whereByKeyPg.Append($"\\\"{ctx.Keys[k].ParameterName}\\\" = @{ctx.Keys[k].ParameterName}");
         }
 
-        var concurrencyWhere = ctx.ConcurrencyToken is { } token
-            ? $"        cmd.CommandText += \" AND \\\"{token.ParameterName}\\\" = @{token.ParameterName}\";\n" +
-              $"        cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}(patch.{token.Name}Value));\n"
-            : "";
-
-        var concurrencyThrow = ctx.ConcurrencyToken is not null
-            ? $$"""
-                      var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                      if (affected == 0) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                        
-                      return affected;
-              """
-            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+        var concurrencySet = PatchConcurrency.BuildSet(ctx, "");
+        var concurrencyWhere = PatchConcurrency.BuildWhere(ctx);
+        var concurrencyThrow = PatchConcurrency.BuildExecute(ctx, "global::AdoGen.PostgreSql.AdoGenConcurrencyException");
 
         // Build class body (only when this provider owns the shared {Dto}Patch class)
         var keyPropsBuilder = new StringBuilder();
@@ -383,11 +373,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             valuePropsBuilder.AppendLine($"    internal {nullableType} {col.Name}Value => {col.Name};");
         }
 
-        var concurrencyField = ctx.ConcurrencyToken is { } ct2
-            ? $"    public {ct2.PropertyType} {ct2.Name} {{ get; set; }}\n" +
-              $"    public {patchClassName} With{ct2.Name}({ct2.PropertyType} value) {{ {ct2.Name} = value; return this; }}\n" +
-              $"    internal {ct2.PropertyType} {ct2.Name}Value => {ct2.Name};\n"
-            : "";
+        var concurrencyField = PatchConcurrency.BuildMembers(ctx, patchClassName);
 
         var patchClassBody = ctx.ShouldGeneratePatchClass
             ? $$""""
@@ -396,7 +382,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                 /// Patch command object for <see cref="{{dto.Name}}"/>.
                 /// Set only the properties you want to update; unset properties are not written to the database.
                 /// </summary>
-                public sealed partial class {{patchClassName}}
+                {{ctx.Accessibility}} sealed partial class {{patchClassName}}
                 {
                     private ulong _mask;
                 {{keyPropsBuilder.ToString().TrimEnd()}}
@@ -413,7 +399,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
         return $$""""
             {{patchClassBody}}
-            {{ctx.Accessibility}} sealed partial {{typeKeyword}} {{dto.Name}}
+            {{ctx.Accessibility}} partial {{typeKeyword}} {{dto.Name}}
             {
             #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
             
@@ -429,9 +415,9 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                     var separator = "";
                     
             {{setClauseItems.ToString().TrimEnd()}}
-            
+            {{concurrencySet}}
                     sb.Append(" WHERE {{whereByKeyPg}}");
-            {{concurrencyWhere.TrimEnd()}}
+            {{concurrencyWhere}}
                     cmd.CommandText = sb.ToString();
             {{keyBindBuilder.ToString().TrimEnd()}}
                     
@@ -442,7 +428,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             }
 
             /// <summary>Extension methods for patching <see cref="{{dto.Name}}"/> via <see cref="NpgsqlConnection"/>.</summary>
-            public static class {{dto.Name}}NpgsqlPatchExtensions
+            {{ctx.Accessibility}} static class {{dto.Name}}NpgsqlPatchExtensions
             {
                 /// <summary>
                 /// Executes a partial UPDATE for <see cref="{{dto.Name}}"/>, touching only the columns

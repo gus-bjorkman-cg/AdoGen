@@ -454,7 +454,8 @@ public static class SqlConnectionExtensions
         }
         
         /// <summary>
-        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
+        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
         /// </summary>
         /// <param name="sql"></param>
         /// <param name="ct"></param>
@@ -473,11 +474,13 @@ public static class SqlConnectionExtensions
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             
-            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return value is null or DBNull ? default : (T)value;
         }
 
         /// <summary>
-        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
+        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
         /// </summary>
         /// <param name="sql"></param>
         /// <param name="parameter"></param>
@@ -499,11 +502,13 @@ public static class SqlConnectionExtensions
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
             
-            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return value is null or DBNull ? default : (T)value;
         }
         
         /// <summary>
-        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
+        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
         /// </summary>
         /// <param name="sql"></param>
         /// <param name="parameters"></param>
@@ -526,7 +531,8 @@ public static class SqlConnectionExtensions
                         
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
             
-            return (T?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return value is null or DBNull ? default : (T)value;
         }
 
         /// <summary>

@@ -10,7 +10,7 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record AuditEvent : INpgsqlBulkModel<global::AdoGen.Generator.Tests.AuditEvent>;
+public partial record AuditEvent : INpgsqlBulkModel<global::AdoGen.Generator.Tests.AuditEvent>;
 
 public sealed class AuditEventNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.Tests.AuditEvent>
 {
@@ -59,6 +59,13 @@ public sealed class AuditEventNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator
         FROM "adoGen_auditevent_tmp" AS S
         WHERE S."operation" = 'M' AND S."EventId" = T."EventId"
         """;
+    private const string _sqlInsertM =
+        """
+        INSERT INTO "log"."Audits" ("CreatedAt", "Type", "JsonPayload")
+            SELECT S."CreatedAt", S."Type", S."JsonPayload"
+            FROM "adoGen_auditevent_tmp" AS S
+            WHERE S."operation" = 'M' AND NOT EXISTS (SELECT 1 FROM "log"."Audits" AS T WHERE S."EventId" = T."EventId")
+        """;
 
     protected override string SqlCreateTempTable => _sqlCreateTempTable;
     protected override string TempTableName => _tempTableName;
@@ -68,7 +75,7 @@ public sealed class AuditEventNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator
     protected override string? SqlInsertI => _sqlInsertI;
     protected override string SqlDeleteD => _sqlDeleteD;
     protected override string? SqlUpdateM => _sqlUpdateM;
-    protected override string? SqlInsertM => null;
+    protected override string? SqlInsertM => _sqlInsertM;
     protected override int FieldCount => 5;
 
     public AuditEventNpgsqlBulk(int capacity = 0) : base(capacity) { }

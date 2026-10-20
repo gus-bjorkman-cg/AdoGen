@@ -24,8 +24,8 @@ internal sealed class BinaryValidatorNpgsql : IParamConfigValidator
         if (cfg is not null && cfg.DbType?.EnumMember == "Bytea") return;
 
         diagnostics.Add(Diagnostic.Create(
-            cfg is null ? SqlDiagnostics.MissingRequiredParameterConfig : SqlDiagnostics.BinaryMissing,
-            dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
+            SqlDiagnostics.BinaryMissing,
+            property.Locations.FirstOrDefault() ?? dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
             dto.Dto.Name,
             property.Name));
     }

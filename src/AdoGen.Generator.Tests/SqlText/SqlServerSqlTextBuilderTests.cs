@@ -109,46 +109,42 @@ public sealed class SqlServerSqlTextBuilderTests
         actual.Should().Be(") AS ids([OrderId], [ProductId]) ON ids.[OrderId]=t.[OrderId] AND ids.[ProductId]=t.[ProductId]");
     }
 
-    // ── Upsert (MERGE) ────────────────────────────────────────────────────────
+    // ── Upsert (insert-if-missing, then update) ───────────────────────────────
 
     [Fact]
-    public void Upsert_ShouldProduceMergeWithOnAndMatchedClauses()
+    public void Upsert_ShouldInsertWhenMissingThenUpdate_WhenSingleKey()
     {
         var actual = SqlServerSqlTextBuilder.Upsert(EmitContextFixtures.SqlServerUser());
 
         actual.Should().Be(
-            "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email " +
-            "WHERE [Id] = @Id; " +
+            "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) SELECT @Id, @Name, @Email " +
+            "WHERE NOT EXISTS (SELECT 1 FROM [dbo].[Users] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = @Id); " +
             "IF @@ROWCOUNT = 0 " +
-            "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) " +
-            "VALUES (@Id, @Name, @Email);");
+            "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id;");
     }
 
     [Fact]
-    public void Upsert_ShouldExcludeIdentityKeyFromOnClause_WhenKeyIsIdentity()
+    public void Upsert_ShouldMatchOnIdentityKeyButNotInsertIt_WhenKeyIsIdentity()
     {
         var actual = SqlServerSqlTextBuilder.Upsert(EmitContextFixtures.SqlServerAuditEvent());
 
         actual.Should().Be(
-            "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload " +
-            "WHERE [EventId] = @EventId; " +
+            "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) SELECT @CreatedAt, @Type, @JsonPayload " +
+            "WHERE NOT EXISTS (SELECT 1 FROM [log].[Audits] WITH (UPDLOCK, HOLDLOCK) WHERE [EventId] = @EventId); " +
             "IF @@ROWCOUNT = 0 " +
-            "INSERT INTO [log].[Audits] ([CreatedAt], [Type], [JsonPayload]) " +
-            "VALUES (@CreatedAt, @Type, @JsonPayload);");
+            "UPDATE [log].[Audits] SET [CreatedAt] = @CreatedAt, [Type] = @Type, [JsonPayload] = @JsonPayload WHERE [EventId] = @EventId;");
     }
 
     [Fact]
-    public void Upsert_ShouldIncludeBothKeysInOnClause_WhenCompositeKey()
+    public void Upsert_ShouldIncludeBothKeysInPredicates_WhenCompositeKey()
     {
         var actual = SqlServerSqlTextBuilder.Upsert(EmitContextFixtures.SqlServerCompositeKey());
         
         actual.Should().Be(
-            "UPDATE [dbo].[OrderLines] SET [Quantity] = @Quantity " +
-            "WHERE [OrderId] = @OrderId AND [ProductId] = @ProductId; " +
+            "INSERT INTO [dbo].[OrderLines] ([OrderId], [ProductId], [Quantity]) SELECT @OrderId, @ProductId, @Quantity " +
+            "WHERE NOT EXISTS (SELECT 1 FROM [dbo].[OrderLines] WITH (UPDLOCK, HOLDLOCK) WHERE [OrderId] = @OrderId AND [ProductId] = @ProductId); " +
             "IF @@ROWCOUNT = 0 " +
-            "INSERT INTO [dbo].[OrderLines] ([OrderId], [ProductId], [Quantity]) " +
-            "VALUES (@OrderId, @ProductId, @Quantity);"
-            );
+            "UPDATE [dbo].[OrderLines] SET [Quantity] = @Quantity WHERE [OrderId] = @OrderId AND [ProductId] = @ProductId;");
     }
 
     // ── CreateTable ───────────────────────────────────────────────────────────

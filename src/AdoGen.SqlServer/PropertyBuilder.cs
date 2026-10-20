@@ -170,10 +170,10 @@ public sealed class PropertyBuilder<TProp>
     public PropertyBuilder<TProp> ConcurrencyToken() => this;
     
     /// <summary>
-    /// Sets default value.
+    /// Sets the column's DDL default, e.g. <c>DefaultValue("SYSUTCDATETIME()")</c> emits <c>DEFAULT SYSUTCDATETIME()</c>.
+    /// A leading <c>DEFAULT</c> keyword is accepted and not duplicated. Must be a compile-time constant.
     /// </summary>
-    /// <param name="sqlExpression"></param>
-    /// <returns></returns>
+    /// <param name="sqlExpression">SQL expression, emitted verbatim after <c>DEFAULT</c>.</param>
     public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
 }
 

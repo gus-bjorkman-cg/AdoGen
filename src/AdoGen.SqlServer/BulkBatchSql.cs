@@ -178,12 +178,15 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
 
     private void AddEntityRange(IEnumerable<T> items, BulkOp operation)
     {
+        var before = Items.Count;
         foreach (var item in items)
         {
             Items.Add(item);
             Operations.Add(operation);
         }
-        
+
+        if (Items.Count == before) return;
+
         if (operation == BulkOp.Insert) HasInserts = true;
         else if (operation == BulkOp.Update) HasUpdates = true;
         else if (operation == BulkOp.Delete) HasDeletes = true;
@@ -218,9 +221,10 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
 
         if (HasInserts && !HasUpdates && !HasDeletes && !HasUpserts)
         {
+            // Small insert-only batches fit in a single multi-row INSERT (≤ 1000 rows, < 2000 parameters).
             var parameterCount = Items.Count * FieldCount;
             
-            if (parameterCount < 2100)
+            if (Items.Count <= 1000 && parameterCount < 2000)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, timeout).ConfigureAwait(false);
                 return new BulkApplyResult(inserted, 0, 0);

@@ -20,7 +20,7 @@ internal static class SqlServerSqlTextBuilder
             var col = ctx.Columns[i];
             var nullability = col.IsNullable ? "NULL" : "NOT NULL";
             var identity = col.IsIdentity ? " IDENTITY(1,1)" : "";
-            var defaultClause = col.DefaultSqlExpression is not null ? $" {col.DefaultSqlExpression}" : "";
+            var defaultClause = SqlTextHelpers.DefaultClause(col.DefaultSqlExpression);
             var comma = i == ctx.Columns.Length - 1 ? "" : ",";
             sbColDefs.AppendLine($"            {col.ColumnNameQuoted} {col.SqlType}{identity}{defaultClause} {nullability}{comma}");
         }
@@ -70,8 +70,14 @@ internal static class SqlServerSqlTextBuilder
             var tokenBump = IsIntOrLong(token.PropertyType)
                 ? $"{token.ColumnNameQuoted} = @{token.ParameterName} + 1"
                 : $"{token.ColumnNameQuoted} = NEWID()";
-            return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet}, {tokenBump} WHERE {ctx.WhereByKey} AND {token.ColumnNameQuoted} = @{token.ParameterName};";
+            var setList = updateSet.Length > 0 ? $"{updateSet}, {tokenBump}" : tokenBump;
+            return $"UPDATE {ctx.SchemaTableQuoted} SET {setList} WHERE {ctx.WhereByKey} AND {token.ColumnNameQuoted} = @{token.ParameterName};";
         }
+
+        // Key-only models have nothing to write; a self-assignment keeps the statement valid and
+        // still reports the number of matching rows.
+        if (updateSet.Length == 0) updateSet = SqlTextHelpers.NoOpSet(ctx);
+
         return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
     }
 
@@ -83,14 +89,23 @@ internal static class SqlServerSqlTextBuilder
         return $"DELETE FROM {ctx.SchemaTableQuoted} WHERE {ctx.WhereByKey}{tokenClause};";
     }
 
+    /// <summary>
+    /// Insert-if-missing followed by update-if-not-inserted. The existence check takes
+    /// UPDLOCK/HOLDLOCK key-range locks inside the INSERT statement, so concurrent upserts of the same
+    /// new key serialize instead of racing into a PK violation (the loser then updates the winner's row).
+    /// </summary>
     public static string Upsert(EmitContext ctx)
     {
         var updateSet = BuildJoined(ctx.WritableNonKeyNonIdentities, col => $"{col.ColumnNameQuoted} = @{col.ParameterName}");
         var insertCols = BuildJoined(ctx.Writables, col => col.ColumnNameQuoted);
         var insertParams = BuildJoined(ctx.Writables, col => "@" + col.ParameterName);
 
-        return $"UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey}; " +
-               $"IF @@ROWCOUNT = 0 INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) VALUES ({insertParams});";
+        var insert = $"INSERT INTO {ctx.SchemaTableQuoted} ({insertCols}) SELECT {insertParams} " +
+                     $"WHERE NOT EXISTS (SELECT 1 FROM {ctx.SchemaTableQuoted} WITH (UPDLOCK, HOLDLOCK) WHERE {ctx.WhereByKey});";
+
+        if (updateSet.Length == 0) return insert;
+
+        return $"{insert} IF @@ROWCOUNT = 0 UPDATE {ctx.SchemaTableQuoted} SET {updateSet} WHERE {ctx.WhereByKey};";
     }
 
     public static string Truncate(EmitContext ctx)

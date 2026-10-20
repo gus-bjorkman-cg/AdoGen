@@ -5,7 +5,9 @@ namespace AdoGen.Generator.Models;
 
 /// <summary>
 /// Per-DTO precomputed context produced once after validation and shared across all emitters.
-/// Must be a record to satisfy Roslyn incremental pipeline value-equality requirements.
+/// Note: although this is a record, it is NOT value-equal in practice — it (transitively) holds
+/// <c>ImmutableArray</c>/<c>ImmutableDictionary</c> and mutable <c>ParamConfig</c> instances, none of which
+/// have structural equality — so the incremental pipeline does not cache it across edits (see PERFORMANCE P10).
 /// </summary>
 internal sealed record EmitContext(
     SqlProviderKind Provider,

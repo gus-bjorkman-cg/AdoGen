@@ -21,7 +21,6 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);
 
-        var ordinals = new StringBuilder();
         var init = new StringBuilder();
         var read = new StringBuilder();
         var constBuilder = new StringBuilder();
@@ -35,12 +34,11 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         {
             var p = profileInfo.DtoProperties[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
-            var ordinalField = $"{cfg.ParameterName}Ordinal";
+            var ordinalField = $"ordinals[{i}]";
             var isLast = i == profileInfo.DtoProperties.Length - 1;
             var getterExpr = EmitReaderGet(p, ordinalField);
 
-            ordinals.AppendLine($"    private static int {ordinalField};");
-            init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{cfg.ParameterName}\");");
+            init.AppendLine($"        ordinals[{i}] = reader.GetOrdinal(\"{cfg.ParameterName}\");");
             read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr}{(isLast ? "" : ",")}");
             constBuilder.AppendLine(CreateSqlParameterConst(cfg));
             
@@ -54,7 +52,8 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var ns = profileInfo.Namespace;
-        var isInitField = "IsInitialized";
+        var ordinalCount = profileInfo.DtoProperties.Length;
+        var initText = init.ToString().TrimEnd();
 
         var src = 
             $$"""
@@ -65,22 +64,33 @@ internal sealed class DtoMapperEmitterSqlServer : IEmitter
             using System;
             using System.Data;
             using System.Runtime.CompilerServices;
-            using System.Threading;
-
+            
             namespace {{ns}};
 
-            {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : ISqlMapper<{{dtoTypeName}}>
+            {{accessibility}} partial {{typeKeyword}} {{dto.Name}} : ISqlMapper<{{dtoTypeName}}>
             {
-                private static bool {{isInitField}};
-            {{ordinals}}
-                public static {{dtoTypeName}} Map(SqlDataReader reader)
+                /// <summary>
+                /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+                /// Resolve once per result set and pass the result to <see cref="Map(SqlDataReader, int[])"/>.
+                /// </summary>
+                public static int[] GetOrdinals(SqlDataReader reader)
                 {
-                    if (!Volatile.Read(ref {{isInitField}}))
-                    {
-            {{init}}
-                        Volatile.Write(ref {{isInitField}}, true);
-                    }
+                    var ordinals = new int[{{ordinalCount}}];
+            {{initText}}
+                    return ordinals;
+                }
 
+                /// <summary>
+                /// Maps the current row, resolving column ordinals by name on every call.
+                /// Prefer <see cref="GetOrdinals(SqlDataReader)"/> + <see cref="Map(SqlDataReader, int[])"/> when reading many rows.
+                /// </summary>
+                public static {{dtoTypeName}} Map(SqlDataReader reader) => Map(reader, GetOrdinals(reader));
+
+                /// <summary>
+                /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(SqlDataReader)"/>.
+                /// </summary>
+                public static {{dtoTypeName}} Map(SqlDataReader reader, int[] ordinals)
+                {
                     return new {{dtoTypeName}}{{read}};
                 }
             }

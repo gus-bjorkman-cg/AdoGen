@@ -26,8 +26,8 @@ internal sealed class StringValidatorNpgsql : IParamConfigValidator
             return;
 
         diagnostics.Add(Diagnostic.Create(
-            cfg is null ? SqlDiagnostics.MissingRequiredParameterConfig : SqlDiagnostics.StringMissing,
-            dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
+            SqlDiagnostics.StringMissing,
+            property.Locations.FirstOrDefault() ?? dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
             dto.Dto.Name,
             property.Name));
     }

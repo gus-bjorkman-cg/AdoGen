@@ -28,8 +28,9 @@ public static class NpgsqlDataReaderExtensions
                 return [];
             }
 
+            var ordinals = T.GetOrdinals(reader);
             var items = new List<T>();
-            do items.Add(reader.Map<T>()); while (await reader.ReadAsync(ct).ConfigureAwait(false));
+            do items.Add(T.Map(reader, ordinals)); while (await reader.ReadAsync(ct).ConfigureAwait(false));
 
             await reader.NextResultAsync(ct).ConfigureAwait(false);
             return items;

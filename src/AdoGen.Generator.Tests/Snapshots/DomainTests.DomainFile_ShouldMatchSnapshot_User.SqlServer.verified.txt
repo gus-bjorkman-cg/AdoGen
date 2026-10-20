@@ -12,7 +12,7 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.Tests.User, Guid>
+public partial record User : ISqlSingleIdModel<global::AdoGen.Generator.Tests.User, Guid>
 {
     private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[Users] AS t JOIN (VALUES ";
     private const string SqlDeleteBatchSuffix = ") AS ids([Id]) ON ids.[Id]=t.[Id]";
@@ -23,25 +23,37 @@ public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.T
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
-        await using var cmd = new SqlCommand("", connection, transaction);
+        // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+        const int RowsPerCommand = 1000;
+        var affected = 0;
         
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-        
-        cmd.EnableOptimizedParameterBinding = ids.Count > 24;
-        
-        var sb = new StringBuilder(SqlDeleteBatchPrefix);
-        
-        for (var i = 0; i < ids.Count; i++)
+        for (var start = 0; start < ids.Count; start += RowsPerCommand)
         {
-            if (i > 0) sb.Append(',');
-            sb.Append($"(@p{i})");
-            cmd.Parameters.Add(UserSql.CreateParameterId(ids[i], $"@p{i}"));
+            var end = Math.Min(start + RowsPerCommand, ids.Count);
+            
+            await using var cmd = new SqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+            
+            cmd.EnableOptimizedParameterBinding = end - start > 24;
+            
+            var sb = new StringBuilder(SqlDeleteBatchPrefix);
+            
+            for (var i = start; i < end; i++)
+            {
+                if (i > start) sb.Append(',');
+                var p = i - start;
+                sb.Append($"(@p{p})");
+                cmd.Parameters.Add(UserSql.CreateParameterId(ids[i], $"@p{p}"));
+            }
+            
+            sb.Append(SqlDeleteBatchSuffix);
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
         
-        sb.Append(SqlDeleteBatchSuffix);
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<bool> ExistsAsync(SqlConnection connection, Guid id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -57,7 +69,7 @@ public sealed partial record User : ISqlSingleIdModel<global::AdoGen.Generator.T
     }
 }
 
-public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tests.User>
+public partial record User : ISqlDomainModel<global::AdoGen.Generator.Tests.User>
 {
     private const string SqlCreateTable = 
         """
@@ -72,7 +84,7 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
     private const string SqlInsertAndReturn = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) OUTPUT INSERTED.* VALUES (@Id, @Name, @Email);";
     private const string SqlUpdate = "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id;";
     private const string SqlDelete = "DELETE FROM [dbo].[Users] WHERE [Id] = @Id;";
-    private const string SqlUpsert = "UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES (@Id, @Name, @Email);";
+    private const string SqlUpsert = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) SELECT @Id, @Name, @Email WHERE NOT EXISTS (SELECT 1 FROM [dbo].[Users] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = @Id); IF @@ROWCOUNT = 0 UPDATE [dbo].[Users] SET [Name] = @Name, [Email] = @Email WHERE [Id] = @Id;";
     private const string SqlTruncate = "TRUNCATE TABLE [dbo].[Users];";
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -102,34 +114,46 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-        await using var cmd = new SqlCommand("", connection, transaction);
-        
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-        
-        cmd.EnableOptimizedParameterBinding = (models.Count * 3) > 24;
+        // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+        // Larger lists are split into several commands; use a transaction for atomicity.
+        const int RowsPerCommand = 666;
+        var affected = 0;
 
-        var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * 17);
-        sb.Append(SqlInsertBatchTemplate);
-
-        var paramIndex = 0;
-
-        for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+        for (var start = 0; start < models.Count; start += RowsPerCommand)
         {
-            if (modelIndex > 0) sb.Append(',');
-            sb.Append($"(@p{paramIndex}");
-            cmd.Parameters.Add(UserSql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex}");
-            cmd.Parameters.Add(UserSql.CreateParameterName(models[modelIndex].Name, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex})");
-            cmd.Parameters.Add(UserSql.CreateParameterEmail(models[modelIndex].Email, $"@p{paramIndex}"));
-            paramIndex++;
+            var end = Math.Min(start + RowsPerCommand, models.Count);
+
+            await using var cmd = new SqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+            
+            cmd.EnableOptimizedParameterBinding = ((end - start) * 3) > 24;
+
+            var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * 17);
+            sb.Append(SqlInsertBatchTemplate);
+
+            var paramIndex = 0;
+
+            for (var modelIndex = start; modelIndex < end; modelIndex++)
+            {
+                if (modelIndex > start) sb.Append(',');
+                sb.Append($"(@p{paramIndex}");
+                cmd.Parameters.Add(UserSql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
+                paramIndex++;
+                sb.Append($",@p{paramIndex}");
+                cmd.Parameters.Add(UserSql.CreateParameterName(models[modelIndex].Name, $"@p{paramIndex}"));
+                paramIndex++;
+                sb.Append($",@p{paramIndex})");
+                cmd.Parameters.Add(UserSql.CreateParameterEmail(models[modelIndex].Email, $"@p{paramIndex}"));
+                paramIndex++;
+            }
+
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.User model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -155,7 +179,7 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
         cmd.Parameters.Add(UserSql.CreateParameterName(model.Name));
         cmd.Parameters.Add(UserSql.CreateParameterEmail(model.Email));
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return User.Map(reader);
         
@@ -248,7 +272,7 @@ public sealed partial record User : ISqlDomainModel<global::AdoGen.Generator.Tes
 /// Patch command object for <see cref="User"/>.
 /// Set only the properties you want to update; unset properties are not written to the database.
 /// </summary>
-public partial class UserPatch
+public sealed partial class UserPatch
 {
     private ulong _mask;
     public Guid Id { get; }
@@ -263,7 +287,7 @@ public partial class UserPatch
 
     public UserPatch(Guid id) { Id = id; }
 }
-public sealed partial record User
+public partial record User
 {
 #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
 

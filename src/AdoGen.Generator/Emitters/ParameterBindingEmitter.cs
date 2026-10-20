@@ -82,11 +82,11 @@ internal static class ParameterBindingEmitter
     }
 
     /// <summary>
-    /// Produces cmd.Parameters.Add calls for SQL Server upsert:
+    /// Produces cmd.Parameters.Add calls for upsert:
     /// non-identity columns first, then any identity key columns.
     /// The returned string ends with a newline.
     /// </summary>
-    public static string BindForUpsertSqlServer(EmitContext ctx, string modelVar, int indent, string cmdVar = "cmd")
+    public static string BindForUpsert(EmitContext ctx, string modelVar, int indent, string cmdVar = "cmd")
     {
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();

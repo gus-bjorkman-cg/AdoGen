@@ -24,8 +24,8 @@ internal sealed class StringValidatorSqlServer : IParamConfigValidator
         if (cfg is { DbType: not null, Size: not null }) return;
 
         diagnostics.Add(Diagnostic.Create(
-            cfg is null ? SqlDiagnostics.MissingRequiredParameterConfig : SqlDiagnostics.StringMissing,
-            dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
+            SqlDiagnostics.StringMissing,
+            property.Locations.FirstOrDefault() ?? dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
             dto.Dto.Name,
             property.Name));
     }

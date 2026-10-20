@@ -5,107 +5,89 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record TestType : ISqlMapper<global::AdoGen.Generator.Tests.TestType>
+public partial record TestType : ISqlMapper<global::AdoGen.Generator.Tests.TestType>
 {
-    private static bool IsInitialized;
-    private static int IntOrdinal;
-    private static int NullableIntOrdinal;
-    private static int DecimalOrdinal;
-    private static int NullableDecimalOrdinal;
-    private static int NullableGuidOrdinal;
-    private static int NullableStringVarcharOrdinal;
-    private static int NullableStringNVarcharOrdinal;
-    private static int StringVarcharRuledNullOrdinal;
-    private static int CharStringOrdinal;
-    private static int NCharStringOrdinal;
-    private static int FloatOrdinal;
-    private static int NullableFloatOrdinal;
-    private static int DateTimeOrdinal;
-    private static int NullableDateTimeOrdinal;
-    private static int DoubleOrdinal;
-    private static int NullableDoubleOrdinal;
-    private static int CharOrdinal;
-    private static int NCharOrdinal;
-    private static int NullableCharOrdinal;
-    private static int NullableBytesOrdinal;
-    private static int BytesOrdinal;
-    private static int FruitsOrdinal;
-    private static int FlagsOrdinal;
-    private static int ByteEnumOrdinal;
-    private static int ShortEnumOrdinal;
-    private static int IntEnumOrdinal;
-    private static int LongEnumOrdinal;
-    private static int CreatedAtOrdinal;
-
-    public static global::AdoGen.Generator.Tests.TestType Map(SqlDataReader reader)
+    /// <summary>
+    /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+    /// Resolve once per result set and pass the result to <see cref="Map(SqlDataReader, int[])"/>.
+    /// </summary>
+    public static int[] GetOrdinals(SqlDataReader reader)
     {
-        if (!Volatile.Read(ref IsInitialized))
-        {
-            IntOrdinal = reader.GetOrdinal("Int");
-            NullableIntOrdinal = reader.GetOrdinal("NullableInt");
-            DecimalOrdinal = reader.GetOrdinal("Decimal");
-            NullableDecimalOrdinal = reader.GetOrdinal("NullableDecimal");
-            NullableGuidOrdinal = reader.GetOrdinal("NullableGuid");
-            NullableStringVarcharOrdinal = reader.GetOrdinal("NullableStringVarchar");
-            NullableStringNVarcharOrdinal = reader.GetOrdinal("NullableStringNVarchar");
-            StringVarcharRuledNullOrdinal = reader.GetOrdinal("StringVarcharRuledNull");
-            CharStringOrdinal = reader.GetOrdinal("CharString");
-            NCharStringOrdinal = reader.GetOrdinal("NCharString");
-            FloatOrdinal = reader.GetOrdinal("Float");
-            NullableFloatOrdinal = reader.GetOrdinal("NullableFloat");
-            DateTimeOrdinal = reader.GetOrdinal("DateTime");
-            NullableDateTimeOrdinal = reader.GetOrdinal("NullableDateTime");
-            DoubleOrdinal = reader.GetOrdinal("Double");
-            NullableDoubleOrdinal = reader.GetOrdinal("NullableDouble");
-            CharOrdinal = reader.GetOrdinal("Char");
-            NCharOrdinal = reader.GetOrdinal("NChar");
-            NullableCharOrdinal = reader.GetOrdinal("NullableChar");
-            NullableBytesOrdinal = reader.GetOrdinal("NullableBytes");
-            BytesOrdinal = reader.GetOrdinal("Bytes");
-            FruitsOrdinal = reader.GetOrdinal("Fruits");
-            FlagsOrdinal = reader.GetOrdinal("Flags");
-            ByteEnumOrdinal = reader.GetOrdinal("ByteEnum");
-            ShortEnumOrdinal = reader.GetOrdinal("ShortEnum");
-            IntEnumOrdinal = reader.GetOrdinal("IntEnum");
-            LongEnumOrdinal = reader.GetOrdinal("LongEnum");
-            CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
+        var ordinals = new int[28];
+        ordinals[0] = reader.GetOrdinal("Int");
+        ordinals[1] = reader.GetOrdinal("NullableInt");
+        ordinals[2] = reader.GetOrdinal("Decimal");
+        ordinals[3] = reader.GetOrdinal("NullableDecimal");
+        ordinals[4] = reader.GetOrdinal("NullableGuid");
+        ordinals[5] = reader.GetOrdinal("NullableStringVarchar");
+        ordinals[6] = reader.GetOrdinal("NullableStringNVarchar");
+        ordinals[7] = reader.GetOrdinal("StringVarcharRuledNull");
+        ordinals[8] = reader.GetOrdinal("CharString");
+        ordinals[9] = reader.GetOrdinal("NCharString");
+        ordinals[10] = reader.GetOrdinal("Float");
+        ordinals[11] = reader.GetOrdinal("NullableFloat");
+        ordinals[12] = reader.GetOrdinal("DateTime");
+        ordinals[13] = reader.GetOrdinal("NullableDateTime");
+        ordinals[14] = reader.GetOrdinal("Double");
+        ordinals[15] = reader.GetOrdinal("NullableDouble");
+        ordinals[16] = reader.GetOrdinal("Char");
+        ordinals[17] = reader.GetOrdinal("NChar");
+        ordinals[18] = reader.GetOrdinal("NullableChar");
+        ordinals[19] = reader.GetOrdinal("NullableBytes");
+        ordinals[20] = reader.GetOrdinal("Bytes");
+        ordinals[21] = reader.GetOrdinal("Fruits");
+        ordinals[22] = reader.GetOrdinal("Flags");
+        ordinals[23] = reader.GetOrdinal("ByteEnum");
+        ordinals[24] = reader.GetOrdinal("ShortEnum");
+        ordinals[25] = reader.GetOrdinal("IntEnum");
+        ordinals[26] = reader.GetOrdinal("LongEnum");
+        ordinals[27] = reader.GetOrdinal("CreatedAt");
+        return ordinals;
+    }
 
-            Volatile.Write(ref IsInitialized, true);
-        }
+    /// <summary>
+    /// Maps the current row, resolving column ordinals by name on every call.
+    /// Prefer <see cref="GetOrdinals(SqlDataReader)"/> + <see cref="Map(SqlDataReader, int[])"/> when reading many rows.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.TestType Map(SqlDataReader reader) => Map(reader, GetOrdinals(reader));
 
+    /// <summary>
+    /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(SqlDataReader)"/>.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.TestType Map(SqlDataReader reader, int[] ordinals)
+    {
         return new global::AdoGen.Generator.Tests.TestType(
-            Int : reader.GetInt32(IntOrdinal),
-            NullableInt : reader.IsDBNull(NullableIntOrdinal) ? (int?)null : reader.GetInt32(NullableIntOrdinal),
-            Decimal : reader.GetDecimal(DecimalOrdinal),
-            NullableDecimal : reader.IsDBNull(NullableDecimalOrdinal) ? (decimal?)null : reader.GetDecimal(NullableDecimalOrdinal),
-            NullableGuid : reader.IsDBNull(NullableGuidOrdinal) ? (Guid?)null : reader.GetFieldValue<Guid>(NullableGuidOrdinal),
-            NullableStringVarchar : reader.IsDBNull(NullableStringVarcharOrdinal) ? null : reader.GetString(NullableStringVarcharOrdinal),
-            NullableStringNVarchar : reader.IsDBNull(NullableStringNVarcharOrdinal) ? null : reader.GetString(NullableStringNVarcharOrdinal),
-            StringVarcharRuledNull : reader.GetString(StringVarcharRuledNullOrdinal),
-            CharString : reader.GetString(CharStringOrdinal),
-            NCharString : reader.GetString(NCharStringOrdinal),
-            Float : reader.GetFloat(FloatOrdinal),
-            NullableFloat : reader.IsDBNull(NullableFloatOrdinal) ? (float?)null : reader.GetFloat(NullableFloatOrdinal),
-            DateTime : reader.GetFieldValue<DateTime>(DateTimeOrdinal),
-            NullableDateTime : reader.GetFieldValue<DateTime>(NullableDateTimeOrdinal),
-            Double : reader.GetDouble(DoubleOrdinal),
-            NullableDouble : reader.IsDBNull(NullableDoubleOrdinal) ? (double?)null : reader.GetDouble(NullableDoubleOrdinal),
-            Char : reader.GetString(CharOrdinal)[0],
-            NChar : reader.GetString(NCharOrdinal)[0],
-            NullableChar : reader.IsDBNull(NullableCharOrdinal) ? (char?)null : reader.GetString(NullableCharOrdinal)[0],
-            NullableBytes : reader.IsDBNull(NullableBytesOrdinal) ? null : reader.GetFieldValue<byte[]>(NullableBytesOrdinal),
-            Bytes : reader.GetFieldValue<byte[]>(BytesOrdinal),
-            Fruits : (global::AdoGen.Generator.Tests.Fruits)reader.GetInt32(FruitsOrdinal),
-            Flags : (global::AdoGen.Generator.Tests.Flags)reader.GetInt32(FlagsOrdinal),
-            ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetByte(ByteEnumOrdinal),
-            ShortEnum : (global::AdoGen.Generator.Tests.ShortEnum)reader.GetInt16(ShortEnumOrdinal),
-            IntEnum : (global::AdoGen.Generator.Tests.IntEnum)reader.GetInt32(IntEnumOrdinal),
-            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(LongEnumOrdinal),
-            CreatedAt : reader.GetFieldValue<DateTimeOffset>(CreatedAtOrdinal)
+            Int : reader.GetInt32(ordinals[0]),
+            NullableInt : reader.IsDBNull(ordinals[1]) ? (int?)null : reader.GetInt32(ordinals[1]),
+            Decimal : reader.GetDecimal(ordinals[2]),
+            NullableDecimal : reader.IsDBNull(ordinals[3]) ? (decimal?)null : reader.GetDecimal(ordinals[3]),
+            NullableGuid : reader.IsDBNull(ordinals[4]) ? (Guid?)null : reader.GetFieldValue<Guid>(ordinals[4]),
+            NullableStringVarchar : reader.IsDBNull(ordinals[5]) ? null : reader.GetString(ordinals[5]),
+            NullableStringNVarchar : reader.IsDBNull(ordinals[6]) ? null : reader.GetString(ordinals[6]),
+            StringVarcharRuledNull : reader.GetString(ordinals[7]),
+            CharString : reader.GetString(ordinals[8]),
+            NCharString : reader.GetString(ordinals[9]),
+            Float : reader.GetFloat(ordinals[10]),
+            NullableFloat : reader.IsDBNull(ordinals[11]) ? (float?)null : reader.GetFloat(ordinals[11]),
+            DateTime : reader.GetFieldValue<DateTime>(ordinals[12]),
+            NullableDateTime : reader.GetFieldValue<DateTime>(ordinals[13]),
+            Double : reader.GetDouble(ordinals[14]),
+            NullableDouble : reader.IsDBNull(ordinals[15]) ? (double?)null : reader.GetDouble(ordinals[15]),
+            Char : reader.GetString(ordinals[16])[0],
+            NChar : reader.GetString(ordinals[17])[0],
+            NullableChar : reader.IsDBNull(ordinals[18]) ? (char?)null : reader.GetString(ordinals[18])[0],
+            NullableBytes : reader.IsDBNull(ordinals[19]) ? null : reader.GetFieldValue<byte[]>(ordinals[19]),
+            Bytes : reader.GetFieldValue<byte[]>(ordinals[20]),
+            Fruits : (global::AdoGen.Generator.Tests.Fruits)reader.GetInt32(ordinals[21]),
+            Flags : (global::AdoGen.Generator.Tests.Flags)reader.GetInt32(ordinals[22]),
+            ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetByte(ordinals[23]),
+            ShortEnum : (global::AdoGen.Generator.Tests.ShortEnum)reader.GetInt16(ordinals[24]),
+            IntEnum : (global::AdoGen.Generator.Tests.IntEnum)reader.GetInt32(ordinals[25]),
+            LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(ordinals[26]),
+            CreatedAt : reader.GetFieldValue<DateTimeOffset>(ordinals[27])
         );
     }
 }

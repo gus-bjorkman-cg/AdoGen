@@ -1,3 +1,4 @@
+﻿using AdoGen.Sample.Features.UserRoles;
 using AdoGen.Sample.Features.Audit;
 using AdoGen.Sample.Features.Orders;
 using AdoGen.Sample.Features.TestTypes;
@@ -39,6 +40,7 @@ public sealed class TestContext : IAsyncLifetime
         await connection.CreateTableAsync<Order2>(CancellationToken);
         await connection.CreateTableAsync<TestType>(CancellationToken);
         await connection.CreateTableAsync<AuditEvent>(CancellationToken);
+        await connection.CreateTableAsync<UserRole>(CancellationToken);
     }
 
     public async ValueTask DisposeAsync() => await _pgContainer.DisposeAsync();

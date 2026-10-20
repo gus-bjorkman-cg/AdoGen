@@ -4,32 +4,39 @@ using AdoGen.PostgreSql;
 using Npgsql;
 using NpgsqlTypes;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record VersionedOrderGuid : INpgsqlMapper<global::AdoGen.Generator.Tests.VersionedOrderGuid>
+public partial record VersionedOrderGuid : INpgsqlMapper<global::AdoGen.Generator.Tests.VersionedOrderGuid>
 {
-    private static bool Pg_IsInitialized;
-    private static int Pg_IdOrdinal;
-    private static int Pg_ProductNameOrdinal;
-    private static int Pg_RowVersionOrdinal;
-
-    public static global::AdoGen.Generator.Tests.VersionedOrderGuid Map(NpgsqlDataReader reader)
+    /// <summary>
+    /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+    /// Resolve once per result set and pass the result to <see cref="Map(NpgsqlDataReader, int[])"/>.
+    /// </summary>
+    public static int[] GetOrdinals(NpgsqlDataReader reader)
     {
-        if (!Volatile.Read(ref Pg_IsInitialized))
-        {
-            Pg_IdOrdinal = reader.GetOrdinal("Id");
-            Pg_ProductNameOrdinal = reader.GetOrdinal("ProductName");
-            Pg_RowVersionOrdinal = reader.GetOrdinal("RowVersion");
+        var ordinals = new int[3];
+        ordinals[0] = reader.GetOrdinal("Id");
+        ordinals[1] = reader.GetOrdinal("ProductName");
+        ordinals[2] = reader.GetOrdinal("RowVersion");
+        return ordinals;
+    }
 
-            Volatile.Write(ref Pg_IsInitialized, true);
-        }
+    /// <summary>
+    /// Maps the current row, resolving column ordinals by name on every call.
+    /// Prefer <see cref="GetOrdinals(NpgsqlDataReader)"/> + <see cref="Map(NpgsqlDataReader, int[])"/> when reading many rows.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.VersionedOrderGuid Map(NpgsqlDataReader reader) => Map(reader, GetOrdinals(reader));
 
+    /// <summary>
+    /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(NpgsqlDataReader)"/>.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.VersionedOrderGuid Map(NpgsqlDataReader reader, int[] ordinals)
+    {
         return new global::AdoGen.Generator.Tests.VersionedOrderGuid(
-            Id : reader.GetFieldValue<Guid>(Pg_IdOrdinal),
-            ProductName : reader.GetString(Pg_ProductNameOrdinal),
-            RowVersion : reader.GetFieldValue<Guid>(Pg_RowVersionOrdinal)
+            Id : reader.GetFieldValue<Guid>(ordinals[0]),
+            ProductName : reader.GetString(ordinals[1]),
+            RowVersion : reader.GetFieldValue<Guid>(ordinals[2])
         );
     }
 }

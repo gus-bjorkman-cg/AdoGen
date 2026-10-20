@@ -85,6 +85,16 @@ internal sealed class NameChainHandler : IChainMethodHandler
     private NameChainHandler() { }
     public static NameChainHandler Instance { get; } = new();
 
+    private static bool IsValidIdentifier(string name)
+    {
+        if (name.Length == 0 || char.IsDigit(name[0])) return false;
+        foreach (var c in name)
+        {
+            if (!(c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) return false;
+        }
+        return true;
+    }
+
     public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
 
     public void Handle(
@@ -97,7 +107,13 @@ internal sealed class NameChainHandler : IChainMethodHandler
         CancellationToken ct)
     {
         if (chain.Args.Count == 1 && model.TryGetConstString(chain.Args[0].Expression, ct, out var pname) && !string.IsNullOrWhiteSpace(pname))
-            cfg.ParameterName = pname!;
+        {
+            // The column name doubles as the SQL parameter name and part of generated C# identifiers.
+            if (IsValidIdentifier(pname!))
+                cfg.ParameterName = pname!;
+            else
+                diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.InvalidColumnName, chain.Node.GetLocation(), dtoType.Name, propertyName, pname));
+        }
         else
             diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
     }

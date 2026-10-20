@@ -24,8 +24,8 @@ internal sealed class DecimalValidatorNpgsql : IParamConfigValidator
         if (cfg is not null && cfg.DbType?.EnumMember == "Numeric" && cfg.Precision is not null && cfg.Scale is not null) return;
 
         diagnostics.Add(Diagnostic.Create(
-            cfg is null ? SqlDiagnostics.MissingRequiredParameterConfig : SqlDiagnostics.DecimalMissing,
-            dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
+            SqlDiagnostics.DecimalMissing,
+            property.Locations.FirstOrDefault() ?? dto.Profile!.Locations.FirstOrDefault() ?? Location.None,
             dto.Dto.Name,
             property.Name));
     }

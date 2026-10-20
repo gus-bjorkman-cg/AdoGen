@@ -23,13 +23,11 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
 
         var setUsingConstructor = dto.Constructors.Any(x => x.Parameters.Length > 0);
 
-        var ordinals = new StringBuilder();
         var init = new StringBuilder();
         var read = new StringBuilder();
         var constBuilder = new StringBuilder();
         var methodBuilder = new StringBuilder();
         var sep = setUsingConstructor ? ":" : "=";
-        var fieldPrefix = "Pg_";
 
         if (setUsingConstructor) read.Append('(').AppendLine();
         else read.AppendLine("{");
@@ -38,12 +36,11 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
         {
             var p = dtoProps[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
-            var ordinalField = $"{fieldPrefix}{cfg.ParameterName}Ordinal";
+            var ordinalField = $"ordinals[{i}]";
             var isLast = i == dtoProps.Length - 1;
             var getterExpr = EmitReaderGet(p, ordinalField);
             
-            ordinals.AppendLine($"    private static int {ordinalField};");
-            init.AppendLine($"            {ordinalField} = reader.GetOrdinal(\"{cfg.ParameterName}\");");
+            init.AppendLine($"        ordinals[{i}] = reader.GetOrdinal(\"{cfg.ParameterName}\");");
             read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr}{(isLast ? "" : ",")}");
             constBuilder.AppendLine(CreateSqlParameterConst(cfg));
             
@@ -57,8 +54,9 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var typeKeyword = dto.IsRecord ? "record" : "class";
         var ns = profileInfo.Namespace;
+        var ordinalCount = profileInfo.DtoProperties.Length;
+        var initText = init.ToString().TrimEnd();
         
-        var isInitField = "Pg_IsInitialized";
 
         var src =
             $$"""
@@ -68,22 +66,33 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
               using Npgsql;
               using NpgsqlTypes;
               using System.Runtime.CompilerServices;
-              using System.Threading;
-
+              
               namespace {{ns}};
 
-              {{accessibility}} sealed partial {{typeKeyword}} {{dto.Name}} : INpgsqlMapper<{{dtoTypeName}}>
+              {{accessibility}} partial {{typeKeyword}} {{dto.Name}} : INpgsqlMapper<{{dtoTypeName}}>
               {
-                  private static bool {{isInitField}};
-              {{ordinals}}
-                  public static {{dtoTypeName}} Map(NpgsqlDataReader reader)
+                  /// <summary>
+                  /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+                  /// Resolve once per result set and pass the result to <see cref="Map(NpgsqlDataReader, int[])"/>.
+                  /// </summary>
+                  public static int[] GetOrdinals(NpgsqlDataReader reader)
                   {
-                      if (!Volatile.Read(ref {{isInitField}}))
-                      {
-              {{init}}
-                          Volatile.Write(ref {{isInitField}}, true);
-                      }
+                      var ordinals = new int[{{ordinalCount}}];
+              {{initText}}
+                      return ordinals;
+                  }
 
+                  /// <summary>
+                  /// Maps the current row, resolving column ordinals by name on every call.
+                  /// Prefer <see cref="GetOrdinals(NpgsqlDataReader)"/> + <see cref="Map(NpgsqlDataReader, int[])"/> when reading many rows.
+                  /// </summary>
+                  public static {{dtoTypeName}} Map(NpgsqlDataReader reader) => Map(reader, GetOrdinals(reader));
+
+                  /// <summary>
+                  /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(NpgsqlDataReader)"/>.
+                  /// </summary>
+                  public static {{dtoTypeName}} Map(NpgsqlDataReader reader, int[] ordinals)
+                  {
                       return new {{dtoTypeName}}{{read}};
                   }
               }

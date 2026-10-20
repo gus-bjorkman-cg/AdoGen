@@ -66,28 +66,67 @@ class Build : NukeBuild
     {
         if (!File.Exists(Changelog)) return string.Empty;
 
-        // Headings should look like: "## [0.1.0.0-alpha] - 2026-01-29"
+        // Accepts "## [2.1.0] - date", "## 2.1.0 - date" and the legacy "## Release 2.0.0.0 - date".
+        // Versions are compared numerically, so "2.0.0" matches "2.0.0.0".
         var lines = File.ReadAllLines(Changelog);
-        var header = $"## [{tagVersion}]";
         var sb = new StringBuilder();
         var capture = false;
         
         foreach (var line in lines)
         {
+            var isHeading = line.StartsWith("## ", StringComparison.Ordinal);
+
             if (!capture)
             {
-                capture = line.StartsWith(header, StringComparison.OrdinalIgnoreCase);
+                capture = isHeading && VersionsMatch(ParseHeadingVersion(line), tagVersion);
                 continue;
             }
 
-            if (line.StartsWith("## [")) break;
+            if (isHeading) break;
             
             sb.AppendLine(line);
         }
         
         return sb.ToString().Trim();
     }
-    
+
+    static string ParseHeadingVersion(string heading)
+    {
+        var text = heading[3..].Trim();
+        if (text.StartsWith("Release ", StringComparison.OrdinalIgnoreCase)) text = text["Release ".Length..];
+        text = text.TrimStart('[');
+
+        var endIndex = text.IndexOfAny([']', ' ']);
+        return endIndex < 0 ? text : text[..endIndex];
+    }
+
+    static bool VersionsMatch(string headingVersion, string tagVersion)
+    {
+        if (string.Equals(headingVersion, tagVersion, StringComparison.OrdinalIgnoreCase)) return true;
+
+        var (headingNumeric, headingSuffix) = SplitPrerelease(headingVersion);
+        var (tagNumeric, tagSuffix) = SplitPrerelease(tagVersion);
+
+        return string.Equals(headingSuffix, tagSuffix, StringComparison.OrdinalIgnoreCase)
+               && Version.TryParse(headingNumeric, out var a)
+               && Version.TryParse(tagNumeric, out var b)
+               && ToFourPart(a) == ToFourPart(b);
+    }
+
+    static (string Numeric, string Suffix) SplitPrerelease(string version)
+    {
+        var parts = version.Split('-', 2);
+        return (parts[0], parts.Length > 1 ? parts[1] : "");
+    }
+
+    static Version ToFourPart(Version v) =>
+        new(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
+
+    static string ToNumericVersion(string version)
+    {
+        var (numeric, _) = SplitPrerelease(version);
+        return Version.TryParse(numeric, out var parsed) ? ToFourPart(parsed).ToString() : "0.0.0.0";
+    }
     
     string ResolveVersion()
     {
@@ -121,7 +160,23 @@ class Build : NukeBuild
     Target Compile => x => x
         .Description("Builds the solution")
         .DependsOn(Restore)
-        .Executes(() => DotNetBuild(x => x.SetProjectFile(Solution).EnableNoRestore().EnableNoLogo().SetConfiguration(Configuration)));
+        .Executes(() =>
+        {
+            // Version properties must be applied at compile time: Pack runs with NoBuild, so properties passed
+            // only to Pack would reach the .nuspec but not the assemblies.
+            var version = ResolveVersion();
+            var numericVersion = ToNumericVersion(version);
+
+            DotNetBuild(x => x
+                .SetProjectFile(Solution)
+                .EnableNoRestore()
+                .EnableNoLogo()
+                .SetConfiguration(Configuration)
+                .SetProperty("Version", version)
+                .SetProperty("InformationalVersion", version)
+                .SetProperty("AssemblyVersion", numericVersion)
+                .SetProperty("FileVersion", numericVersion));
+        });
     
     Target Test => x => x
         .Description("Runs all tests in the TestProject")
@@ -144,8 +199,11 @@ class Build : NukeBuild
         .Executes(() =>
         {
             var version = ResolveVersion();
-            var numericVersion = version.Split('-', 2)[0] + ".0";
+            var numericVersion = ToNumericVersion(version);
             var notes = ExtractReleaseNotes(version);
+
+            Assert.True(!IsTagBuild || !string.IsNullOrWhiteSpace(notes),
+                $"No release notes found in Changelog.md for version '{version}'. Add a '## [{version}] - <date>' section.");
             
             var providerProjects = new[] { SqlServerProject, PostgreSqlProject };
 

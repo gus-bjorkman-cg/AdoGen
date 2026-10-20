@@ -10,7 +10,7 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record TestType : INpgsqlBulkModel<global::AdoGen.Generator.Tests.TestType>;
+public partial record TestType : INpgsqlBulkModel<global::AdoGen.Generator.Tests.TestType>;
 
 public sealed class TestTypeNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.Tests.TestType>
 {
@@ -27,8 +27,8 @@ public sealed class TestTypeNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.T
             "NullableStringVarchar" VARCHAR(100) NULL,
             "NullableStringNVarchar" VARCHAR(100) NULL,
             "StringVarcharRuledNull" VARCHAR(100) NULL,
-            "CharString" TEXT NOT NULL,
-            "NCharString" TEXT NOT NULL,
+            "CharString" CHAR(10) NOT NULL,
+            "NCharString" CHAR(15) NOT NULL,
             "Float" REAL NOT NULL,
             "NullableFloat" REAL NULL,
             "DateTime" TIMESTAMP NOT NULL,

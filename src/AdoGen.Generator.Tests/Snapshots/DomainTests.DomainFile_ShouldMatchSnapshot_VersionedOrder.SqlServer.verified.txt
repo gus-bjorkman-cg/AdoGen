@@ -12,7 +12,7 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record VersionedOrder : ISqlSingleIdModel<global::AdoGen.Generator.Tests.VersionedOrder, Guid>
+public partial record VersionedOrder : ISqlSingleIdModel<global::AdoGen.Generator.Tests.VersionedOrder, Guid>
 {
     private const string SqlDeleteBatchPrefix = "DELETE t FROM [dbo].[VersionedOrders] AS t JOIN (VALUES ";
     private const string SqlDeleteBatchSuffix = ") AS ids([Id]) ON ids.[Id]=t.[Id]";
@@ -23,25 +23,37 @@ public sealed partial record VersionedOrder : ISqlSingleIdModel<global::AdoGen.G
         if (ids is null || ids.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
         
-        await using var cmd = new SqlCommand("", connection, transaction);
+        // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+        const int RowsPerCommand = 1000;
+        var affected = 0;
         
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-        
-        cmd.EnableOptimizedParameterBinding = ids.Count > 24;
-        
-        var sb = new StringBuilder(SqlDeleteBatchPrefix);
-        
-        for (var i = 0; i < ids.Count; i++)
+        for (var start = 0; start < ids.Count; start += RowsPerCommand)
         {
-            if (i > 0) sb.Append(',');
-            sb.Append($"(@p{i})");
-            cmd.Parameters.Add(VersionedOrderSql.CreateParameterId(ids[i], $"@p{i}"));
+            var end = Math.Min(start + RowsPerCommand, ids.Count);
+            
+            await using var cmd = new SqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+            
+            cmd.EnableOptimizedParameterBinding = end - start > 24;
+            
+            var sb = new StringBuilder(SqlDeleteBatchPrefix);
+            
+            for (var i = start; i < end; i++)
+            {
+                if (i > start) sb.Append(',');
+                var p = i - start;
+                sb.Append($"(@p{p})");
+                cmd.Parameters.Add(VersionedOrderSql.CreateParameterId(ids[i], $"@p{p}"));
+            }
+            
+            sb.Append(SqlDeleteBatchSuffix);
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
         
-        sb.Append(SqlDeleteBatchSuffix);
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<bool> ExistsAsync(SqlConnection connection, Guid id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -57,7 +69,7 @@ public sealed partial record VersionedOrder : ISqlSingleIdModel<global::AdoGen.G
     }
 }
 
-public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Generator.Tests.VersionedOrder>
+public partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Generator.Tests.VersionedOrder>
 {
     private const string SqlCreateTable = 
         """
@@ -72,7 +84,7 @@ public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Gen
     private const string SqlInsertAndReturn = "INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version]) OUTPUT INSERTED.* VALUES (@Id, @ProductName, @Version);";
     private const string SqlUpdate = "UPDATE [dbo].[VersionedOrders] SET [ProductName] = @ProductName, [Version] = @Version + 1 WHERE [Id] = @Id AND [Version] = @Version;";
     private const string SqlDelete = "DELETE FROM [dbo].[VersionedOrders] WHERE [Id] = @Id AND [Version] = @Version;";
-    private const string SqlUpsert = "UPDATE [dbo].[VersionedOrders] SET [ProductName] = @ProductName WHERE [Id] = @Id; IF @@ROWCOUNT = 0 INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version]) VALUES (@Id, @ProductName, @Version);";
+    private const string SqlUpsert = "INSERT INTO [dbo].[VersionedOrders] ([Id], [ProductName], [Version]) SELECT @Id, @ProductName, @Version WHERE NOT EXISTS (SELECT 1 FROM [dbo].[VersionedOrders] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = @Id); IF @@ROWCOUNT = 0 UPDATE [dbo].[VersionedOrders] SET [ProductName] = @ProductName WHERE [Id] = @Id;";
     private const string SqlTruncate = "TRUNCATE TABLE [dbo].[VersionedOrders];";
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -102,34 +114,46 @@ public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Gen
         if (models is null || models.Count == 0) return 0;
         if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-        await using var cmd = new SqlCommand("", connection, transaction);
-        
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-        
-        cmd.EnableOptimizedParameterBinding = (models.Count * 3) > 24;
+        // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+        // Larger lists are split into several commands; use a transaction for atomicity.
+        const int RowsPerCommand = 666;
+        var affected = 0;
 
-        var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * 17);
-        sb.Append(SqlInsertBatchTemplate);
-
-        var paramIndex = 0;
-
-        for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+        for (var start = 0; start < models.Count; start += RowsPerCommand)
         {
-            if (modelIndex > 0) sb.Append(',');
-            sb.Append($"(@p{paramIndex}");
-            cmd.Parameters.Add(VersionedOrderSql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex}");
-            cmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(models[modelIndex].ProductName, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex})");
-            cmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(models[modelIndex].Version, $"@p{paramIndex}"));
-            paramIndex++;
+            var end = Math.Min(start + RowsPerCommand, models.Count);
+
+            await using var cmd = new SqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+            
+            cmd.EnableOptimizedParameterBinding = ((end - start) * 3) > 24;
+
+            var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * 17);
+            sb.Append(SqlInsertBatchTemplate);
+
+            var paramIndex = 0;
+
+            for (var modelIndex = start; modelIndex < end; modelIndex++)
+            {
+                if (modelIndex > start) sb.Append(',');
+                sb.Append($"(@p{paramIndex}");
+                cmd.Parameters.Add(VersionedOrderSql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
+                paramIndex++;
+                sb.Append($",@p{paramIndex}");
+                cmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(models[modelIndex].ProductName, $"@p{paramIndex}"));
+                paramIndex++;
+                sb.Append($",@p{paramIndex})");
+                cmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(models[modelIndex].Version, $"@p{paramIndex}"));
+                paramIndex++;
+            }
+
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.VersionedOrder model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -157,7 +181,7 @@ public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Gen
         cmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName(model.ProductName));
         cmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(model.Version));
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return VersionedOrder.Map(reader);
         
@@ -254,13 +278,14 @@ public sealed partial record VersionedOrder : ISqlDomainModel<global::AdoGen.Gen
 /// Patch command object for <see cref="VersionedOrder"/>.
 /// Set only the properties you want to update; unset properties are not written to the database.
 /// </summary>
-public partial class VersionedOrderPatch
+public sealed partial class VersionedOrderPatch
 {
     private ulong _mask;
     public Guid Id { get; }
-    public int Version { get; set; }
-    public VersionedOrderPatch WithVersion(int value) { Version = value; return this; }
-    internal int VersionValue => Version;
+    /// <summary>Expected current value of <c>Version</c>; when set, the patch only applies if it matches and the token is incremented.</summary>
+    public int? ExpectedVersion { get; private set; }
+    /// <summary>Enables the optimistic-concurrency check: throws <c>AdoGenConcurrencyException</c> if the stored <c>Version</c> differs.</summary>
+    public VersionedOrderPatch WithExpectedVersion(int expected) { ExpectedVersion = expected; return this; }
     public string? ProductName { get; set { field = value; _mask |= 1UL << 0; } }
     public VersionedOrderPatch WithProductName(string value) { ProductName = value; return this; }
     internal string? ProductNameValue => ProductName;
@@ -268,7 +293,7 @@ public partial class VersionedOrderPatch
 
     public VersionedOrderPatch(Guid id) { Id = id; }
 }
-public sealed partial record VersionedOrder
+public partial record VersionedOrder
 {
 #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
 
@@ -284,16 +309,19 @@ public sealed partial record VersionedOrder
         var separator = "";
         
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("[ProductName] = @ProductName"); separator = ", "; cmd.Parameters.Add(VersionedOrderSql.CreateParameterProductName((string)patch.ProductNameValue!)); }
-
+        if (patch.ExpectedVersion.HasValue) sb.Append(separator + "[Version] = @Version + 1");
         sb.Append(" WHERE [Id] = @Id");
-        cmd.CommandText += " AND [Version] = @Version";
-        cmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(patch.VersionValue));
+        if (patch.ExpectedVersion.HasValue)
+        {
+            sb.Append(" AND [Version] = @Version");
+            cmd.Parameters.Add(VersionedOrderSql.CreateParameterVersion(patch.ExpectedVersion.Value));
+        }
         cmd.CommandText = sb.ToString();
         cmd.Parameters.Add(VersionedOrderSql.CreateParameterId(patch.Id));
         
         var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-        if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrders");
-        
+        if (affected == 0 && patch.ExpectedVersion.HasValue) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrders");
+
         return affected;
     }
 

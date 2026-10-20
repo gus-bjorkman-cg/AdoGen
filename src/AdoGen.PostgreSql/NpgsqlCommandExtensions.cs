@@ -28,13 +28,14 @@ public static class NpgsqlCommandExtensions
                 await command.Connection.OpenAsync(ct).ConfigureAwait(false);
 
             await using var reader = await command
-                .ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                .ExecuteReaderAsync(CommandBehavior.SingleResult, ct)
                 .ConfigureAwait(false);
 
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return [];
 
+            var ordinals = T.GetOrdinals(reader);
             var items = new List<T>();
-            do items.Add(T.Map(reader)); while (await reader.ReadAsync(ct).ConfigureAwait(false));
+            do items.Add(T.Map(reader, ordinals)); while (await reader.ReadAsync(ct).ConfigureAwait(false));
 
             return items;
         }
@@ -53,7 +54,7 @@ public static class NpgsqlCommandExtensions
 
             await using var reader = await command
                 .ExecuteReaderAsync(
-                    CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
+                    CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct)
                 .ConfigureAwait(false);
 
             if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return default;

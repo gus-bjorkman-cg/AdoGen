@@ -180,11 +180,14 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
 
     private void AddEntityRange(IEnumerable<T> items, BulkOp operation)
     {
+        var before = Items.Count;
         foreach (var item in items)
         {
             Items.Add(item);
             Operations.Add(operation);
         }
+
+        if (Items.Count == before) return;
 
         if (operation == BulkOp.Insert) HasInserts = true;
         else if (operation == BulkOp.Update) HasUpdates = true;

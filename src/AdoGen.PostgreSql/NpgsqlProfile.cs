@@ -136,7 +136,8 @@ public sealed class PropertyBuilder<TProp>
     public PropertyBuilder<TProp> ConcurrencyToken() => this;
 
     /// <summary>
-    /// Sets a default SQL expression for the database column.
+    /// Sets the column's DDL default, e.g. <c>DefaultValue("now()")</c> emits <c>DEFAULT now()</c>.
+    /// A leading <c>DEFAULT</c> keyword is accepted and not duplicated. Must be a compile-time constant.
     /// </summary>
     public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
 }

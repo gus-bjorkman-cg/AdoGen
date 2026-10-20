@@ -37,6 +37,8 @@ internal static class ConfigureChainParser
         VarcharChainHandlerNpgsql.Instance,
         TextChainHandlerNpgsql.Instance,
         ByteaChainHandlerNpgsql.Instance,
+        SizedTypeChainHandlerNpgsql.Char,
+        SizedTypeChainHandlerNpgsql.Varbit,
         DecimalChainHandlerNpgsql.Instance
     ];
 
@@ -50,9 +52,7 @@ internal static class ConfigureChainParser
         ImmutableArray<Diagnostic>.Builder diagnosticsBuilder,
         CancellationToken ct)
     {
-        var lambda = (LambdaExpressionSyntax)configureInvocation.ArgumentList.Arguments[0].Expression;
-        var propName = lambda.TryGetPropertyNameFromLambdaStrict(model);
-
+        var propName = ProfileInfoCollector.TryGetSelectedProperty(configureInvocation, model, dtoProps);
         if (propName is null || !dtoProps.TryGetValue(propName, out var propSymbol)) return;
 
         var cfg = new ParamConfig

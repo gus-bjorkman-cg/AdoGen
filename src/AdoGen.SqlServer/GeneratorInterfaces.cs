@@ -16,11 +16,20 @@ public interface ISqlMapper;
 public interface ISqlMapper<out T> where T : ISqlMapper<T>
 {
     /// <summary>
-    /// Maps the objects by using the source generated mapper.
+    /// Maps the current row, resolving column ordinals by name on every call.
     /// </summary>
-    /// <param name="reader"></param>
-    /// <returns></returns>
     static abstract T Map(SqlDataReader reader);
+
+    /// <summary>
+    /// Resolves the column ordinals of <typeparamref name="T"/> for the reader's current result set.
+    /// Ordinals are only valid for the result set they were resolved from.
+    /// </summary>
+    static abstract int[] GetOrdinals(SqlDataReader reader);
+
+    /// <summary>
+    /// Maps the current row using ordinals resolved by <see cref="GetOrdinals"/> for the same result set.
+    /// </summary>
+    static abstract T Map(SqlDataReader reader, int[] ordinals);
 }
 
 /// <summary>

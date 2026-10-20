@@ -13,7 +13,7 @@ using AdoGen.PostgreSql;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record TestType : INpgsqlCompositeKeyModel<global::AdoGen.Generator.Tests.TestType>, INpgsqlCompositeKeyExistsModel<global::AdoGen.Generator.Tests.TestType>
+public partial record TestType : INpgsqlCompositeKeyModel<global::AdoGen.Generator.Tests.TestType>, INpgsqlCompositeKeyExistsModel<global::AdoGen.Generator.Tests.TestType>
 {
     private const string Pg_SqlDeleteBatchUnnest = """DELETE FROM "public"."TestTypes" AS t USING unnest(@Ints, @Decimals) AS k("Int", "Decimal") WHERE k."Int" = t."Int" AND k."Decimal" = t."Decimal";""";
     private const string Pg_SqlExists = """SELECT 1 FROM "public"."TestTypes" WHERE "Int" = @Int AND "Decimal" = @Decimal LIMIT 1;""";
@@ -57,7 +57,7 @@ public sealed partial record TestType : INpgsqlCompositeKeyModel<global::AdoGen.
     }
 }
 
-public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tests.TestType>
+public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tests.TestType>
 {
     private const string Pg_SqlCreateTable = 
     """
@@ -70,8 +70,8 @@ public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Genera
         "NullableStringVarchar" VARCHAR(100) NULL,
         "NullableStringNVarchar" VARCHAR(100) NULL,
         "StringVarcharRuledNull" VARCHAR(100) NULL,
-        "CharString" TEXT NOT NULL,
-        "NCharString" TEXT NOT NULL,
+        "CharString" CHAR(10) NOT NULL,
+        "NCharString" CHAR(15) NOT NULL,
         "Float" REAL NOT NULL,
         "NullableFloat" REAL NULL,
         "DateTime" TIMESTAMP NOT NULL,
@@ -286,7 +286,7 @@ public sealed partial record TestType : INpgsqlDomainModel<global::AdoGen.Genera
         cmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(model.IntEnum));
         cmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(model.LongEnum));
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
         
         if (await reader.ReadAsync(ct).ConfigureAwait(false)) return TestType.Map(reader);
         
@@ -623,7 +623,7 @@ public sealed partial class TestTypePatch
 
     public TestTypePatch(int @int, decimal @decimal) { Int = @int; Decimal = @decimal; }
 }
-public sealed partial record TestType
+public partial record TestType
 {
 #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
 

@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
@@ -44,7 +45,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             idBasedSrc =
                 $$""""
                   
-                  {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
+                  {{ctx.Accessibility}} partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlSingleIdModel<{{ctx.DtoTypeName}}, {{keyType}}>
                   {
                       private const string SqlDeleteBatchPrefix = "{{deleteBatchPrefix}}";
                       private const string SqlDeleteBatchSuffix = "{{deleteBatchSuffix}}";
@@ -55,25 +56,37 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           if (ids is null || ids.Count == 0) return 0;
                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                           
-                          await using var cmd = new SqlCommand("", connection, transaction);
+                          // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+                          const int RowsPerCommand = 1000;
+                          var affected = 0;
                           
-                          if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-                          
-                          cmd.EnableOptimizedParameterBinding = ids.Count > 24;
-                          
-                          var sb = new StringBuilder(SqlDeleteBatchPrefix);
-                          
-                          for (var i = 0; i < ids.Count; i++)
+                          for (var start = 0; start < ids.Count; start += RowsPerCommand)
                           {
-                              if (i > 0) sb.Append(',');
-                              sb.Append($"(@p{i})");
-                              cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(ids[i], $"@p{i}"));
+                              var end = Math.Min(start + RowsPerCommand, ids.Count);
+                              
+                              await using var cmd = new SqlCommand("", connection, transaction);
+                              
+                              if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                              
+                              cmd.EnableOptimizedParameterBinding = end - start > 24;
+                              
+                              var sb = new StringBuilder(SqlDeleteBatchPrefix);
+                              
+                              for (var i = start; i < end; i++)
+                              {
+                                  if (i > start) sb.Append(',');
+                                  var p = i - start;
+                                  sb.Append($"(@p{p})");
+                                  cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(ids[i], $"@p{p}"));
+                              }
+                              
+                              sb.Append(SqlDeleteBatchSuffix);
+                              cmd.CommandText = sb.ToString();
+                              
+                              affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                           }
                           
-                          sb.Append(SqlDeleteBatchSuffix);
-                          cmd.CommandText = sb.ToString();
-                          
-                          return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                          return affected;
                       }
                   
                       public static async ValueTask<bool> ExistsAsync(SqlConnection connection, {{keyType}} id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -102,7 +115,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             idBasedSrc =
                 $$""""
                   
-                  {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlCompositeKeyModel<{{ctx.DtoTypeName}}>, ISqlCompositeKeyExistsModel<{{ctx.DtoTypeName}}>
+                  {{ctx.Accessibility}} partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlCompositeKeyModel<{{ctx.DtoTypeName}}>, ISqlCompositeKeyExistsModel<{{ctx.DtoTypeName}}>
                   {
                       private const string SqlDeleteBatchPrefix = "{{deleteBatchPrefix}}";
                       private const string SqlDeleteBatchSuffix = "{{deleteBatchSuffix}}";
@@ -114,25 +127,36 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           if (models is null || models.Count == 0) return 0;
                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                           
-                          await using var cmd = new SqlCommand("", connection, transaction);
+                          // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+                          const int RowsPerCommand = {{RowsPerCommand(keyCount)}};
+                          var affected = 0;
                           
-                          if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-                          
-                          cmd.EnableOptimizedParameterBinding = models.Count * KeyPropertyCount > 24;
-                          
-                          var sb = new StringBuilder(SqlDeleteBatchPrefix);
-                          var paramIndex = 0;
-                          
-                          for (var i = 0; i < models.Count; i++)
+                          for (var start = 0; start < models.Count; start += RowsPerCommand)
                           {
-                              if (i > 0) sb.Append(',');
-                  {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 12)}}
+                              var end = Math.Min(start + RowsPerCommand, models.Count);
+                              
+                              await using var cmd = new SqlCommand("", connection, transaction);
+                              
+                              if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                              
+                              cmd.EnableOptimizedParameterBinding = (end - start) * KeyPropertyCount > 24;
+                              
+                              var sb = new StringBuilder(SqlDeleteBatchPrefix);
+                              var paramIndex = 0;
+                              
+                              for (var i = start; i < end; i++)
+                              {
+                                  if (i > start) sb.Append(',');
+                  {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 16)}}
+                              }
+                              
+                              sb.Append(SqlDeleteBatchSuffix);
+                              cmd.CommandText = sb.ToString();
+                              
+                              affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                           }
                           
-                          sb.Append(SqlDeleteBatchSuffix);
-                          cmd.CommandText = sb.ToString();
-                          
-                          return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                          return affected;
                       }
                   
                       public static async ValueTask<bool> ExistsAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -185,7 +209,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
             namespace {{ctx.Namespace}};
             {{idBasedSrc}}
-            {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlDomainModel<{{ctx.DtoTypeName}}>
+            {{ctx.Accessibility}} partial {{ctx.TypeKeyword}} {{dto.Name}} : ISqlDomainModel<{{ctx.DtoTypeName}}>
             {
                 private const string SqlCreateTable = 
                     """
@@ -223,26 +247,38 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     if (models is null || models.Count == 0) return 0;
                     if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
 
-                    await using var cmd = new SqlCommand("", connection, transaction);
-                    
-                    if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
-                    
-                    cmd.EnableOptimizedParameterBinding = (models.Count * {{nonIdentityPropCount}}) > 24;
+                    // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
+                    // Larger lists are split into several commands; use a transaction for atomicity.
+                    const int RowsPerCommand = {{RowsPerCommand(nonIdentityPropCount)}};
+                    var affected = 0;
 
-                    var sb = new StringBuilder(SqlInsertBatchTemplate.Length + models.Count * {{ParameterBindingEmitter.BatchInsertPerRowEstimate(ctx)}});
-                    sb.Append(SqlInsertBatchTemplate);
-
-                    var paramIndex = 0;
-
-                    for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+                    for (var start = 0; start < models.Count; start += RowsPerCommand)
                     {
-                        if (modelIndex > 0) sb.Append(',');
-            {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", 12)}}
+                        var end = Math.Min(start + RowsPerCommand, models.Count);
+
+                        await using var cmd = new SqlCommand("", connection, transaction);
+                        
+                        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                        
+                        cmd.EnableOptimizedParameterBinding = ((end - start) * {{nonIdentityPropCount}}) > 24;
+
+                        var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * {{ParameterBindingEmitter.BatchInsertPerRowEstimate(ctx)}});
+                        sb.Append(SqlInsertBatchTemplate);
+
+                        var paramIndex = 0;
+
+                        for (var modelIndex = start; modelIndex < end; modelIndex++)
+                        {
+                            if (modelIndex > start) sb.Append(',');
+            {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", 16)}}
+                        }
+
+                        cmd.CommandText = sb.ToString();
+                        
+                        affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     }
 
-                    cmd.CommandText = sb.ToString();
-                    
-                    return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return affected;
                 }
 
                 public static async ValueTask<int> UpdateAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
@@ -262,7 +298,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
                     
             {{ParameterBindingEmitter.BindAll(ctx, "model", 8)}}
-                    await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
+                    await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleResult | CommandBehavior.SingleRow, ct).ConfigureAwait(false);
                     
                     if (await reader.ReadAsync(ct).ConfigureAwait(false)) return {{dto.Name}}.Map(reader);
                     
@@ -285,7 +321,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     
                     await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
                     
-            {{ParameterBindingEmitter.BindForUpsertSqlServer(ctx, "model", 8)}}
+            {{ParameterBindingEmitter.BindForUpsert(ctx, "model", 8)}}
                     return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
@@ -322,7 +358,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 public static void AddUpsertBatchCommand(SqlBatch batch, {{ctx.DtoTypeName}} model)
                 {
                     var batchCmd = new SqlBatchCommand(SqlUpsert);
-            {{ParameterBindingEmitter.BindForUpsertSqlServer(ctx, "model", 8, "batchCmd")}}
+            {{ParameterBindingEmitter.BindForUpsert(ctx, "model", 8, "batchCmd")}}
                     batch.BatchCommands.Add(batchCmd);
                 }
 
@@ -375,11 +411,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             valuePropsBuilder.AppendLine($"    internal {nullableType} {col.Name}Value => {col.Name};");
         }
 
-        var concurrencyField = ctx.ConcurrencyToken is { } ct2
-            ? $"    public {ct2.PropertyType} {ct2.Name} {{ get; set; }}\n" +
-              $"    public {patchClassName} With{ct2.Name}({ct2.PropertyType} value) {{ {ct2.Name} = value; return this; }}\n" +
-              $"    internal {ct2.PropertyType} {ct2.Name}Value => {ct2.Name};\n"
-            : "";
+        var concurrencyField = PatchConcurrency.BuildMembers(ctx, patchClassName);
 
         var setClauseItems = new StringBuilder();
         for (var i = 0; i < patchColumns.Length; i++)
@@ -389,19 +421,9 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 $"        if ((patch.Mask & (1UL << {i})) != 0) {{ sb.Append({(i > 0 ? "separator + " : "")}\"[{col.ParameterName}] = @{col.ParameterName}\"); separator = \", \"; cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}(({col.PropertyType.TrimEnd('?')})patch.{col.Name}Value!)); }}");
         }
 
-        var concurrencyWhere = ctx.ConcurrencyToken is { } token
-            ? $"        cmd.CommandText += \" AND [{token.ParameterName}] = @{token.ParameterName}\";\n" +
-              $"        cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{token.Name}(patch.{token.Name}Value));\n"
-            : "";
-
-        var concurrencyThrow = ctx.ConcurrencyToken is not null
-            ? $$"""
-                      var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                      if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                      
-                      return affected;
-              """
-            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+        var concurrencySet = PatchConcurrency.BuildSet(ctx, "@");
+        var concurrencyWhere = PatchConcurrency.BuildWhere(ctx);
+        var concurrencyThrow = PatchConcurrency.BuildExecute(ctx, "global::AdoGen.SqlServer.AdoGenConcurrencyException");
 
         var patchClassBody = ctx.ShouldGeneratePatchClass
             ? $$""""
@@ -410,7 +432,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 /// Patch command object for <see cref="{{dto.Name}}"/>.
                 /// Set only the properties you want to update; unset properties are not written to the database.
                 /// </summary>
-                public partial class {{patchClassName}}
+                {{ctx.Accessibility}} sealed partial class {{patchClassName}}
                 {
                     private ulong _mask;
                 {{keyPropsBuilder.ToString().TrimEnd()}}
@@ -427,7 +449,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
         return $$""""
             {{patchClassBody}}
-            {{ctx.Accessibility}} sealed partial {{ctx.TypeKeyword}} {{dto.Name}}
+            {{ctx.Accessibility}} partial {{ctx.TypeKeyword}} {{dto.Name}}
             {
             #pragma warning disable CS0219 // generated code, will trigger warn when single property on class
             
@@ -443,9 +465,9 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     var separator = "";
                     
             {{setClauseItems.ToString().TrimEnd()}}
-            
+            {{concurrencySet}}
                     sb.Append(" WHERE {{ctx.WhereByKey}}");
-            {{concurrencyWhere.TrimEnd()}}
+            {{concurrencyWhere}}
                     cmd.CommandText = sb.ToString();
             {{keyBindBuilder.ToString().TrimEnd()}}
                     
@@ -456,7 +478,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             }
 
             /// <summary>Extension methods for patching <see cref="{{dto.Name}}"/> via <see cref="SqlConnection"/>.</summary>
-            public static class {{dto.Name}}SqlPatchExtensions
+            {{ctx.Accessibility}} static class {{dto.Name}}SqlPatchExtensions
             {
                 /// <summary>
                 /// Executes a partial UPDATE for <see cref="{{dto.Name}}"/>, touching only the columns
@@ -473,6 +495,10 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             }
             """";
     }
+
+    /// <summary>Max rows per command that keeps under SQL Server's 2100-parameter and 1000-row VALUES limits.</summary>
+    private static int RowsPerCommand(int parametersPerRow) =>
+        Math.Min(1000, 2000 / Math.Max(1, parametersPerRow));
 
     private static string LowerFirst(string s)
     {

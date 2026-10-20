@@ -22,16 +22,17 @@ public static class SqlDataReaderExtensions
         public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
             where T : ISqlMapper<T>
         {
-            if (!await reader.ReadAsync(ct))
+            if (!await reader.ReadAsync(ct).ConfigureAwait(false))
             {
-                await reader.NextResultAsync(ct);
+                await reader.NextResultAsync(ct).ConfigureAwait(false);
                 return [];
             }
         
+            var ordinals = T.GetOrdinals(reader);
             var items = new List<T>();
-            do items.Add(reader.Map<T>()); while (await reader.ReadAsync(ct));
+            do items.Add(T.Map(reader, ordinals)); while (await reader.ReadAsync(ct).ConfigureAwait(false));
 
-            await reader.NextResultAsync(ct);
+            await reader.NextResultAsync(ct).ConfigureAwait(false);
             return items;
         }
 
@@ -44,15 +45,15 @@ public static class SqlDataReaderExtensions
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
             where T : ISqlMapper<T>
         {
-            if (!await reader.ReadAsync(ct))
+            if (!await reader.ReadAsync(ct).ConfigureAwait(false))
             {
-                await reader.NextResultAsync(ct);
+                await reader.NextResultAsync(ct).ConfigureAwait(false);
                 return default;
             }
         
             var item = reader.Map<T>();
         
-            await reader.NextResultAsync(ct);
+            await reader.NextResultAsync(ct).ConfigureAwait(false);
             return item;
         }
         

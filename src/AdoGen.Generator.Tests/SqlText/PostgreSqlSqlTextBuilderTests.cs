@@ -140,10 +140,14 @@ public sealed class PostgreSqlSqlTextBuilderTests
     }
 
     [Fact]
-    public void Upsert_ShouldExcludeIdentityKeyFromConflictTarget_WhenKeyIsIdentity()
+    public void Upsert_ShouldUseMerge_WhenKeyIsIdentity()
     {
         var actual = PostgreSqlSqlTextBuilder.Upsert(EmitContextFixtures.PostgreSqlAuditEvent());
-        actual.Should().Contain("ON CONFLICT ()");
+
+        actual.Should().Be(
+            "MERGE INTO \"log\".\"Audits\" AS T USING (SELECT @EventId AS \"EventId\") AS S ON T.\"EventId\" = S.\"EventId\" " +
+            "WHEN MATCHED THEN UPDATE SET \"CreatedAt\" = @CreatedAt, \"Type\" = @Type, \"JsonPayload\" = @JsonPayload " +
+            "WHEN NOT MATCHED THEN INSERT (\"CreatedAt\", \"Type\", \"JsonPayload\") VALUES (@CreatedAt, @Type, @JsonPayload);");
     }
 
     // ── CreateTable ───────────────────────────────────────────────────────────

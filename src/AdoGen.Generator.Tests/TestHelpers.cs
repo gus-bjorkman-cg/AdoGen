@@ -26,6 +26,27 @@ internal static class TestHelpers
         return new RunResult(runResult, diagnostics);
     }
 
+    /// <summary>
+    /// Runs the generator and returns the C# compiler errors of the resulting compilation
+    /// (user source + generated sources), to prove the emitted code compiles.
+    /// </summary>
+    public static ImmutableArray<Diagnostic> GetOutputCompilationErrors(this string source, AdoGenType genType)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest));
+        var compilation = CSharpCompilation.Create(
+            assemblyName: $"{genType.FileName}.{genType.Provider.ExtensionName}.CompileTests",
+            syntaxTrees: [syntaxTree],
+            references: GetReferences(genType),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+
+        Driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var driverDiagnostics);
+
+        return driverDiagnostics
+            .Concat(output.GetDiagnostics())
+            .Where(static d => d.Severity == DiagnosticSeverity.Error)
+            .ToImmutableArray();
+    }
+
     public static string GetGeneratedText(this GeneratorDriverRunResult result, string fileName) =>
         result.Results
             .SelectMany(x => x.GeneratedSources)

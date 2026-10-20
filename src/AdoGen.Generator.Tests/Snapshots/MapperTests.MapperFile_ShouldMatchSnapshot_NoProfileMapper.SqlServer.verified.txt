@@ -5,44 +5,47 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record NoProfileMapper : ISqlMapper<global::AdoGen.Generator.Tests.NoProfileMapper>
+public partial record NoProfileMapper : ISqlMapper<global::AdoGen.Generator.Tests.NoProfileMapper>
 {
-    private static bool IsInitialized;
-    private static int IdOrdinal;
-    private static int CountOrdinal;
-    private static int ActiveOrdinal;
-    private static int CreatedAtOrdinal;
-    private static int NameOrdinal;
-    private static int AmountOrdinal;
-    private static int DataOrdinal;
-
-    public static global::AdoGen.Generator.Tests.NoProfileMapper Map(SqlDataReader reader)
+    /// <summary>
+    /// Resolves the column ordinals of this type for the current result set of <paramref name="reader"/>.
+    /// Resolve once per result set and pass the result to <see cref="Map(SqlDataReader, int[])"/>.
+    /// </summary>
+    public static int[] GetOrdinals(SqlDataReader reader)
     {
-        if (!Volatile.Read(ref IsInitialized))
-        {
-            IdOrdinal = reader.GetOrdinal("Id");
-            CountOrdinal = reader.GetOrdinal("Count");
-            ActiveOrdinal = reader.GetOrdinal("Active");
-            CreatedAtOrdinal = reader.GetOrdinal("CreatedAt");
-            NameOrdinal = reader.GetOrdinal("Name");
-            AmountOrdinal = reader.GetOrdinal("Amount");
-            DataOrdinal = reader.GetOrdinal("Data");
+        var ordinals = new int[7];
+        ordinals[0] = reader.GetOrdinal("Id");
+        ordinals[1] = reader.GetOrdinal("Count");
+        ordinals[2] = reader.GetOrdinal("Active");
+        ordinals[3] = reader.GetOrdinal("CreatedAt");
+        ordinals[4] = reader.GetOrdinal("Name");
+        ordinals[5] = reader.GetOrdinal("Amount");
+        ordinals[6] = reader.GetOrdinal("Data");
+        return ordinals;
+    }
 
-            Volatile.Write(ref IsInitialized, true);
-        }
+    /// <summary>
+    /// Maps the current row, resolving column ordinals by name on every call.
+    /// Prefer <see cref="GetOrdinals(SqlDataReader)"/> + <see cref="Map(SqlDataReader, int[])"/> when reading many rows.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.NoProfileMapper Map(SqlDataReader reader) => Map(reader, GetOrdinals(reader));
 
+    /// <summary>
+    /// Maps the current row using ordinals previously resolved by <see cref="GetOrdinals(SqlDataReader)"/>.
+    /// </summary>
+    public static global::AdoGen.Generator.Tests.NoProfileMapper Map(SqlDataReader reader, int[] ordinals)
+    {
         return new global::AdoGen.Generator.Tests.NoProfileMapper(
-            Id : reader.GetFieldValue<Guid>(IdOrdinal),
-            Count : reader.GetInt32(CountOrdinal),
-            Active : reader.GetBoolean(ActiveOrdinal),
-            CreatedAt : reader.GetFieldValue<DateTime>(CreatedAtOrdinal),
-            Name : reader.GetString(NameOrdinal),
-            Amount : reader.GetDecimal(AmountOrdinal),
-            Data : reader.GetFieldValue<byte[]>(DataOrdinal)
+            Id : reader.GetFieldValue<Guid>(ordinals[0]),
+            Count : reader.GetInt32(ordinals[1]),
+            Active : reader.GetBoolean(ordinals[2]),
+            CreatedAt : reader.GetFieldValue<DateTime>(ordinals[3]),
+            Name : reader.GetString(ordinals[4]),
+            Amount : reader.GetDecimal(ordinals[5]),
+            Data : reader.GetFieldValue<byte[]>(ordinals[6])
         );
     }
 }

@@ -10,7 +10,7 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record TestType : ISqlBulkModel<global::AdoGen.Generator.Tests.TestType>;
+public partial record TestType : ISqlBulkModel<global::AdoGen.Generator.Tests.TestType>;
 
 public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.TestType>
 {

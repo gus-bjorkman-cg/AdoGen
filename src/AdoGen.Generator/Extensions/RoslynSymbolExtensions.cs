@@ -78,6 +78,7 @@ internal static class RoslynSymbolExtensions
                     "global::System.DateTimeOffset" or "DateTimeOffset" => SqlDbType.DateTimeOffset,
                     "global::System.DateOnly" => SqlDbType.Date,
                     "global::System.TimeOnly" => SqlDbType.Time,
+                    "global::System.TimeSpan" => SqlDbType.Time,
                     _ => SqlDbType.Variant
                 }
             };
@@ -126,6 +127,7 @@ internal static class RoslynSymbolExtensions
                     "global::System.DateTimeOffset" or "DateTimeOffset" => "TimestampTz",
                     "global::System.DateOnly" => "Date",
                     "global::System.TimeOnly" => "Time",
+                    "global::System.TimeSpan" => "Interval",
                     _ => "Unknown"
                 }
             };
@@ -133,6 +135,13 @@ internal static class RoslynSymbolExtensions
             return DbTypeRef.PostgreSql(mapped);
         }
     }
+
+    /// <summary>
+    /// True when no default provider type exists for the CLR type (e.g. unsigned integers, <c>char</c> on
+    /// SQL Server, arbitrary structs/classes). Such properties need an explicit <c>.Type(...)</c>.
+    /// </summary>
+    public static bool IsUnmappedDefault(this DbTypeRef dbType) =>
+        dbType.EnumMember is "Variant" or "Unknown";
 
     extension(IPropertySymbol prop)
     {

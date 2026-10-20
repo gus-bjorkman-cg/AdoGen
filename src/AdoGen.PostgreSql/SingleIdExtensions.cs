@@ -53,14 +53,14 @@ public static class NpgsqlConnectionSingleIdExtensions
     /// <typeparam name="TModel"></typeparam>
     /// <typeparam name="TKey"></typeparam>
     /// <returns></returns>
-    public static async ValueTask<int> DeleteAsync<TModel, TKey>(
+    public static ValueTask<int> DeleteAsync<TModel, TKey>(
         this NpgsqlConnection connection,
         List<TKey> ids,
         CancellationToken ct,
         NpgsqlTransaction? transaction = null,
         int? commandTimeout = null)
         where TModel : INpgsqlSingleIdModel<TModel, TKey>
-        => await TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout).ConfigureAwait(false);
+        => TModel.DeleteAsync(connection, ids, ct, transaction, commandTimeout);
     
     /// <summary>
     /// Deletes the records with the given ids.

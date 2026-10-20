@@ -61,7 +61,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
 
                namespace {{{ns}}};
 
-               {{{accessibility}}} sealed partial {{{typeKeyword}}} {{{dto.Name}}} : ISqlBulkModel<{{{dtoTypeName}}}>;
+               {{{accessibility}}} partial {{{typeKeyword}}} {{{dto.Name}}} : ISqlBulkModel<{{{dtoTypeName}}}>;
 
                {{{accessibility}}} sealed class {{{bulkTypeName}}} : BulkBatchSql<{{{dtoTypeName}}}>
                {

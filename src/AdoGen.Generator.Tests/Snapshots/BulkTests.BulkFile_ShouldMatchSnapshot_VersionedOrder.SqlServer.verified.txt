@@ -10,7 +10,7 @@ using AdoGen.SqlServer;
 
 namespace AdoGen.Generator.Tests;
 
-public sealed partial record VersionedOrder : ISqlBulkModel<global::AdoGen.Generator.Tests.VersionedOrder>;
+public partial record VersionedOrder : ISqlBulkModel<global::AdoGen.Generator.Tests.VersionedOrder>;
 
 public sealed class VersionedOrderBulk : BulkBatchSql<global::AdoGen.Generator.Tests.VersionedOrder>
 {
