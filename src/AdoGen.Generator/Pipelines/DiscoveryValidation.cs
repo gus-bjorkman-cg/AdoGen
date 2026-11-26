@@ -57,13 +57,27 @@ internal static class DiscoveryValidation
                     dto.Dto.Name));
             }
 
-            if (dto.Dto.ContainingType is { } containingType)
+            for (var containingType = dto.Dto.ContainingType; containingType is not null; containingType = containingType.ContainingType)
             {
+                if (containingType.IsPartial &&
+                    !containingType.IsGenericType &&
+                    containingType.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal)
+                    continue;
+
                 diagnostics.Add(Diagnostic.Create(
                     SqlDiagnostics.NestedTypeNotSupported,
                     dto.Dto.Locations.FirstOrDefault() ?? Location.None,
                     dto.Dto.Name,
                     containingType.Name));
+                break;
+            }
+
+            if (dto.Dto.IsValueType && (dto.Kind is not SqlModelKind.Mapper || dto.Dto.IsRefLikeType))
+            {
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.StructNotSupported,
+                    dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name));
             }
 
             if (dto.Dto.DeclaredAccessibility is not (Accessibility.Public or Accessibility.Internal))
@@ -116,19 +130,21 @@ internal static class DiscoveryValidation
                 return vdto with { ProfileInfo = mapperOnlyProfile, Diagnostics = ImmutableArray<Diagnostic>.Empty };
             }
 
-            var propsNeedingConfig = new Dictionary<IPropertySymbol, PropertyTypeKind>(dtoProperties.Length, SymbolEqualityComparer.Default);
+            var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+            var profile = ProfileInfoCollector.Resolve(dto, diagnostics, dtoProperties, ct);
 
-            for (var i = 0; i < dtoProperties.Length; i++)
+            // Ignored properties are not columns, so they never need mandatory configuration.
+            var mappedProperties = profile.DtoProperties;
+            var propsNeedingConfig = new Dictionary<IPropertySymbol, PropertyTypeKind>(mappedProperties.Length, SymbolEqualityComparer.Default);
+
+            for (var i = 0; i < mappedProperties.Length; i++)
             {
-                var property = dtoProperties[i];
+                var property = mappedProperties[i];
                 
                 if (property.Type.IsString) propsNeedingConfig.Add(property, PropertyTypeKind.String);
                 else if (property.Type.IsDecimal) propsNeedingConfig.Add(property, PropertyTypeKind.Decimal);
                 else if (property.Type.IsByteArray) propsNeedingConfig.Add(property, PropertyTypeKind.ByteArray);
             }
-            
-            var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
-            var profile = ProfileInfoCollector.Resolve(dto, diagnostics, dtoProperties, ct);
 
             // Properties whose CLR type has no default provider type would produce invalid DDL and
             // untyped parameters; require an explicit .Type(...) instead.

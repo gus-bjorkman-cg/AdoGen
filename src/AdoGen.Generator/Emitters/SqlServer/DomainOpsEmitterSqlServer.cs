@@ -380,16 +380,18 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             }
             """";
         
-        var patchSrc = BuildPatchSrc(ctx, dto);
-        
-        spc.AddSource($"{dto.Name}.Domain.Sql.g.cs", patchSrc.Length == 0 ? src : src + "\n" + patchSrc);
+        var (patchNested, patchTopLevel) = BuildPatchSrc(ctx, dto);
+        var body = patchNested.Length == 0 ? src : src + "\n" + patchNested;
+        var wrapped = TypeDeclarations.WrapInContainers(dto, body);
+
+        spc.AddSource(TypeDeclarations.HintName(dto, "Domain.Sql.g.cs"), patchTopLevel.Length == 0 ? wrapped : wrapped + "\n\n" + patchTopLevel);
     }
 
-    private static string BuildPatchSrc(EmitContext ctx, INamedTypeSymbol dto)
+    private static (string Nested, string TopLevel) BuildPatchSrc(EmitContext ctx, INamedTypeSymbol dto)
     {
         var patchColumns = ctx.WritableNonKeyNonIdentities;
         // Skip if no patchable columns or too many (>64 exceeds bitmask capacity)
-        if (patchColumns.Length is 0 or > 64) return string.Empty;
+        if (patchColumns.Length is 0 or > 64) return (string.Empty, string.Empty);
 
         var patchClassName = $"{dto.Name}Patch";
 
@@ -464,7 +466,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 """"
             : string.Empty;
 
-        return $$""""
+        var nested = $$""""
             {{patchClassBody}}
             {{ctx.Accessibility}} partial {{ctx.TypeKeyword}} {{dto.Name}}
             {
@@ -494,24 +496,33 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             
             #pragma warning restore CS0219
             }
+            """";
 
-            /// <summary>Extension methods for patching <see cref="{{dto.Name}}"/> via <see cref="SqlConnection"/>.</summary>
-            {{ctx.Accessibility}} static class {{dto.Name}}SqlPatchExtensions
+        var qualifiedDto = TypeDeclarations.ContainerPrefix(dto) + dto.Name;
+        var qualifiedPatch = TypeDeclarations.ContainerPrefix(dto) + patchClassName;
+        var extensionsClassName = TypeDeclarations.ContainerPrefix(dto, "") + dto.Name + "SqlPatchExtensions";
+        var extensionsAccessibility = TypeDeclarations.EffectiveAccessibility(dto);
+
+        var topLevel = $$""""
+            /// <summary>Extension methods for patching <see cref="{{qualifiedDto}}"/> via <see cref="SqlConnection"/>.</summary>
+            {{extensionsAccessibility}} static class {{extensionsClassName}}
             {
                 /// <summary>
-                /// Executes a partial UPDATE for <see cref="{{dto.Name}}"/>, touching only the columns
+                /// Executes a partial UPDATE for <see cref="{{qualifiedDto}}"/>, touching only the columns
                 /// explicitly set on <paramref name="patch"/>.
                 /// Returns 0 immediately (without sending SQL) when no columns were set.
                 /// </summary>
                 public static global::System.Threading.Tasks.ValueTask<int> PatchAsync(
                     this SqlConnection connection,
-                    {{patchClassName}} patch,
+                    {{qualifiedPatch}} patch,
                     global::System.Threading.CancellationToken ct,
                     SqlTransaction? transaction = null,
                     int? commandTimeout = null)
-                    => {{dto.Name}}.PatchAsync(connection, patch, ct, transaction, commandTimeout);
+                    => {{qualifiedDto}}.PatchAsync(connection, patch, ct, transaction, commandTimeout);
             }
             """";
+
+        return (nested, topLevel);
     }
 
     /// <summary>Max rows per command that keeps under SQL Server's 2100-parameter and 1000-row VALUES limits.</summary>

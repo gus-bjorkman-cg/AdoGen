@@ -158,10 +158,14 @@ internal static class ParameterBindingEmitter
 
         foreach (var col in ctx.Keys)
         {
-            var dbTypeMember = ctx.Profile.ParamsByProperty[col.Name].DbType!.Value.EnumMember;
+            var cfg = ctx.Profile.ParamsByProperty[col.Name];
+            var dbTypeMember = cfg.DbType!.Value.EnumMember;
             var arrayVar = $"{LowerFirst(col.Name)}Values";
-            sb.AppendLine($"{prefix}var {arrayVar} = new {col.PropertyType}[{listVar}.Count];");
-            sb.AppendLine($"{prefix}for (var i = 0; i < {listVar}.Count; i++) {arrayVar}[i] = {listVar}[i].{col.Name};");
+            var element = $"{listVar}[i].{col.Name}";
+            var converted = ValueConversions.Write(cfg, element, ctx.FactoryClassName + ".");
+            var elementType = cfg.IsEnumAsString ? "string" : ValueConversions.Resolve(cfg)?.WireType ?? col.PropertyType;
+            sb.AppendLine($"{prefix}var {arrayVar} = new {elementType}[{listVar}.Count];");
+            sb.AppendLine($"{prefix}for (var i = 0; i < {listVar}.Count; i++) {arrayVar}[i] = {converted ?? element};");
             sb.AppendLine($"{prefix}cmd.Parameters.Add(new global::Npgsql.NpgsqlParameter");
             sb.AppendLine($"{prefix}{{");
             sb.AppendLine($"{prefix}    ParameterName = \"{col.ParameterName}s\",");

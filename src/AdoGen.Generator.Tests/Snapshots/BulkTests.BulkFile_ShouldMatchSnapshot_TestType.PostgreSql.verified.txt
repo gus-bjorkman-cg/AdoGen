@@ -183,7 +183,7 @@ public sealed class TestTypeNpgsqlBulk : BulkBatchNpg<global::AdoGen.Generator.T
             importer.Write(item.Bytes);
             importer.Write((int)item.Fruits);
             importer.Write((int)item.Flags);
-            importer.Write((byte)item.ByteEnum);
+            importer.Write((short)item.ByteEnum);
             importer.Write((short)item.ShortEnum);
             importer.Write((int)item.IntEnum);
             importer.Write((long)item.LongEnum);

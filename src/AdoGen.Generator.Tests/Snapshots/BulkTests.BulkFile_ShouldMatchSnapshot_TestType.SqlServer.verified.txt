@@ -210,12 +210,12 @@ public sealed class TestTypeBulk : BulkBatchSql<global::AdoGen.Generator.Tests.T
              18 => _item.NullableChar.HasValue ? _item.NullableChar.Value : DBNull.Value,
              19 => _item.NullableBytes ?? (object)DBNull.Value,
              20 => _item.Bytes,
-             21 => _item.Fruits,
-             22 => _item.Flags,
-             23 => _item.ByteEnum,
-             24 => _item.ShortEnum,
-             25 => _item.IntEnum,
-             26 => _item.LongEnum,
+             21 => (int)_item.Fruits,
+             22 => (int)_item.Flags,
+             23 => (byte)_item.ByteEnum,
+             24 => (short)_item.ShortEnum,
+             25 => (int)_item.IntEnum,
+             26 => (long)_item.LongEnum,
              27 => _op,
              _ => throw new IndexOutOfRangeException()
          };

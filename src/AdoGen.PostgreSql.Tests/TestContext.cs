@@ -3,6 +3,7 @@ using AdoGen.Sample.Features.Audit;
 using AdoGen.Sample.Features.Orders;
 using AdoGen.Sample.Features.TestTypes;
 using AdoGen.Sample.Features.Users;
+using AdoGen.Sample.Features.Gauges;
 using Testcontainers.PostgreSql;
 
 namespace AdoGen.PostgreSql.Tests;
@@ -41,6 +42,7 @@ public sealed class TestContext : IAsyncLifetime
         await connection.CreateTableAsync<TestType>(CancellationToken);
         await connection.CreateTableAsync<AuditEvent>(CancellationToken);
         await connection.CreateTableAsync<UserRole>(CancellationToken);
+        await connection.CreateTableAsync<Telemetry.Gauge>(CancellationToken);
     }
 
     public async ValueTask DisposeAsync() => await _pgContainer.DisposeAsync();

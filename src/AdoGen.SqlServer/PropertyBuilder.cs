@@ -168,6 +168,21 @@ public sealed class PropertyBuilder<TProp>
     /// When 0 rows are affected an <c>AdoGenConcurrencyException</c> is thrown.
     /// </summary>
     public PropertyBuilder<TProp> ConcurrencyToken() => this;
+
+    /// <summary>
+    /// Excludes the property from mapping: it is not a column, is not read by <c>Map</c>, and is never
+    /// written by INSERT/UPDATE/bulk/patch. Constructor parameters bound to an ignored property receive
+    /// <c>default</c>. An ignored property cannot be a key, identity or concurrency token (AG022).
+    /// </summary>
+    public PropertyBuilder<TProp> Ignore() => this;
+
+    /// <summary>
+    /// Stores an enum property as its member name in a VARCHAR(<paramref name="size"/>) column instead of its integer value.
+    /// Conversion uses generated switch statements (no reflection, no <c>Enum.ToString</c>).
+    /// Only valid for non-<c>[Flags]</c> enums (AG023). Renaming an enum member changes the stored value.
+    /// </summary>
+    /// <param name="size">Maximum stored member-name length.</param>
+    public PropertyBuilder<TProp> AsString(int size) => this;
     
     /// <summary>
     /// Sets the column's DDL default, e.g. <c>DefaultValue("SYSUTCDATETIME()")</c> emits <c>DEFAULT SYSUTCDATETIME()</c>.

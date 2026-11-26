@@ -18,11 +18,14 @@ All IDs are prefixed `AG`. Descriptors live in `src/AdoGen.Generator/Diagnostics
 | [AG012](#ag012--concurrencytoken-unsupported-type) | Error | ConcurrencyToken unsupported type               | Both     |
 | [AG013](#ag013--multiple-concurrency-tokens) | Error   | Multiple concurrency tokens                          | Both     |
 | [AG014](#ag014--abstract-types-not-supported) | Error  | Abstract types not supported                         | Both     |
-| [AG015](#ag015--nested-types-not-supported) | Error    | Nested types not supported                           | Both     |
+| [AG015](#ag015--unsupported-containing-type) | Error   | Unsupported containing type                          | Both     |
 | [AG016](#ag016--invalid-column-name)        | Error    | Invalid column name                                  | Both     |
 | [AG017](#ag017--unsupported-property-type)  | Error    | Unsupported property type                            | Both     |
 | [AG018](#ag018--multiple-profiles-for-the-same-type) | Error | Multiple profiles for the same type           | Both     |
 | [AG019](#ag019--unsupported-profile-expression) | Error | Unsupported profile expression                     | Both     |
+| [AG022](#ag022--ignored-property-is-in-use) | Error    | Ignored property is in use                           | Both     |
+| [AG023](#ag023--asstring-requires-a-non-flags-enum) | Error | AsString requires a non-flags enum              | Both     |
+| [AG024](#ag024--struct-model-not-supported) | Error    | Struct model not supported                           | Both     |
 
 **Removed rules:** AG003 (*Missing required parameter configuration*) was never reported in practice — AG004–AG006 cover the same cases. AG009 (*Upsert cannot be generated*) was never reported; identity-keyed models now get a working upsert (SQL Server: insert-first + `IF @@ROWCOUNT = 0 UPDATE`; PostgreSQL: `MERGE`).
 
@@ -116,7 +119,7 @@ Key(x => x.UserId); Key(x => x.RoleId); // composite key
 
 **Trigger:** the DTO is `private`, `protected`, `private protected` or `protected internal`. Only `public` and `internal` are supported.
 
-Nested DTOs are reported by [AG015](#ag015--nested-types-not-supported).
+Nested DTOs are supported when every containing type is `partial`, non-generic, and `public`/`internal` (see [AG015](#ag015--unsupported-containing-type)).
 
 ## AG012 — ConcurrencyToken unsupported type
 
@@ -136,11 +139,17 @@ Nested DTOs are reported by [AG015](#ag015--nested-types-not-supported).
 
 **Fix:** put the marker interface on a concrete type. Markers inherited from a base class are ignored, so a non-sealed DTO may have subclasses without them being treated as DTOs.
 
-## AG015 — Nested types not supported
+## AG015 — Unsupported containing type
 
-**Trigger:** the DTO is declared inside another type. Generated extension classes must be top-level.
+**Trigger:** the DTO is nested inside a type that is not `partial`, is generic, or is not `public`/`internal`. The generator re-opens every containing type as a `partial` declaration.
 
-**Fix:** declare the DTO at namespace level.
+**Fix:** mark each containing type `partial` (and non-generic, `public` or `internal`), or move the DTO to namespace level.
+```csharp
+public static partial class Telemetry          // OK
+{
+    public sealed partial record Gauge(Guid Id, uint Reads) : ISqlDomainModel;
+}
+```
 
 ## AG016 — Invalid column name
 
@@ -154,7 +163,7 @@ RuleFor(x => x.Count).Name("Item Count");  // AG016
 
 ## AG017 — Unsupported property type
 
-**Trigger:** a property on a profiled (Domain/Bulk) DTO has a CLR type with no default database mapping — e.g. `uint`, `ulong`, `ushort`, `sbyte`, `char` on SQL Server, or an arbitrary class — and the profile doesn't set an explicit type.
+**Trigger:** a property on a profiled (Domain/Bulk) DTO has a CLR type with no default database mapping — e.g. an arbitrary class or struct such as `Version` — and the profile doesn't set an explicit type. Unsigned integers and `char` map by default (see the api-reference default type table).
 
 **Fix:** set an explicit type (`.Type(SqlDbType.BigInt)` / `.Type(NpgsqlDbType.Bigint)`) or change the property type. `TimeSpan` maps to `TIME` (SQL Server) / `interval` (PostgreSQL) by default.
 
@@ -174,6 +183,24 @@ Key(x => x.Code);        // OK
 Key(SomeSelector);       // AG019
 ```
 Calls prefixed with `this.` (`this.RuleFor(...)`) are supported.
+
+## AG022 — Ignored property is in use
+
+**Trigger:** a property marked `.Ignore()` is also the key (by convention or `Key(...)`), an identity column, or a concurrency token.
+
+**Fix:** remove `.Ignore()` or pick a different key / identity / concurrency token.
+
+## AG023 — AsString requires a non-flags enum
+
+**Trigger:** `.AsString(n)` is applied to a property that is not an enum (or nullable enum), to a `[Flags]` enum (combined values have no single name), or `n` is not a positive compile-time constant.
+
+**Fix:** use `.AsString(n)` only on plain enums; keep `[Flags]` enums on their default integer mapping.
+
+## AG024 — Struct model not supported
+
+**Trigger:** a `struct` / `record struct` implements a Domain or Bulk marker interface, or a `ref struct` implements any marker interface.
+
+**Fix:** structs are supported only as mapper-only models (`ISqlMapper` / `INpgsqlMapper`). Use a class or record for Domain/Bulk models.
 
 ---
 

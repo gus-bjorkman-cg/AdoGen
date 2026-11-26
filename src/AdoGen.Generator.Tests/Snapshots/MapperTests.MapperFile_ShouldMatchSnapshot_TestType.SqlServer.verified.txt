@@ -379,7 +379,7 @@ public static class TestTypeSql
     {
         ParameterName = propertyName ?? ParameterFruits,
         SqlDbType = SqlDbType.Int,
-        Value = value,
+        Value = (int)value,
     };
     
     /// <summary>
@@ -390,7 +390,7 @@ public static class TestTypeSql
     {
         ParameterName = propertyName ?? ParameterFlags,
         SqlDbType = SqlDbType.Int,
-        Value = value,
+        Value = (int)value,
     };
     
     /// <summary>
@@ -401,7 +401,7 @@ public static class TestTypeSql
     {
         ParameterName = propertyName ?? ParameterByteEnum,
         SqlDbType = SqlDbType.TinyInt,
-        Value = value,
+        Value = (byte)value,
     };
     
     /// <summary>
@@ -412,7 +412,7 @@ public static class TestTypeSql
     {
         ParameterName = propertyName ?? ParameterShortEnum,
         SqlDbType = SqlDbType.SmallInt,
-        Value = value,
+        Value = (short)value,
     };
     
     /// <summary>
@@ -423,7 +423,7 @@ public static class TestTypeSql
     {
         ParameterName = propertyName ?? ParameterIntEnum,
         SqlDbType = SqlDbType.Int,
-        Value = value,
+        Value = (int)value,
     };
     
     /// <summary>
@@ -434,7 +434,7 @@ public static class TestTypeSql
     {
         ParameterName = propertyName ?? ParameterLongEnum,
         SqlDbType = SqlDbType.BigInt,
-        Value = value,
+        Value = (long)value,
     };
     
     /// <summary>

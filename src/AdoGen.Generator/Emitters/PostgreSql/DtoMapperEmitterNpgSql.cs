@@ -28,6 +28,7 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
         var constBuilder = new StringBuilder();
         var methodBuilder = new StringBuilder();
         var sep = setUsingConstructor ? ":" : "=";
+        var factoryClassName = $"{dto.Name}Npgsql";
 
         if (setUsingConstructor) read.Append('(').AppendLine();
         else read.AppendLine("{");
@@ -37,22 +38,27 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
             var p = dtoProps[i];
             var cfg = profileInfo.ParamsByProperty[p.Name];
             var ordinalField = $"ordinals[{i}]";
-            var isLast = i == dtoProps.Length - 1;
-            var getterExpr = EmitReaderGet(p, ordinalField);
+            var getterExpr = EmitReaderGet(p, cfg, ordinalField, factoryClassName);
             
             init.AppendLine($"        ordinals[{i}] = reader.GetOrdinal(\"{cfg.ParameterName}\");");
-            read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr}{(isLast ? "" : ",")}");
+            read.AppendLine($"            {cfg.PropertyName} {sep} {getterExpr},");
             constBuilder.AppendLine(CreateSqlParameterConst(cfg));
             
+            if (cfg.IsEnumAsString)
+                methodBuilder.AppendLine(EnumStringConversions.Build(cfg));
+
             if (cfg.CanEmitParameterFactory(discoveryDto.Provider))
                 methodBuilder.AppendLine(CreateNpgsqlParameterMethod(cfg));
         }
+
+        if (setUsingConstructor) TypeDeclarations.AppendIgnoredConstructorArguments(dto, profileInfo, read);
+        TrimLastComma(read);
 
         read.Append(setUsingConstructor ? "        )" : "        }");
 
         var methods = methodBuilder.ToString().TrimEnd();
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var typeKeyword = dto.IsRecord ? "record" : "class";
+        var typeKeyword = TypeDeclarations.Keyword(dto);
         var ns = profileInfo.Namespace;
         var ordinalCount = profileInfo.DtoProperties.Length;
         var initText = init.ToString().TrimEnd();
@@ -107,17 +113,29 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
               }
               """;
         
-        spc.AddSource($"{dto.Name}.Mapper.Npgsql.g.cs", src);
+        spc.AddSource(TypeDeclarations.HintName(dto, "Mapper.Npgsql.g.cs"), TypeDeclarations.WrapInContainers(dto, src));
+    }
+
+    private static void TrimLastComma(StringBuilder sb)
+    {
+        var i = sb.Length - 1;
+        while (i >= 0 && char.IsWhiteSpace(sb[i])) i--;
+        if (i >= 0 && sb[i] == ',') sb.Remove(i, 1);
     }
 
     private static string EmitReaderGet(
         IPropertySymbol p,
-        string ordinalField)
+        ParamConfig cfg,
+        string ordinalField,
+        string factoryClassName)
     {
         var (underlying, isNullableValueType) = p.Type.UnwrapNullable();
         var isNullable = isNullableValueType || p.NullableAnnotation == NullableAnnotation.Annotated;
         var propertyTypeKey = p.Type.ToDisplayString(RoslynSymbolExtensions.GetterKeyFormat);
         var dbNullValueExpr = isNullableValueType ? $"({propertyTypeKey})null" : "null";
+
+        if (ValueConversions.Read(cfg, "reader", ordinalField, factoryClassName + ".") is { } converted)
+            return isNullable ? $"reader.IsDBNull({ordinalField}) ? {dbNullValueExpr} : {converted}" : converted;
         
         if (underlying.TypeKind == TypeKind.Enum)
         {
@@ -199,22 +217,17 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
 
         var isNullableValueType = cfg.PropertyType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
 
-        // Npgsql cannot write .NET enum types directly when NpgsqlDbType is set to an integer type.
-        // We must cast enum values to their underlying primitive type.
-        var enumCast = ResolveNpgsqlEnumCast(cfg.PropertyType);
-        string valueExpr;
-        if (enumCast is not null)
+        // Npgsql cannot write .NET enum or unsigned types when NpgsqlDbType is an integer type,
+        // so those values are converted to the matching primitive.
+        var canBeNull = cfg.PropertyType.IsReferenceType || isNullableValueType;
+        var converted = ValueConversions.Write(cfg, isNullableValueType ? "value.Value" : "value", "");
+        var valueExpr = (canBeNull, converted) switch
         {
-            valueExpr = isNullableValueType || cfg.PropertyType.IsReferenceType
-                ? $"value is null ? DBNull.Value : ({enumCast})value"
-                : $"({enumCast})value";
-        }
-        else
-        {
-            valueExpr = cfg.PropertyType.IsReferenceType || isNullableValueType
-                ? "value is null ? DBNull.Value : value"
-                : "value";
-        }
+            (true, null) => "value is null ? global::System.DBNull.Value : value",
+            (true, _) => $"value is null ? global::System.DBNull.Value : {converted}",
+            (false, null) => "value",
+            _ => converted
+        };
 
         var optional = new StringBuilder();
         if (cfg.Size is { } size) optional.AppendLine($"        Size = {size},");
@@ -236,29 +249,5 @@ internal sealed class DtoMapperEmitterNpgSql : IEmitter
                 };
                 
             """;
-    }
-    
-    /// <summary>
-    /// Returns the C# cast expression for enum types (e.g. "(int)") or null if no cast is needed.
-    /// Npgsql requires enum values to be written as their underlying primitive type.
-    /// </summary>
-    private static string? ResolveNpgsqlEnumCast(ITypeSymbol type)
-    {
-        var (underlying, _) = type.UnwrapNullable();
-        if (underlying.TypeKind != TypeKind.Enum || underlying is not INamedTypeSymbol enumType)
-            return null;
-
-        return enumType.EnumUnderlyingType?.SpecialType switch
-        {
-            SpecialType.System_Byte => "byte",
-            SpecialType.System_SByte => "sbyte",
-            SpecialType.System_Int16 => "short",
-            SpecialType.System_UInt16 => "ushort",
-            SpecialType.System_Int32 => "int",
-            SpecialType.System_UInt32 => "uint",
-            SpecialType.System_Int64 => "long",
-            SpecialType.System_UInt64 => "ulong",
-            _ => "int"
-        };
     }
 }

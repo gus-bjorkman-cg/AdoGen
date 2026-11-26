@@ -27,7 +27,7 @@ internal static class EmitContextBuilder
         var quoter = Quoters.First(x => x.IsMatch(v));
 
         var dtoTypeName = dto.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var typeKeyword = dto.IsRecord ? "record" : "class";
+        var typeKeyword = TypeDeclarations.Keyword(dto);
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
         var schemaQuoted = quoter.Quote(profile.Schema);
         var tableQuoted = quoter.Quote(profile.Table);

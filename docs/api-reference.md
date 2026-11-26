@@ -105,6 +105,22 @@ Common modifiers available on all properties:
 | `.ReadOnly()`                | Excluded from INSERT/UPDATE/bulk writes; included in DDL and mapper |
 | `.DefaultValue(sqlExpr)`     | Emitted as `DEFAULT {sqlExpr}` in the column DDL (`"GETUTCDATE()"` / `"now()"`). A leading `DEFAULT` keyword is accepted for backward compatibility |
 | `.ConcurrencyToken()`        | See [Concurrency tokens](#concurrency-tokens)                       |
+| `.Ignore()`                  | Not a column: excluded from DDL, writes, bulk and `Map()`. Ignored constructor parameters receive `default`. Cannot be combined with key / identity / concurrency token (AG022) |
+| `.AsString(n)`               | Enum only: stored as `varchar(n)` holding the member name instead of the underlying integer. Conversion uses generated `switch` expressions (no reflection); an unknown name read from the database throws `InvalidOperationException`. `[Flags]` enums are rejected (AG023) |
+
+```csharp
+public enum OrderStatus { Pending, Shipped }
+public sealed partial record Order(Guid Id, OrderStatus Status, string? DisplayName) : ISqlDomainModel;
+
+public sealed class OrderProfile : SqlProfile<Order>
+{
+    public OrderProfile()
+    {
+        RuleFor(x => x.Status).AsString(20);     // VARCHAR(20): 'Pending' / 'Shipped'
+        RuleFor(x => x.DisplayName).Ignore();    // not a column; Map() passes default
+    }
+}
+```
 
 ### SQL Server types
 
@@ -500,10 +516,13 @@ Both methods split the list into chunks that respect these limits and return the
 | `DateTimeOffset`               | `datetimeoffset`   | `timestamptz`                |
 | `DateOnly` / `TimeOnly`        | `date` / `time`    | `date` / `time`              |
 | `TimeSpan`                     | `time`             | `interval`                   |
-| `enum`                         | underlying integer type | underlying integer type |
+| `sbyte` / `ushort` / `uint` / `ulong` | `smallint` / `int` / `bigint` / `decimal(20,0)` | `smallint` / `integer` / `bigint` / `numeric(20,0)` |
+| `char`                         | `nchar(1)`         | `char(1)`                    |
+| `enum`                         | underlying integer type (unsigned → next wider signed type, as above) | same |
+| `enum` with `.AsString(n)`     | `varchar(n)` (member name) | `varchar(n)` (member name) |
 | `string`, `decimal`, `byte[]`  | rule required      | `string` → `text` (by design); `decimal` rule required; `byte[]` → `bytea` |
 
-`uint`, `ulong`, `ushort`, `sbyte` and (on SQL Server) `char` have no default mapping. On Domain/Bulk models they are rejected with AG017 unless configured with `.Type(...)`. SQL Server `time` holds at most 24 hours; use `bigint` ticks for longer durations.
+Unsigned types map to the next wider signed type, so every value round-trips. The generated mapper and parameter factories convert explicitly (e.g. `(long)value`, `(uint)reader.GetInt64(o)`). Reading a value out of range for the CLR type (e.g. a negative number into `uint`) throws `OverflowException` only in a `checked` context; by default it wraps. SQL Server `time` holds at most 24 hours; use `bigint` ticks for longer durations.
 
 ### Table naming
 
@@ -511,6 +530,13 @@ Without `Table("...")`, the table name is the class name, pluralized with a simp
 - consonant + `y` → `ies` (`Category` → `Categories`);
 - names ending in `s`, `x`, `z`, `ch` or `sh` get `es` (`Box` → `Boxes`);
 - otherwise `s` is appended.
+
+Turn pluralization off for a whole assembly with the provider's naming attribute; the table name is then the class name as-is. `Table("...")` always wins.
+
+```csharp
+[assembly: AdoGen.SqlServer.SqlNaming(Pluralize = false)]      // SQL Server profiles
+[assembly: AdoGen.PostgreSql.NpgsqlNaming(Pluralize = false)]  // PostgreSQL profiles
+```
 
 The default schema is `dbo` on SQL Server and `public` on PostgreSQL. `CreateTableAsync` does not create a missing schema. On PostgreSQL it uses `CREATE TABLE IF NOT EXISTS`, while on SQL Server it fails if the table already exists.
 
@@ -521,6 +547,16 @@ Both runtimes define `AdoGenConcurrencyException`, `BulkApplyResult`, `BulkOp` a
 ```csharp
 using SqlConcurrencyException    = AdoGen.SqlServer.AdoGenConcurrencyException;
 using NpgsqlConcurrencyException = AdoGen.PostgreSql.AdoGenConcurrencyException;
+```
+
+### Nested and struct DTOs
+
+A DTO may be nested inside other types if every containing type is `partial`, non-generic and `public`/`internal` (AG015). Generated helper classes (`{Dto}Sql`, `{Dto}Bulk`, `{Dto}Patch`, …) are nested beside the DTO. Generated files are named `Outer.Dto.{Mapper|Domain|Bulk}.{Sql|Npgsql}.g.cs`. Patch extension methods live in a top-level `{Outer}{Dto}{Sql|Npgsql}PatchExtensions` class, because C# extension methods must be top-level.
+
+`struct`, `readonly struct` and `(readonly) record struct` DTOs are supported for **mapper-only** models (`ISqlMapper` / `INpgsqlMapper`). `QueryAsync<T>` then stores rows inline in the `List<T>` with no per-row heap allocation. `QueryFirstOrDefaultAsync<T>` returns `default(T)` when there is no row, so check a key field or use a nullable wrapper. Domain/Bulk structs and `ref struct`s are rejected (AG024).
+
+```csharp
+public readonly partial record struct GaugeTotal(uint Reads, ulong Total) : ISqlMapper;
 ```
 
 ### Optimistic concurrency and missing rows
@@ -539,9 +575,9 @@ using NpgsqlConcurrencyException = AdoGen.PostgreSql.AdoGenConcurrencyException;
 - **One concurrency token per model.** Only one property may be marked `.ConcurrencyToken()`.
 - **Profiles are required for Domain/Bulk models.** Even if every property has a default mapping, a profile class must exist in the compilation. Mapper-only DTOs are exempt (see [Profiles](#profiles)).
 - **Required profile configuration.** SQL Server needs explicit configuration for `string`, `decimal` and `byte[]`. PostgreSQL needs it only for `decimal`; strings default to `text` (see [PostgreSQL types](#postgresql-types)). Missing configuration is a compile-time error (see [diagnostics](diagnostics.md)).
-- **DTO shape.** DTOs must be top-level (AG015), `partial`, non-static, non-abstract (AG014), and at least `internal`. They may be non-sealed and used as base classes; subclasses are not DTOs unless they implement a marker interface themselves.
-- **Columns are settable properties.** A property is a column if it has a setter/`init` or a matching constructor parameter. Computed get-only properties (e.g. `FullName => …`) and indexers are ignored. There is no `Ignore()` for settable properties.
+- **DTO shape.** DTOs must be `partial`, non-static, non-abstract (AG014), and at least `internal`. Nested DTOs need `partial`, non-generic, `public`/`internal` containing types (AG015). Structs are mapper-only (AG024). They may be non-sealed and used as base classes; subclasses are not DTOs unless they implement a marker interface themselves.
+- **Columns are settable properties.** A property is a column if it has a setter/`init` or a matching constructor parameter. Computed get-only properties (e.g. `FullName => …`) and indexers are ignored. Use `.Ignore()` to exclude a settable property.
 - **Column names must be valid identifiers** (AG016). `.Name("...")` values are used in both C# member names and SQL parameter names.
-- **Unsupported CLR types** (AG017). `uint`, `ulong`, `ushort`, `sbyte` and SQL Server `char` need an explicit `.Type(...)`.
+- **Unsupported CLR types** (AG017). Types without a default mapping (e.g. arbitrary classes) need an explicit `.Type(...)`.
 - **`ExecuteScalarAsync<T>` casts, it does not convert.** See [Scalar & execute helpers](#executescalarasynct).
 

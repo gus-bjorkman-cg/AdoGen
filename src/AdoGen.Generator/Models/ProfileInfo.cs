@@ -10,7 +10,8 @@ internal sealed record ProfileInfo(
     ImmutableHashSet<string> IdentityKeys,
     ImmutableArray<IPropertySymbol> DtoProperties,
     ImmutableDictionary<string, ParamConfig> ParamsByProperty,
-    string Namespace
+    string Namespace,
+    ImmutableArray<string> IgnoredProperties = default
 )
 {
     public static readonly ProfileInfo Empty = new(

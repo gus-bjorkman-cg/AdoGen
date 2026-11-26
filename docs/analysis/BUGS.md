@@ -23,11 +23,11 @@ Severity ranges from **Critical** (silent wrong data or a broken release), throu
 | B8  | High     | Runtime                 | `ExecuteScalarAsync<T>` throws on NULL/DBNull/numeric mismatch                       | Fixed — null/DBNull return `default`; exact-type cast documented |
 | B9  | High     | Runtime / SQL Server    | `CreateParameter` with null value → "parameter not supplied"                         | Fixed — null sent as `DBNull.Value` |
 | B10 | Medium   | Generator               | `sealed` forced onto every DTO (breaks inheritance/abstract)                         | Fixed — `sealed` no longer emitted; inherited markers ignored; AG014 for abstract |
-| B11 | Medium   | Generator               | Nested DTOs generate uncompilable code                                               | Fixed — AG015 diagnostic |
+| B11 | Medium   | Generator               | Nested DTOs generate uncompilable code                                               | Fixed — nested DTOs supported (F17); AG015 for non-partial/generic containers |
 | B12 | Medium   | Generator / Patch       | `{Dto}Patch` always `public` → CS0051/CS0053 on internal DTOs                        | Fixed — patch class/extensions use the DTO accessibility |
-| B13 | Medium   | Generator               | Computed properties treated as columns; no way to ignore                             | Fixed — only settable / ctor-bound properties are columns; indexers excluded |
+| B13 | Medium   | Generator               | Computed properties treated as columns; no way to ignore                             | Fixed — only settable / ctor-bound properties are columns; indexers excluded; `.Ignore()` (F11) |
 | B14 | Medium   | Generator               | `.Name("with space")` breaks generated C# and SQL                                    | Fixed — AG016 diagnostic |
-| B15 | Medium   | Generator               | Unsupported CLR types emit `VARIANT` / `unknown` DDL without diagnostic              | Fixed — `TimeSpan` → `time`/`interval`; others AG017 |
+| B15 | Medium   | Generator               | Unsupported CLR types emit `VARIANT` / `unknown` DDL without diagnostic              | Fixed — `TimeSpan` → `time`/`interval`; unsigned/`char` default mappings (F15); others AG017 |
 | B16 | Medium   | Generator               | Duplicate profiles silently first-wins                                               | Fixed — AG018 diagnostic |
 | B17 | Medium   | Generator               | Non-lambda args crash generator; `this.RuleFor` ignored                              | Fixed — `this.` calls parsed; AG019 for non-lambda selectors; non-constant `Table`/`Schema` → AG007 |
 | B18 | Medium   | Generator / runtime     | No chunking for SQL Server 2100-param / 1000-row limits                              | Fixed — SQL Server list insert/delete chunked (not atomic without a transaction) |

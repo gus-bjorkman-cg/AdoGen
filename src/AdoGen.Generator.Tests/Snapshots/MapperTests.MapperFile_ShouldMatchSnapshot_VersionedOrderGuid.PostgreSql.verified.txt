@@ -58,7 +58,7 @@ public static class VersionedOrderGuidNpgsql
     {
         ParameterName = propertyName ?? ParameterId,
         NpgsqlDbType = NpgsqlDbType.Uuid,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -69,7 +69,7 @@ public static class VersionedOrderGuidNpgsql
     {
         ParameterName = propertyName ?? ParameterProductName,
         NpgsqlDbType = NpgsqlDbType.Varchar,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 50,
     };
     
@@ -81,6 +81,6 @@ public static class VersionedOrderGuidNpgsql
     {
         ParameterName = propertyName ?? ParameterRowVersion,
         NpgsqlDbType = NpgsqlDbType.Uuid,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
 }

@@ -95,8 +95,8 @@ internal static class SqlDiagnostics
 
     public static readonly DiagnosticDescriptor NestedTypeNotSupported = new(
         id: "AG015",
-        title: "Nested types not supported",
-        messageFormat: "Type '{0}' is nested inside '{1}'. Declare AdoGen DTOs as top-level types.",
+        title: "Unsupported containing type",
+        messageFormat: "Type '{0}' is nested inside '{1}', which must be a partial, non-generic, public or internal type",
         category: "Design",
         DiagnosticSeverity.Error, true);
 
@@ -140,5 +140,26 @@ internal static class SqlDiagnostics
         title: "Unknown profile method",
         messageFormat: "Profile method '{1}' on property '{2}' of '{0}' is not recognized by the {3} generator and would be ignored",
         category: "Usage",
+        DiagnosticSeverity.Error, true);
+
+    public static readonly DiagnosticDescriptor IgnoredPropertyInUse = new(
+        id: "AG022",
+        title: "Ignored property is in use",
+        messageFormat: "Property '{1}' of '{0}' is marked Ignore() but is also configured as {2}",
+        category: "Usage",
+        DiagnosticSeverity.Error, true);
+
+    public static readonly DiagnosticDescriptor InvalidAsString = new(
+        id: "AG023",
+        title: "AsString requires a non-flags enum",
+        messageFormat: "AsString on property '{1}' of '{0}' requires a non-[Flags] enum type and a positive constant size, but the property type is '{2}'",
+        category: "Usage",
+        DiagnosticSeverity.Error, true);
+
+    public static readonly DiagnosticDescriptor StructNotSupported = new(
+        id: "AG024",
+        title: "Struct model not supported",
+        messageFormat: "Type '{0}' is a struct; structs are only supported as mapper-only models (ISqlMapper or INpgsqlMapper) and ref structs are not supported",
+        category: "Design",
         DiagnosticSeverity.Error, true);
 }

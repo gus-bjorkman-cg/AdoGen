@@ -82,7 +82,7 @@ public partial record TestType : INpgsqlMapper<global::AdoGen.Generator.Tests.Te
             Bytes : reader.GetFieldValue<byte[]>(ordinals[20]),
             Fruits : (global::AdoGen.Generator.Tests.Fruits)reader.GetInt32(ordinals[21]),
             Flags : (global::AdoGen.Generator.Tests.Flags)reader.GetInt32(ordinals[22]),
-            ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetByte(ordinals[23]),
+            ByteEnum : (global::AdoGen.Generator.Tests.ByteEnum)reader.GetInt16(ordinals[23]),
             ShortEnum : (global::AdoGen.Generator.Tests.ShortEnum)reader.GetInt16(ordinals[24]),
             IntEnum : (global::AdoGen.Generator.Tests.IntEnum)reader.GetInt32(ordinals[25]),
             LongEnum : (global::AdoGen.Generator.Tests.LongEnum)reader.GetInt64(ordinals[26]),
@@ -144,7 +144,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableInt,
         NpgsqlDbType = NpgsqlDbType.Integer,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -168,7 +168,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableDecimal,
         NpgsqlDbType = NpgsqlDbType.Numeric,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Precision = 6,
         Scale = 3,
     };
@@ -181,7 +181,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableGuid,
         NpgsqlDbType = NpgsqlDbType.Uuid,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -192,7 +192,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableStringVarchar,
         NpgsqlDbType = NpgsqlDbType.Varchar,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 100,
     };
     
@@ -204,7 +204,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableStringNVarchar,
         NpgsqlDbType = NpgsqlDbType.Varchar,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 100,
     };
     
@@ -216,7 +216,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterStringVarcharRuledNull,
         NpgsqlDbType = NpgsqlDbType.Varchar,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 100,
     };
     
@@ -228,7 +228,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterCharString,
         NpgsqlDbType = NpgsqlDbType.Char,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 10,
     };
     
@@ -240,7 +240,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNCharString,
         NpgsqlDbType = NpgsqlDbType.Char,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 15,
     };
     
@@ -263,7 +263,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableFloat,
         NpgsqlDbType = NpgsqlDbType.Real,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -274,7 +274,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterDateTime,
         NpgsqlDbType = NpgsqlDbType.Timestamp,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -285,7 +285,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableDateTime,
         NpgsqlDbType = NpgsqlDbType.Timestamp,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -307,7 +307,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableDouble,
         NpgsqlDbType = NpgsqlDbType.Double,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -342,7 +342,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableChar,
         NpgsqlDbType = NpgsqlDbType.Char,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 1,
     };
     
@@ -354,7 +354,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterNullableBytes,
         NpgsqlDbType = NpgsqlDbType.Bytea,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -365,7 +365,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterBytes,
         NpgsqlDbType = NpgsqlDbType.Bytea,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -398,7 +398,7 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterByteEnum,
         NpgsqlDbType = NpgsqlDbType.Smallint,
-        Value = (byte)value,
+        Value = (short)value,
     };
     
     /// <summary>
@@ -442,6 +442,6 @@ public static class TestTypeNpgsql
     {
         ParameterName = propertyName ?? ParameterCreatedAt,
         NpgsqlDbType = NpgsqlDbType.TimestampTz,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
 }

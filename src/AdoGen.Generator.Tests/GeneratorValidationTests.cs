@@ -82,15 +82,34 @@ public sealed class GeneratorValidationTests
         result.Diagnostics.Should().Contain(d => d.Id == "AG014");
     }
 
-    // ── B11: nested types ─────────────────────────────────────────────────────
+    // ── B11 / F17: nested types need partial, non-generic, public/internal containers ──
 
     [Fact]
-    public void AG015_ShouldBeEmitted_WhenDtoIsNested()
+    public void AG015_ShouldBeEmitted_WhenContainingTypeIsGeneric()
     {
         // Arrange
         var source = SqlUsings + """
 
-            public static partial class Outer
+            public static partial class Outer<T>
+            {
+                public partial record Inner(int Id, int Value) : ISqlMapper;
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlMapper);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG015");
+    }
+
+    [Fact]
+    public void AG015_ShouldBeEmitted_WhenContainingTypeIsNotPartial()
+    {
+        // Arrange
+        var source = SqlUsings + """
+
+            public static class Outer
             {
                 public partial record Inner(int Id, int Value) : ISqlMapper;
             }
@@ -186,7 +205,7 @@ public sealed class GeneratorValidationTests
         // Arrange
         var source = SqlUsings + """
 
-            public sealed partial record Counter(Guid Id, uint Hits) : ISqlDomainModel;
+            public sealed partial record Counter(Guid Id, Version Hits) : ISqlDomainModel;
             public sealed class CounterProfile : SqlProfile<Counter>
             {
                 public CounterProfile() { }

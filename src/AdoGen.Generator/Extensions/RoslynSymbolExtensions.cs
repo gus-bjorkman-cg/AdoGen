@@ -17,6 +17,16 @@ internal static class RoslynSymbolExtensions
         public bool IsDecimal => t.SpecialType == SpecialType.System_Decimal;
         public bool IsByteArray => t is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte };
 
+        public bool IsFlagsEnum()
+        {
+            foreach (var attribute in t.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() == "System.FlagsAttribute") return true;
+            }
+
+            return false;
+        }
+
         public bool IsGuidType
         {
             get
@@ -63,9 +73,14 @@ internal static class RoslynSymbolExtensions
             {
                 SpecialType.System_Boolean => SqlDbType.Bit,
                 SpecialType.System_Byte => SqlDbType.TinyInt,
+                SpecialType.System_SByte => SqlDbType.SmallInt,
                 SpecialType.System_Int16 => SqlDbType.SmallInt,
+                SpecialType.System_UInt16 => SqlDbType.Int,
                 SpecialType.System_Int32 => SqlDbType.Int,
+                SpecialType.System_UInt32 => SqlDbType.BigInt,
                 SpecialType.System_Int64 => SqlDbType.BigInt,
+                SpecialType.System_UInt64 => SqlDbType.Decimal,
+                SpecialType.System_Char => SqlDbType.NChar,
                 SpecialType.System_Single => SqlDbType.Real,
                 SpecialType.System_Double => SqlDbType.Float,
                 SpecialType.System_Decimal => SqlDbType.Decimal,
@@ -111,9 +126,13 @@ internal static class RoslynSymbolExtensions
             {
                 SpecialType.System_Boolean => "Boolean",
                 SpecialType.System_Byte => "Smallint",
+                SpecialType.System_SByte => "Smallint",
                 SpecialType.System_Int16 => "Smallint",
+                SpecialType.System_UInt16 => "Integer",
                 SpecialType.System_Int32 => "Integer",
+                SpecialType.System_UInt32 => "Bigint",
                 SpecialType.System_Int64 => "Bigint",
+                SpecialType.System_UInt64 => "Numeric",
                 SpecialType.System_Single => "Real",
                 SpecialType.System_Double => "Double",
                 SpecialType.System_Decimal => "Numeric",
@@ -137,8 +156,7 @@ internal static class RoslynSymbolExtensions
     }
 
     /// <summary>
-    /// True when no default provider type exists for the CLR type (e.g. unsigned integers, <c>char</c> on
-    /// SQL Server, arbitrary structs/classes). Such properties need an explicit <c>.Type(...)</c>.
+    /// True when no default provider type exists for the CLR type (e.g. arbitrary structs/classes). Such properties need an explicit <c>.Type(...)</c>.
     /// </summary>
     public static bool IsUnmappedDefault(this DbTypeRef dbType) =>
         dbType.EnumMember is "Variant" or "Unknown";

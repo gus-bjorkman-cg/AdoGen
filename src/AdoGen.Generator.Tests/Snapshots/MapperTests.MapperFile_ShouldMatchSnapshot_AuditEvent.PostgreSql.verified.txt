@@ -83,7 +83,7 @@ public static class AuditEventNpgsql
     {
         ParameterName = propertyName ?? ParameterEventType,
         NpgsqlDbType = NpgsqlDbType.Varchar,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 50,
     };
     
@@ -95,6 +95,6 @@ public static class AuditEventNpgsql
     {
         ParameterName = propertyName ?? ParameterJsonPayload,
         NpgsqlDbType = NpgsqlDbType.Bytea,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
 }

@@ -44,7 +44,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
         var createIndexSql = PostgreSqlSqlTextBuilder.BulkCreateIndex(ctx, tempTableName);
         var analyzeSql = PostgreSqlSqlTextBuilder.BulkAnalyze(tempTableName);
         var stmts = PostgreSqlSqlTextBuilder.BulkApply(ctx, tempTableName, ctx.SchemaTableQuoted);
-        var typeKeyword = dto.IsRecord ? "record" : "class";
+        var typeKeyword = TypeDeclarations.Keyword(dto);
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         var copyColumnsEscaped = BuildJoined(bulkColumns, col => $"\"{col.ParameterName}\"") + ", \"operation\"";
@@ -111,7 +111,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 }
                 """";
 
-        spc.AddSource($"{dto.Name}.Bulk.Npgsql.g.cs", src);
+        spc.AddSource(TypeDeclarations.HintName(dto, "Bulk.Npgsql.g.cs"), TypeDeclarations.WrapInContainers(dto, src));
         return;
 
         string EmitImporterWrites()
@@ -130,7 +130,7 @@ internal sealed class BulkEmitterNpgSql : IEmitter
                 
                 if (p is null) continue;
                 
-                var accessor = ResolveNpgsqlBulkWriteAccessor(p);
+                var accessor = ResolveNpgsqlBulkWriteAccessor(p, profileInfo.ParamsByProperty[p.Name], dto.Name + "Npgsql.");
                 sb.AppendLine($"            importer.Write({accessor});");
             }
             
@@ -200,30 +200,26 @@ internal sealed class BulkEmitterNpgSql : IEmitter
 
     /// <summary>
     /// Returns the accessor expression for a property in a COPY BINARY write.
-    /// Enum values must be cast to their underlying type because Npgsql COPY BINARY
-    /// does not support writing .NET enum types directly.
+    /// Enum and unsigned values are converted to the primitive matching the column type because
+    /// Npgsql COPY BINARY does not write those .NET types directly.
     /// </summary>
-    private static string ResolveNpgsqlBulkWriteAccessor(IPropertySymbol p)
+    private static string ResolveNpgsqlBulkWriteAccessor(IPropertySymbol p, ParamConfig cfg, string factoryPrefix)
     {
-        var (underlying, isNullable) = p.Type.UnwrapNullable();
-        if (underlying.TypeKind != TypeKind.Enum || underlying is not INamedTypeSymbol enumType)
+        var (_, isNullableValueType) = p.Type.UnwrapNullable();
+
+        if (cfg.IsEnumAsString)
+        {
+            var toDb = $"{factoryPrefix}{ValueConversions.EnumToDbMethod(cfg)}";
+            return isNullableValueType
+                ? $"item.{p.Name}.HasValue ? {toDb}(item.{p.Name}.Value) : null"
+                : $"{toDb}(item.{p.Name})";
+        }
+
+        if (ValueConversions.Resolve(cfg) is not { } conversion)
             return $"item.{p.Name}";
 
-        var castType = enumType.EnumUnderlyingType?.SpecialType switch
-        {
-            SpecialType.System_Byte => "byte",
-            SpecialType.System_SByte => "sbyte",
-            SpecialType.System_Int16 => "short",
-            SpecialType.System_UInt16 => "ushort",
-            SpecialType.System_Int32 => "int",
-            SpecialType.System_UInt32 => "uint",
-            SpecialType.System_Int64 => "long",
-            SpecialType.System_UInt64 => "ulong",
-            _ => "int"
-        };
-
-        return isNullable
-            ? $"item.{p.Name}.HasValue ? ({castType})item.{p.Name}.Value : DBNull.Value"
-            : $"({castType})item.{p.Name}";
+        return isNullableValueType
+            ? $"item.{p.Name}.HasValue ? ({conversion.WireType}?){conversion.Write($"item.{p.Name}.Value")} : null"
+            : conversion.Write($"item.{p.Name}");
     }
 }

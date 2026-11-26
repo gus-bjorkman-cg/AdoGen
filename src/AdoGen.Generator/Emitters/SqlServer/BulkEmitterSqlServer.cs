@@ -43,7 +43,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
             HasUpdates: ctx.WritableNonKeyNonIdentities.Length > 0);
         var applySql = SqlServerSqlTextBuilder.BulkApply(ctx, tempTableName, applyOptions);
         var createIndexSql = SqlServerSqlTextBuilder.BulkCreateIndex(ctx, tempTableName);
-        var typeKeyword = dto.IsRecord ? "record" : "class";
+        var typeKeyword = TypeDeclarations.Keyword(dto);
         var accessibility = dto.DeclaredAccessibility.ToString().ToLowerInvariant();
 
         // Generated file
@@ -154,7 +154,7 @@ internal sealed class BulkEmitterSqlServer : IEmitter
                 }
                """";
 
-        spc.AddSource($"{dto.Name}.Bulk.Sql.g.cs", src);
+        spc.AddSource(TypeDeclarations.HintName(dto, "Bulk.Sql.g.cs"), TypeDeclarations.WrapInContainers(dto, src));
         
         return;
 
@@ -230,6 +230,17 @@ internal sealed class BulkEmitterSqlServer : IEmitter
 
         string GetValueExpression(IPropertySymbol p, bool isNullable)
         {
+            var cfg = profileInfo.ParamsByProperty[p.Name];
+            var isNullableValueType = p.Type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
+            var converted = ValueConversions.Write(cfg, isNullableValueType ? $"_item.{p.Name}.Value" : $"_item.{p.Name}", $"{dto.Name}Sql.");
+
+            if (converted is not null)
+            {
+                if (isNullableValueType) return $"_item.{p.Name}.HasValue ? (object){converted} : DBNull.Value";
+                if (p.Type.IsReferenceType) return $"_item.{p.Name} is null ? DBNull.Value : (object){converted}";
+                return converted;
+            }
+
             if (isNullable && p.Type.IsReferenceType)
                 return $"_item.{p.Name} ?? (object)DBNull.Value";
 

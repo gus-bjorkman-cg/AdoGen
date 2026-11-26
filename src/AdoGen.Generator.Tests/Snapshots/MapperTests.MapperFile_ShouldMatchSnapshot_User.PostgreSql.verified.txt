@@ -58,7 +58,7 @@ public static class UserNpgsql
     {
         ParameterName = propertyName ?? ParameterId,
         NpgsqlDbType = NpgsqlDbType.Uuid,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
     };
     
     /// <summary>
@@ -69,7 +69,7 @@ public static class UserNpgsql
     {
         ParameterName = propertyName ?? ParameterName,
         NpgsqlDbType = NpgsqlDbType.Varchar,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 20,
     };
     
@@ -81,7 +81,7 @@ public static class UserNpgsql
     {
         ParameterName = propertyName ?? ParameterEmail,
         NpgsqlDbType = NpgsqlDbType.Varchar,
-        Value = value is null ? DBNull.Value : value,
+        Value = value is null ? global::System.DBNull.Value : value,
         Size = 50,
     };
 }

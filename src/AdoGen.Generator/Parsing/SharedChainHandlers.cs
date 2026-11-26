@@ -231,3 +231,73 @@ internal sealed class ConcurrencyTokenChainHandler : IChainMethodHandler
     }
 }
 
+
+internal sealed class IgnoreChainHandler : IChainMethodHandler
+{
+    private const string MethodName = "Ignore";
+    private IgnoreChainHandler() { }
+    public static IgnoreChainHandler Instance { get; } = new();
+
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
+
+    public void Handle(
+        SemanticModel model,
+        INamedTypeSymbol dtoType,
+        string propertyName,
+        ChainMethod chain,
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder,
+        CancellationToken ct)
+    {
+        if (chain.Args.Count == 0) cfg.IsIgnored = true;
+        else diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
+    }
+}
+
+/// <summary>
+/// <c>.AsString(size)</c>: stores a non-[Flags] enum as its member name in a VARCHAR(size) column.
+/// </summary>
+internal sealed class AsStringChainHandler : IChainMethodHandler
+{
+    private const string MethodName = "AsString";
+    private readonly SqlProviderKind _provider;
+    private readonly string _dbTypeMember;
+
+    private AsStringChainHandler(SqlProviderKind provider, string dbTypeMember)
+    {
+        _provider = provider;
+        _dbTypeMember = dbTypeMember;
+    }
+
+    public static AsStringChainHandler SqlServer { get; } = new(SqlProviderKind.SqlServer, "VarChar");
+    public static AsStringChainHandler Npgsql { get; } = new(SqlProviderKind.PostgreSql, "Varchar");
+
+    public bool IsMatch(SqlProviderKind provider, string methodName) => provider == _provider && methodName == MethodName;
+
+    public void Handle(
+        SemanticModel model,
+        INamedTypeSymbol dtoType,
+        string propertyName,
+        ChainMethod chain,
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder,
+        CancellationToken ct)
+    {
+        var (underlying, _) = cfg.PropertyType.UnwrapNullable();
+        var isSupportedEnum = underlying.TypeKind == TypeKind.Enum && !underlying.IsFlagsEnum();
+
+        if (!isSupportedEnum ||
+            chain.Args.Count != 1 ||
+            !model.TryGetConstInt(chain.Args[0].Expression, ct, out var size) ||
+            size <= 0)
+        {
+            diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.InvalidAsString, chain.Node.GetLocation(),
+                dtoType.Name, propertyName, cfg.PropertyType.ToDisplayString()));
+            return;
+        }
+
+        cfg.IsEnumAsString = true;
+        cfg.DbType = _provider is SqlProviderKind.PostgreSql ? DbTypeRef.PostgreSql(_dbTypeMember) : DbTypeRef.SqlServer(_dbTypeMember);
+        cfg.Size = size;
+    }
+}

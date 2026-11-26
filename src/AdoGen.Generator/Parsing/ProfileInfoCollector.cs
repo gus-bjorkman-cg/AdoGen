@@ -27,8 +27,8 @@ internal static class ProfileInfoCollector
         ImmutableArray<IPropertySymbol> props,
         CancellationToken ct)
     {
-        var (dto, _, profile, model, provider, _, _) = discoveryDto;
-        var collected = Collect(profile!, dto, model!, diagnostics, provider, props, ct);
+        var (dto, _, profile, model, provider, _, _, pluralize) = discoveryDto;
+        var collected = Collect(profile!, dto, model!, diagnostics, provider, props, pluralize, ct);
 
         if (collected.Keys.IsDefaultOrEmpty || collected.Keys.Length == 0)
         {
@@ -71,8 +71,11 @@ internal static class ProfileInfoCollector
         }
 
         foreach (var cfg in configs.Values)
+        {
+            ApplyConventionDefaults(cfg);
             if (cfg.SqlTypeLiteral is "")
                 cfg.SqlTypeLiteral = SqlTypeLiterals.First(x => x.IsMatch(cfg)).Get(cfg);
+        }
 
         return new ProfileInfo(
             Schema: string.Empty,
@@ -92,6 +95,7 @@ internal static class ProfileInfoCollector
         ImmutableArray<Diagnostic>.Builder diagnostics,
         SqlProviderKind provider,
         ImmutableArray<IPropertySymbol> props,
+        bool pluralize,
         CancellationToken ct)
     {
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
@@ -100,7 +104,7 @@ internal static class ProfileInfoCollector
         
         var dtoProps = props.ToImmutableDictionary(static p => p.Name, p => p, StringComparer.Ordinal);
         var schema = provider.DefaultSchema();
-        var table = dtoType.Name.PluralizeSimple();
+        var table = pluralize ? dtoType.Name.PluralizeSimple() : dtoType.Name;
         var expressionSyntaxes = profileSymbol.GetProfileExpressions();
 
         foreach (var expressionSyntax in expressionSyntaxes)
@@ -165,6 +169,26 @@ internal static class ProfileInfoCollector
             }
         }
         
+        var ignored = ImmutableArray.CreateBuilder<string>();
+        foreach (var cfg in configs.Values)
+        {
+            if (!cfg.IsIgnored) continue;
+
+            ignored.Add(cfg.PropertyName);
+            ReportIgnoredInUse(cfg, keys.Contains(cfg.PropertyName), "a key");
+            ReportIgnoredInUse(cfg, identityKeys.Contains(cfg.PropertyName), "an identity");
+            ReportIgnoredInUse(cfg, cfg.IsConcurrencyToken, "a concurrency token");
+        }
+
+        if (ignored.Count > 0)
+        {
+            foreach (var name in ignored) configs.Remove(name);
+            keys.RemoveAll(ignored.Contains);
+            identityKeys.ExceptWith(ignored);
+            dtoProps = dtoProps.RemoveRange(ignored);
+            props = props.RemoveAll(p => ignored.Contains(p.Name));
+        }
+
         if (keys.Count == 0)
         {
             var idProp = dtoProps.Keys.FirstOrDefault(static n => string.Equals(n, "Id", StringComparison.OrdinalIgnoreCase));
@@ -191,8 +215,11 @@ internal static class ProfileInfoCollector
         }
         
         foreach (var cfg in configs.Values)
-            if (cfg.SqlTypeLiteral is "") 
+        {
+            ApplyConventionDefaults(cfg);
+            if (cfg.SqlTypeLiteral is "")
                 cfg.SqlTypeLiteral = SqlTypeLiterals.First(x => x.IsMatch(cfg)).Get(cfg);
+        }
         
         return new ProfileInfo(
             Schema: schema,
@@ -201,8 +228,45 @@ internal static class ProfileInfoCollector
             IdentityKeys: identityKeys.Distinct().ToImmutableHashSet(StringComparer.Ordinal),
             DtoProperties: props,
             ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal),
-            Namespace: dtoType.GetNamespace()
+            Namespace: dtoType.GetNamespace(),
+            IgnoredProperties: ignored.ToImmutable()
         );
+
+        void ReportIgnoredInUse(ParamConfig cfg, bool inUse, string usage)
+        {
+            if (!inUse) return;
+
+            var location = dtoProps.TryGetValue(cfg.PropertyName, out var p)
+                ? p.Locations.FirstOrDefault() ?? Location.None
+                : dtoType.Locations.FirstOrDefault() ?? Location.None;
+
+            diagnostics.Add(Diagnostic.Create(SqlDiagnostics.IgnoredPropertyInUse, location, dtoType.Name, cfg.PropertyName, usage));
+        }
+    }
+
+    /// <summary>
+    /// Fills convention metadata for CLR types whose default provider type needs a size or precision:
+    /// <c>char</c> is a single character and <c>ulong</c> (or a ulong-backed enum) needs 20 integral digits.
+    /// </summary>
+    private static void ApplyConventionDefaults(ParamConfig cfg)
+    {
+        var (underlying, _) = cfg.PropertyType.UnwrapNullable();
+        var integral = underlying is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } eu } ? eu : underlying;
+
+        if (integral.SpecialType == SpecialType.System_UInt64 &&
+            cfg.DbType?.EnumMember is "Decimal" or "Numeric" &&
+            cfg.Precision is null && cfg.Scale is null)
+        {
+            cfg.Precision = 20;
+            cfg.Scale = 0;
+        }
+
+        if (underlying.SpecialType == SpecialType.System_Char &&
+            cfg.DbType?.EnumMember is "NChar" or "Char" &&
+            cfg.Size is null)
+        {
+            cfg.Size = 1;
+        }
     }
     
     /// <summary>

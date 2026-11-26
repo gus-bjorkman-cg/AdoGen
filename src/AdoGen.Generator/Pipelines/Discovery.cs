@@ -21,6 +21,9 @@ internal static class Discovery
     private const string NpgsqlDomainInterface = $"{NpgsqlSqlLib}.INpgsqlDomainModel";
     private const string NpgsqlBulkInterface = $"{NpgsqlSqlLib}.INpgsqlBulkModel";
     private const string NpgsqlProfile = "NpgsqlProfile";
+
+    private const string SqlServerNamingAttribute = $"{SqlServerLib}.SqlNamingAttribute";
+    private const string NpgsqlNamingAttribute = $"{NpgsqlSqlLib}.NpgsqlNamingAttribute";
     
     public static IncrementalValuesProvider<DiscoveryDto> DiscoverDtos(
         IncrementalGeneratorInitializationContext context)
@@ -32,8 +35,8 @@ internal static class Discovery
     private static IncrementalValueProvider<ImmutableArray<INamedTypeSymbol>> CreateDtoCandidates(
         IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
-                // A DTO needs a base list to implement a marker interface; at least one partial part declares it.
-                static (node, _) => node is ClassDeclarationSyntax { BaseList: not null } or RecordDeclarationSyntax { BaseList: not null },
+                // A DTO (class, record, struct or record struct) needs a base list to implement a marker interface; at least one partial part declares it.
+                static (node, _) => node is ClassDeclarationSyntax { BaseList: not null } or RecordDeclarationSyntax { BaseList: not null } or StructDeclarationSyntax { BaseList: not null },
                 static (ctx, ct) =>
                     ctx.SemanticModel.GetDeclaredSymbol((TypeDeclarationSyntax)ctx.Node, ct) as INamedTypeSymbol)
             .Where(static x => x is not null)
@@ -55,6 +58,8 @@ internal static class Discovery
                 var distinctTypes = types.Distinct<INamedTypeSymbol>(SymbolEqualityComparer.Default);
                 var builder = ImmutableArray.CreateBuilder<DiscoveryDto>(types.Length);
                 var adoGenInterfaces = GetAdoGenInterfaces(compilation);
+                var pluralizeSqlServer = ShouldPluralize(compilation, SqlServerNamingAttribute);
+                var pluralizeNpgsql = ShouldPluralize(compilation, NpgsqlNamingAttribute);
 
                 foreach (var type in distinctTypes)
                 {
@@ -90,12 +95,34 @@ internal static class Discovery
 
                         builder.Add(new DiscoveryDto(type, typeDiscovery.Kind, discoveryModel.Profile, discoveryModel.Model, typeDiscovery.Provider,
                             ShouldGeneratePatchClass: typeDiscovery.Kind >= SqlModelKind.Domain && typeDiscovery.Provider == patchOwner,
-                            ProfileCount: profileCount));
+                            ProfileCount: profileCount,
+                            PluralizeTableNames: typeDiscovery.Provider is SqlProviderKind.PostgreSql ? pluralizeNpgsql : pluralizeSqlServer));
                     }
                 }
 
                 return builder.ToImmutable();
             });
+
+    /// <summary>
+    /// Reads <c>Pluralize</c> from the provider's assembly-level naming attribute; defaults to true when absent.
+    /// </summary>
+    private static bool ShouldPluralize(Compilation compilation, string attributeMetadataName)
+    {
+        var attributeType = compilation.GetTypeByMetadataName(attributeMetadataName);
+        if (attributeType is null) return true;
+
+        foreach (var attribute in compilation.Assembly.GetAttributes())
+        {
+            if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType)) continue;
+
+            foreach (var named in attribute.NamedArguments)
+            {
+                if (named.Key == "Pluralize" && named.Value.Value is bool pluralize) return pluralize;
+            }
+        }
+
+        return true;
+    }
 
     private static IEnumerable<INamedTypeSymbol> GetOwnInterfaces(INamedTypeSymbol type)
     {

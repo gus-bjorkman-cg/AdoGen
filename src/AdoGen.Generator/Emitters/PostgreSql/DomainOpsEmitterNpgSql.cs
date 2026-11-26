@@ -16,7 +16,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
     {
         var (discoveryDto, profileInfo, _) = validatedDto;
         var dto = discoveryDto.Dto;
-        var typeKeyword = dto.IsRecord ? "record" : "class";
+        var typeKeyword = TypeDeclarations.Keyword(dto);
 
         // SQL strings — produced by PostgreSqlSqlTextBuilder
         var createTableSql = PostgreSqlSqlTextBuilder.CreateTable(ctx);
@@ -56,6 +56,15 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             var keyType = keyCfg.PropertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var keyDbType = keyCfg.DbType!.Value.EnumMember;
             var deleteBatchSql = PostgreSqlSqlTextBuilder.DeleteBatchAny(ctx, keyName);
+            var convertedId = ValueConversions.Write(keyCfg, "ids[i]", ctx.FactoryClassName + ".");
+            var idsValue = "ids";
+            var idsConversion = "";
+            if (convertedId is not null)
+            {
+                var wireType = keyCfg.IsEnumAsString ? "string" : ValueConversions.Resolve(keyCfg)!.Value.WireType;
+                idsValue = "idValues";
+                idsConversion = $"\n        var idValues = new {wireType}[ids.Count];\n        for (var i = 0; i < ids.Count; i++) idValues[i] = {convertedId};";
+            }
 
             idBasedSrc =
                 $$""""
@@ -71,12 +80,12 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
                    
                            await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchAny, CommandType.Text, transaction, commandTimeout);
-                           
+                           {{idsConversion}}
                            cmd.Parameters.Add(new NpgsqlParameter
                            {
                                ParameterName = "ids",
                                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.{{keyDbType}},
-                               Value = ids,
+                               Value = {{idsValue}},
                            });
                            
                            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -304,16 +313,18 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               }
               """";
 
-        var patchSrc = BuildPatchSrc(ctx, dto, typeKeyword);
+        var (patchNested, patchTopLevel) = BuildPatchSrc(ctx, dto, typeKeyword);
+        var body = patchNested.Length == 0 ? src : src + "\n" + patchNested;
+        var wrapped = TypeDeclarations.WrapInContainers(dto, body);
 
-        spc.AddSource($"{dto.Name}.Domain.Npgsql.g.cs", patchSrc.Length == 0 ? src : src + "\n" + patchSrc);
+        spc.AddSource(TypeDeclarations.HintName(dto, "Domain.Npgsql.g.cs"), patchTopLevel.Length == 0 ? wrapped : wrapped + "\n\n" + patchTopLevel);
     }
 
-    private static string BuildPatchSrc(EmitContext ctx, INamedTypeSymbol dto, string typeKeyword)
+    private static (string Nested, string TopLevel) BuildPatchSrc(EmitContext ctx, INamedTypeSymbol dto, string typeKeyword)
     {
         var patchColumns = ctx.WritableNonKeyNonIdentities;
         // Skip if no patchable columns or too many (>64 exceeds bitmask capacity)
-        if (patchColumns.Length is 0 or > 64) return string.Empty;
+        if (patchColumns.Length is 0 or > 64) return (string.Empty, string.Empty);
 
         var patchClassName = $"{dto.Name}Patch";
         var schemaTableEscaped = ctx.SchemaTableQuoted.Replace("\"", "\\\"");
@@ -404,7 +415,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                 """"
             : string.Empty;
 
-        return $$""""
+        var nested = $$""""
             {{patchClassBody}}
             {{ctx.Accessibility}} partial {{typeKeyword}} {{dto.Name}}
             {
@@ -434,24 +445,33 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             
             #pragma warning restore CS0219
             }
+            """";
 
-            /// <summary>Extension methods for patching <see cref="{{dto.Name}}"/> via <see cref="NpgsqlConnection"/>.</summary>
-            {{ctx.Accessibility}} static class {{dto.Name}}NpgsqlPatchExtensions
+        var qualifiedDto = TypeDeclarations.ContainerPrefix(dto) + dto.Name;
+        var qualifiedPatch = TypeDeclarations.ContainerPrefix(dto) + patchClassName;
+        var extensionsClassName = TypeDeclarations.ContainerPrefix(dto, "") + dto.Name + "NpgsqlPatchExtensions";
+        var extensionsAccessibility = TypeDeclarations.EffectiveAccessibility(dto);
+
+        var topLevel = $$""""
+            /// <summary>Extension methods for patching <see cref="{{qualifiedDto}}"/> via <see cref="NpgsqlConnection"/>.</summary>
+            {{extensionsAccessibility}} static class {{extensionsClassName}}
             {
                 /// <summary>
-                /// Executes a partial UPDATE for <see cref="{{dto.Name}}"/>, touching only the columns
+                /// Executes a partial UPDATE for <see cref="{{qualifiedDto}}"/>, touching only the columns
                 /// explicitly set on <paramref name="patch"/>.
                 /// Returns 0 immediately (without sending SQL) when no columns were set.
                 /// </summary>
                 public static global::System.Threading.Tasks.ValueTask<int> PatchAsync(
                     this NpgsqlConnection connection,
-                    {{patchClassName}} patch,
+                    {{qualifiedPatch}} patch,
                     global::System.Threading.CancellationToken ct,
                     NpgsqlTransaction? transaction = null,
                     int? commandTimeout = null)
-                    => {{dto.Name}}.PatchAsync(connection, patch, ct, transaction, commandTimeout);
+                    => {{qualifiedDto}}.PatchAsync(connection, patch, ct, transaction, commandTimeout);
             }
             """";
+
+        return (nested, topLevel);
     }
 
     private static string LowerFirst(string s)
