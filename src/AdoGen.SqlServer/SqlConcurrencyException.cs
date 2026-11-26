@@ -1,6 +1,6 @@
 using System;
 
-namespace AdoGen.PostgreSql;
+namespace AdoGen.SqlServer;
 
 /// <summary>
 /// Thrown by generated <c>UpdateAsync</c> and <c>DeleteAsync</c> methods when 0 rows are
@@ -12,15 +12,15 @@ namespace AdoGen.PostgreSql;
 /// Avoid logging it automatically in security-sensitive environments; consider catching this
 /// exception and logging only a sanitized message.
 /// </remarks>
-public sealed class AdoGenConcurrencyException : Exception
+public sealed class SqlConcurrencyException : Exception
 {
     /// <summary>
-    /// The schema-qualified table name (e.g. <c>public.Orders</c>) where the conflict occurred.
+    /// The schema-qualified table name (e.g. <c>dbo.Orders</c>) where the conflict occurred.
     /// </summary>
     public string TableName { get; }
 
-    /// <param name="tableName">Schema-qualified table name, e.g. <c>public.Orders</c>.</param>
-    public AdoGenConcurrencyException(string tableName)
+    /// <param name="tableName">Schema-qualified table name, e.g. <c>dbo.Orders</c>.</param>
+    public SqlConcurrencyException(string tableName)
         : base("A concurrency conflict was detected. The row was modified or deleted by another process.")
         => TableName = tableName;
 }

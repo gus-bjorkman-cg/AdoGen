@@ -16,7 +16,7 @@ public abstract class NpgsqlProfile<T>
     /// Entry-point for configuring a property.
     /// The generator parses the fluent calls that follow.
     /// </summary>
-    protected PropertyBuilder<TProp> RuleFor<TProp>(Expression<Func<T, TProp>> selector) => new(selector);
+    protected NpgsqlPropertyBuilder<TProp> RuleFor<TProp>(Expression<Func<T, TProp>> selector) => new(selector);
 
     /// <summary>
     /// Allows a custom table name.
@@ -43,76 +43,76 @@ public abstract class NpgsqlProfile<T>
 /// Fluent builder used purely for compile-time configuration.
 /// All arguments should be literals or consts, so the generator can read them safely.
 /// </summary>
-public sealed class PropertyBuilder<TProp>
+public sealed class NpgsqlPropertyBuilder<TProp>
 {
-    internal PropertyBuilder(LambdaExpression selector) => Selector = selector;
+    internal NpgsqlPropertyBuilder(LambdaExpression selector) => Selector = selector;
     internal LambdaExpression Selector { get; }
 
     /// <summary>
     /// Configures the PostgreSQL/Npgsql type.
     /// </summary>
-    public PropertyBuilder<TProp> Type(NpgsqlDbType dbType) => this;
+    public NpgsqlPropertyBuilder<TProp> Type(NpgsqlDbType dbType) => this;
 
     /// <summary>
     /// Configures the string size.
     /// </summary>
-    public PropertyBuilder<TProp> Size(int size) => this;
+    public NpgsqlPropertyBuilder<TProp> Size(int size) => this;
 
     /// <summary>
     /// Configures the decimal precision.
     /// </summary>
-    public PropertyBuilder<TProp> Precision(int precision) => this;
+    public NpgsqlPropertyBuilder<TProp> Precision(int precision) => this;
 
     /// <summary>
     /// Configures the decimal scale.
     /// </summary>
-    public PropertyBuilder<TProp> Scale(int scale) => this;
+    public NpgsqlPropertyBuilder<TProp> Scale(int scale) => this;
 
     /// <summary>
     /// Configures the db column / parameter name. Default is property name.
     /// </summary>
-    public PropertyBuilder<TProp> Name(string parameterName) => this;
+    public NpgsqlPropertyBuilder<TProp> Name(string parameterName) => this;
 
     /// <summary>
     /// Shorthand config for setting db type as Numeric with its precision and scale.
     /// </summary>
-    public PropertyBuilder<TProp> Decimal(int precision, int scale) =>
+    public NpgsqlPropertyBuilder<TProp> Decimal(int precision, int scale) =>
         Type(NpgsqlDbType.Numeric).Precision(precision).Scale(scale);
 
     /// <summary>
     /// Shorthand config for setting db type as Text.
     /// </summary>
-    public PropertyBuilder<TProp> Text() => Type(NpgsqlDbType.Text);
+    public NpgsqlPropertyBuilder<TProp> Text() => Type(NpgsqlDbType.Text);
 
     /// <summary>
     /// Shorthand config for setting db type as Varchar with its size.
     /// </summary>
-    public PropertyBuilder<TProp> VarChar(int size) => Type(NpgsqlDbType.Varchar).Size(size);
+    public NpgsqlPropertyBuilder<TProp> VarChar(int size) => Type(NpgsqlDbType.Varchar).Size(size);
 
     /// <summary>
     /// Shorthand config for setting db type as Char with its size.
     /// </summary>
-    public PropertyBuilder<TProp> Char(int size) => Type(NpgsqlDbType.Char).Size(size);
+    public NpgsqlPropertyBuilder<TProp> Char(int size) => Type(NpgsqlDbType.Char).Size(size);
 
     /// <summary>
     /// Shorthand config for setting db type as Varbit with its size.
     /// </summary>
-    public PropertyBuilder<TProp> Varbit(int size) => Type(NpgsqlDbType.Varbit).Size(size);
+    public NpgsqlPropertyBuilder<TProp> Varbit(int size) => Type(NpgsqlDbType.Varbit).Size(size);
 
     /// <summary>
     /// Shorthand config for setting db type as Bytea.
     /// </summary>
-    public PropertyBuilder<TProp> Bytea() => Type(NpgsqlDbType.Bytea);
+    public NpgsqlPropertyBuilder<TProp> Bytea() => Type(NpgsqlDbType.Bytea);
 
     /// <summary>
     /// Configures the db type to be nullable.
     /// </summary>
-    public PropertyBuilder<TProp> Nullable() => this;
+    public NpgsqlPropertyBuilder<TProp> Nullable() => this;
 
     /// <summary>
     /// Configures the db type to be non-null.
     /// </summary>
-    public PropertyBuilder<TProp> NotNull() => this;
+    public NpgsqlPropertyBuilder<TProp> NotNull() => this;
 
     /// <summary>
     /// Marks the column as read-only.
@@ -121,7 +121,7 @@ public sealed class PropertyBuilder<TProp>
     /// Use this for server-managed columns such as computed columns or audit timestamps
     /// that have a DEFAULT expression set via <see cref="DefaultValue"/>.
     /// </summary>
-    public PropertyBuilder<TProp> ReadOnly() => this;
+    public NpgsqlPropertyBuilder<TProp> ReadOnly() => this;
 
     /// <summary>
     /// Marks this column as the concurrency token for optimistic concurrency control.
@@ -131,16 +131,16 @@ public sealed class PropertyBuilder<TProp>
     /// For <c>int</c>/<c>long</c> tokens the UPDATE SET list also includes <c>"Column" = @Column + 1</c>
     /// so the token is bumped automatically. For <c>Guid</c> tokens the caller is responsible
     /// for setting a new value on the model before calling <c>UpdateAsync</c>.
-    /// When 0 rows are affected an <c>AdoGenConcurrencyException</c> is thrown.
+    /// When 0 rows are affected an <c>NpgsqlConcurrencyException</c> is thrown.
     /// </summary>
-    public PropertyBuilder<TProp> ConcurrencyToken() => this;
+    public NpgsqlPropertyBuilder<TProp> ConcurrencyToken() => this;
 
     /// <summary>
     /// Excludes the property from mapping: it is not a column, is not read by <c>Map</c>, and is never
     /// written by INSERT/UPDATE/bulk/patch. Constructor parameters bound to an ignored property receive
     /// <c>default</c>. An ignored property cannot be a key, identity or concurrency token (AG022).
     /// </summary>
-    public PropertyBuilder<TProp> Ignore() => this;
+    public NpgsqlPropertyBuilder<TProp> Ignore() => this;
 
     /// <summary>
     /// Stores an enum property as its member name in a varchar(<paramref name="size"/>) column instead of its integer value.
@@ -148,13 +148,13 @@ public sealed class PropertyBuilder<TProp>
     /// Only valid for non-<c>[Flags]</c> enums (AG023). Renaming an enum member changes the stored value.
     /// </summary>
     /// <param name="size">Maximum stored member-name length.</param>
-    public PropertyBuilder<TProp> AsString(int size) => this;
+    public NpgsqlPropertyBuilder<TProp> AsString(int size) => this;
 
     /// <summary>
     /// Sets the column's DDL default, e.g. <c>DefaultValue("now()")</c> emits <c>DEFAULT now()</c>.
     /// A leading <c>DEFAULT</c> keyword is accepted and not duplicated. Must be a compile-time constant.
     /// </summary>
-    public PropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
+    public NpgsqlPropertyBuilder<TProp> DefaultValue(string sqlExpression) => this;
 }
 
 #pragma warning restore CA1720

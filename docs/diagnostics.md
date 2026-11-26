@@ -201,11 +201,3 @@ Calls prefixed with `this.` (`this.RuleFor(...)`) are supported.
 **Trigger:** a `struct` / `record struct` implements a Domain or Bulk marker interface, or a `ref struct` implements any marker interface.
 
 **Fix:** structs are supported only as mapper-only models (`ISqlMapper` / `INpgsqlMapper`). Use a class or record for Domain/Bulk models.
-
----
-
-## Known limitations not covered by diagnostics
-
-| Input                                                                  | Symptom                                                    | Bug |
-|------------------------------------------------------------------------|------------------------------------------------------------|-----|
-| `catch (AdoGenConcurrencyException)` with both provider namespaces imported | CS0104 ambiguous reference — use an alias              | B26 |

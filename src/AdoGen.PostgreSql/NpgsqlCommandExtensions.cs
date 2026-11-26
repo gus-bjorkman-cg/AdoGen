@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
@@ -24,8 +25,7 @@ public static class NpgsqlCommandExtensions
         public async ValueTask<List<T>> QueryAsync<T>(CancellationToken ct)
             where T : INpgsqlMapper<T>
         {
-            if (command.Connection!.State != ConnectionState.Open)
-                await command.Connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
 
             await using var reader = await command
                 .ExecuteReaderAsync(CommandBehavior.SingleResult, ct)
@@ -49,8 +49,7 @@ public static class NpgsqlCommandExtensions
         public async ValueTask<T?> QueryFirstOrDefaultAsync<T>(CancellationToken ct)
             where T : INpgsqlMapper<T>
         {
-            if (command.Connection!.State != ConnectionState.Open)
-                await command.Connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
 
             await using var reader = await command
                 .ExecuteReaderAsync(
@@ -71,8 +70,7 @@ public static class NpgsqlCommandExtensions
         /// <returns></returns>
         public async ValueTask<List<T?>> QueryScalarAsync<T>(CancellationToken ct)
         {
-            if (command.Connection!.State != ConnectionState.Open)
-                await command.Connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
 
             await using var reader = await command
                 .ExecuteReaderAsync(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
@@ -97,8 +95,7 @@ public static class NpgsqlCommandExtensions
         /// <returns></returns>
         public async ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(CancellationToken ct)
         {
-            if (command.Connection!.State != ConnectionState.Open)
-                await command.Connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
 
             await using var reader = await command
                 .ExecuteReaderAsync(
@@ -117,10 +114,48 @@ public static class NpgsqlCommandExtensions
         /// <returns></returns>
         public async ValueTask<NpgsqlDataReader> QueryMultiAsync(CancellationToken ct)
         {
-            if (command.Connection!.State != ConnectionState.Open)
-                await command.Connection.OpenAsync(ct).ConfigureAwait(false);
+            var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
 
-            return await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            try
+            {
+                // When the connection was opened here, the reader owns it and closes it on disposal.
+                var behavior = connectionScope.OpenedConnection ? CommandBehavior.CloseConnection : CommandBehavior.Default;
+                return await command.ExecuteReaderAsync(behavior, ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                await connectionScope.DisposeAsync();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Executes the SQL and streams the rows, mapping each one with the source generated mapper as it is read.
+        /// Nothing is buffered: use this for large result sets. The connection is opened on the first
+        /// <c>MoveNextAsync</c> if needed, and the reader is disposed (and the connection closed, if it was opened here)
+        /// when enumeration completes or the consumer stops early.
+        /// </summary>
+        /// <remarks>
+        /// The connection cannot run other commands while the enumeration is in progress.
+        /// When enumeration is stopped early, Npgsql consumes the remaining rows while disposing the reader; add a
+        /// <c>LIMIT</c> or cancel the token if the remaining result is large.
+        /// </remarks>
+        /// <param name="ct"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns>An async stream of mapped rows.</returns>
+        public async IAsyncEnumerable<T> QueryUnbufferedAsync<T>([EnumeratorCancellation] CancellationToken ct)
+            where T : INpgsqlMapper<T>
+        {
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
+
+            await using var reader = await command
+                .ExecuteReaderAsync(CommandBehavior.SingleResult, ct)
+                .ConfigureAwait(false);
+
+            if (!await reader.ReadAsync(ct).ConfigureAwait(false)) yield break;
+
+            var ordinals = T.GetOrdinals(reader);
+            do yield return T.Map(reader, ordinals); while (await reader.ReadAsync(ct).ConfigureAwait(false));
         }
 
         /// <summary>

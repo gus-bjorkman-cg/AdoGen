@@ -21,7 +21,7 @@ public partial record VersionedOrderGuid : ISqlSingleIdModel<global::AdoGen.Gene
     public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<Guid> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (ids is null || ids.Count == 0) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
         const int RowsPerCommand = 1000;
@@ -62,7 +62,7 @@ public partial record VersionedOrderGuid : ISqlSingleIdModel<global::AdoGen.Gene
 
     public static async ValueTask<bool> ExistsAsync(SqlConnection connection, Guid id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
         
@@ -93,7 +93,7 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlCreateTable, CommandType.Text, transaction, commandTimeout);
         
@@ -102,7 +102,7 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
         
@@ -116,7 +116,7 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
     public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.VersionedOrderGuid> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
         // Larger lists are split into several commands; use a transaction for atomicity.
@@ -162,7 +162,7 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
         
@@ -171,13 +171,13 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
         cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
 
         var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrderGuids");
-                return affected;
+        if (affected == 0) throw new global::AdoGen.SqlServer.SqlConcurrencyException("dbo.VersionedOrderGuids");
+        return affected;
     }
 
     public static async ValueTask<global::AdoGen.Generator.Tests.VersionedOrderGuid> InsertAndReturnAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
         
@@ -194,7 +194,7 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
         
@@ -202,13 +202,52 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
         cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
 
         var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrderGuids");
-                return affected;
+        if (affected == 0) throw new global::AdoGen.SqlServer.SqlConcurrencyException("dbo.VersionedOrderGuids");
+        return affected;
+    }
+
+    public static async ValueTask<SqlWriteResult> TryUpdateAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName(model.ProductName));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
+
+        if (await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0) return SqlWriteResult.Applied;
+
+        cmd.CommandText = SqlExists;
+        cmd.Parameters.Clear();
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+
+        var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return scalar is null or DBNull ? SqlWriteResult.NotFound : SqlWriteResult.Conflict;
+    }
+
+    public static async ValueTask<SqlWriteResult> TryDeleteAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(model.RowVersion));
+
+        if (await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0) return SqlWriteResult.Applied;
+
+        cmd.CommandText = SqlExists;
+        cmd.Parameters.Clear();
+        cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(model.Id));
+
+        var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return scalar is null or DBNull ? SqlWriteResult.NotFound : SqlWriteResult.Conflict;
     }
 
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.VersionedOrderGuid model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
         
@@ -221,7 +260,7 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
 
     public static async ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlTruncate, CommandType.Text, transaction, commandTimeout);
         
@@ -290,7 +329,7 @@ public sealed partial class VersionedOrderGuidPatch
     public Guid? ExpectedRowVersion { get; private set; }
     /// <summary>New value written to <c>RowVersion</c> when the concurrency check passes.</summary>
     public Guid? NextRowVersion { get; private set; }
-    /// <summary>Enables the optimistic-concurrency check: throws <c>AdoGenConcurrencyException</c> if the stored <c>RowVersion</c> differs, otherwise writes <paramref name="next"/>.</summary>
+    /// <summary>Enables the optimistic-concurrency check: throws the provider concurrency exception (<c>SqlConcurrencyException</c> / <c>NpgsqlConcurrencyException</c>) if the stored <c>RowVersion</c> differs, otherwise writes <paramref name="next"/>.</summary>
     public VersionedOrderGuidPatch WithExpectedRowVersion(Guid expected, Guid next) { ExpectedRowVersion = expected; NextRowVersion = next; return this; }
     public string? ProductName { get; set { field = value; _mask |= 1UL << 0; } }
     public VersionedOrderGuidPatch WithProductName(string value) { ProductName = value; return this; }
@@ -306,7 +345,7 @@ public partial record VersionedOrderGuid
     public static async ValueTask<int> PatchAsync(SqlConnection connection, VersionedOrderGuidPatch patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (patch.Mask == 0UL) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         await using var cmd = new SqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
@@ -331,7 +370,7 @@ public partial record VersionedOrderGuid
         cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(patch.Id));
         
         var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-        if (affected == 0 && patch.ExpectedRowVersion.HasValue) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("dbo.VersionedOrderGuids");
+        if (affected == 0 && patch.ExpectedRowVersion.HasValue) throw new global::AdoGen.SqlServer.SqlConcurrencyException("dbo.VersionedOrderGuids");
 
         return affected;
     }

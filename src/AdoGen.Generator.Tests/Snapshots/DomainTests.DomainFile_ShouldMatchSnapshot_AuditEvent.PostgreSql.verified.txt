@@ -20,7 +20,7 @@ public partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Generator
     public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<long> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (ids is null || ids.Count == 0) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchAny, CommandType.Text, transaction, commandTimeout);
         
@@ -36,7 +36,7 @@ public partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Generator
 
     public static async ValueTask<bool> ExistsAsync(NpgsqlConnection connection, long id, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
         
@@ -69,7 +69,7 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
 
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlCreateTable, CommandType.Text, transaction, commandTimeout);
         
@@ -78,7 +78,7 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlInsert, CommandType.Text, transaction, commandTimeout);
         
@@ -93,38 +93,50 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
     {
         if (models is null || models.Count == 0) return 0;
         
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
-        await using var cmd = new NpgsqlCommand("", connection, transaction);
-        
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        // PostgreSQL limit: 65535 bind parameters per statement.
+        // Larger lists are split into several commands; use a transaction for atomicity.
+        const int RowsPerCommand = 21845;
+        var affected = 0;
 
-        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 20);
-        sb.Append(Pg_SqlInsertBatchTemplate);
-        var paramIndex = 0;
-
-        for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+        for (var start = 0; start < models.Count; start += RowsPerCommand)
         {
-            if (modelIndex > 0) sb.Append(',');
-            var name0 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append('(').Append(name0);
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, name0));
-            var name1 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name1);
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(models[modelIndex].EventType, name1));
-            var name2 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name2).Append(')');
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, name2));
+            var end = Math.Min(start + RowsPerCommand, models.Count);
+
+            await using var cmd = new NpgsqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+            var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + (end - start) * 20);
+            sb.Append(Pg_SqlInsertBatchTemplate);
+            var paramIndex = 0;
+
+            for (var modelIndex = start; modelIndex < end; modelIndex++)
+            {
+                if (modelIndex > start) sb.Append(',');
+                var name0 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append('(').Append(name0);
+                cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, name0));
+                var name1 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name1);
+                cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(models[modelIndex].EventType, name1));
+                var name2 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name2).Append(')');
+                cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, name2));
+            }
+
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<global::AdoGen.Generator.Tests.AuditEvent> InsertAndReturnAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
         
@@ -141,7 +153,7 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
         
@@ -155,7 +167,7 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
         
@@ -164,9 +176,34 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    public static async ValueTask<NpgsqlWriteResult> TryUpdateAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(model.CreatedAt));
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(model.EventType));
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(model.JsonPayload));
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(model.EventId));
+
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? NpgsqlWriteResult.Applied : NpgsqlWriteResult.NotFound;
+    }
+
+    public static async ValueTask<NpgsqlWriteResult> TryDeleteAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventId(model.EventId));
+
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? NpgsqlWriteResult.Applied : NpgsqlWriteResult.NotFound;
+    }
+
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.AuditEvent model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlUpsert, CommandType.Text, transaction, commandTimeout);
         
@@ -180,7 +217,7 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
 
     public static async ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlTruncate, CommandType.Text, transaction, commandTimeout);
         
@@ -267,7 +304,7 @@ public partial record AuditEvent
     public static async ValueTask<int> PatchAsync(NpgsqlConnection connection, AuditEventPatch patch, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (patch.Mask == 0UL) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         await using var cmd = new NpgsqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;

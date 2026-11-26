@@ -12,10 +12,22 @@ All notable changes to this project will be documented in this file.
 - Generated DTO partials are no longer `sealed` (B10); patch classes follow the DTO's accessibility (B12).
 - New generator errors may surface on previously "accepted" input: AG014–AG019 (see `docs/diagnostics.md`). AG003 and AG009 were removed.
 - PostgreSQL `UpsertAsync` on identity-keyed models uses `MERGE` and requires PostgreSQL 15+ (B5).
+- **Provider-prefixed runtime type names (F27, B26).** Both namespaces can now be imported together without CS0104:
+
+  | Old | SQL Server | PostgreSQL |
+  |---|---|---|
+  | `AdoGenConcurrencyException` | `SqlConcurrencyException` | `NpgsqlConcurrencyException` |
+  | `BulkApplyResult` | `SqlBulkApplyResult` | `NpgsqlBulkApplyResult` |
+  | `BulkOp` | `SqlBulkOp` | `NpgsqlBulkOp` |
+  | `PropertyBuilder<T,TProp>` | `SqlPropertyBuilder<T,TProp>` | `NpgsqlPropertyBuilder<T,TProp>` |
+- **Connections opened by AdoGen are closed again (F26).** A closed connection is opened for the call and closed afterwards (Dapper's behaviour); an open connection is left open. Open the connection yourself when you need session state (temp tables, `SET`, transactions) across calls.
+- **`ExecuteScalarAsync<T>` converts numeric results (F21).** E.g. a `bigint` `count(*)` read as `int` now succeeds; overflow throws `OverflowException`, non-numeric mismatches still throw `InvalidCastException`.
+- `ISqlDomainModel<T>` / `INpgsqlDomainModel<T>` gain static abstract `TryUpdateAsync` / `TryDeleteAsync` (generated automatically).
 
 ### Fixed
 - Wrong data / exceptions when SELECT column order differs between queries (B1).
 - Version stamping and NuGet release notes in the build (B2, B3).
+- PostgreSQL `InsertAsync(List<T>)` no longer fails above 65,535 parameters; it is chunked per command (F23).
 - PostgreSQL `ON CONFLICT ()` for identity keys (B5); invalid UPDATE/UPSERT SQL for key-only models (B6).
 - PostgreSQL `.Char(n)` / `.Varbit(n)` were ignored (B7).
 - `ExecuteScalarAsync<T>` returns `default` for no row / `NULL` (B8); `CreateParameter` with a null value sends `DBNull` (B9).
@@ -29,6 +41,9 @@ All notable changes to this project will be documented in this file.
 - `DefaultValue(expr)` now emits `DEFAULT {expr}`; a leading `DEFAULT` is still accepted (B29).
 
 ### Added
+- `QueryUnbufferedAsync<T>` returns `IAsyncEnumerable<T>` for streaming large result sets, on connections and commands (F22).
+- Generated `TryUpdateAsync` / `TryDeleteAsync` return `SqlWriteResult` / `NpgsqlWriteResult` (`Applied`, `NotFound`, `Conflict`) instead of throwing, so stale and missing rows can be told apart (F24, B23).
+- `SqlConnectionScope` / `NpgsqlConnectionScope` for open-if-closed / close-if-opened in custom code (F26).
 - `.Ignore()` profile rule: excludes a property from DDL, writes, bulk and `Map()` (F11, AG022).
 - `.AsString(n)` for enums: stores the member name as `varchar(n)` via generated `switch` conversions (F14, AG023).
 - Default mappings for `sbyte`/`ushort`/`uint`/`ulong` (next wider signed type; `ulong` → `decimal(20,0)` / `numeric(20,0)`) and `char` on SQL Server (`nchar(1)`) (F15).

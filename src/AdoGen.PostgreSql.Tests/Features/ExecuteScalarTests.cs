@@ -223,4 +223,41 @@ public sealed class ExecuteScalarTests(TestContext testContext) : TestBase(testC
         actualString.Should().BeNull();
         actualInt.Should().BeNull();
     }
+
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldConvertToSmallerNumericType_WhenProviderReturnsLong() =>
+        (await Connection.ExecuteScalarAsync<int>("""SELECT COUNT(*) FROM "public"."Users" """, CancellationToken)).Should().Be(DefaultUsers.Count);
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldConvertToLargerNumericType_WhenProviderReturnsInt() =>
+        (await Connection.ExecuteScalarAsync<long>("""SELECT CAST(COUNT(*) AS int) FROM "public"."Users" """, CancellationToken)).Should().Be(DefaultUsers.Count);
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldConvertToNullableNumericType_WhenProviderReturnsLong() =>
+        (await Connection.ExecuteScalarAsync<int?>("""SELECT COUNT(*) FROM "public"."Users" """, CancellationToken)).Should().Be(DefaultUsers.Count);
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldReturnNull_WhenValueIsNull() =>
+        (await Connection.ExecuteScalarAsync<int?>("SELECT CAST(NULL AS int)", CancellationToken)).Should().BeNull();
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldThrowOverflowException_WhenValueDoesNotFit()
+    {
+        // Act
+        var act = async () => await Connection.ExecuteScalarAsync<byte>("SELECT 300", CancellationToken);
+
+        // Assert
+        await act.Should().ThrowAsync<OverflowException>();
+    }
+
+    [Fact]
+    public async Task ExecuteScalar_ShouldThrowInvalidCastException_WhenConversionIsNotNumeric()
+    {
+        // Act
+        var act = async () => await Connection.ExecuteScalarAsync<Guid>("SELECT 1", CancellationToken);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidCastException>();
+    }
 }

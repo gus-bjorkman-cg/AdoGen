@@ -22,7 +22,7 @@ public partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Generator.
     public static async ValueTask<int> DeleteAsync(List<global::AdoGen.Generator.Tests.TestType> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
         const int RowsPerCommand = 1000;
@@ -68,7 +68,7 @@ public partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Generator.
 
     public static async ValueTask<bool> ExistsAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
         cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
         cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
@@ -125,7 +125,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
 
     public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlCreateTable, CommandType.Text, transaction, commandTimeout);
         
@@ -134,7 +134,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
         
@@ -172,7 +172,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
     public static async ValueTask<int> InsertAsync(List<global::AdoGen.Generator.Tests.TestType> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
         // Larger lists are split into several commands; use a transaction for atomicity.
@@ -290,7 +290,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
         
@@ -327,7 +327,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
 
     public static async ValueTask<global::AdoGen.Generator.Tests.TestType> InsertAndReturnAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
         
@@ -368,7 +368,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
         
@@ -378,9 +378,58 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    public static async ValueTask<SqlWriteResult> TryUpdateAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(model.NullableInt));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(model.NullableDecimal));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(model.NullableGuid));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterCharString(model.CharString));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(model.NCharString));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterFloat(model.Float));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(model.NullableFloat));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(model.DateTime));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(model.NullableDateTime));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDouble(model.Double));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(model.NullableDouble));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterChar(model.Char));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNChar(model.NChar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(model.NullableChar));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(model.NullableBytes));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterBytes(model.Bytes));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterFruits(model.Fruits));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterFlags(model.Flags));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(model.ByteEnum));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(model.ShortEnum));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(model.IntEnum));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(model.LongEnum));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? SqlWriteResult.Applied : SqlWriteResult.NotFound;
+    }
+
+    public static async ValueTask<SqlWriteResult> TryDeleteAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int));
+        cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal));
+
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? SqlWriteResult.Applied : SqlWriteResult.NotFound;
+    }
+
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.TestType model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
         
@@ -417,7 +466,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
 
     public static async ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(SqlTruncate, CommandType.Text, transaction, commandTimeout);
         
@@ -666,7 +715,7 @@ public partial record TestType
     public static async ValueTask<int> PatchAsync(SqlConnection connection, TestTypePatch patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (patch.Mask == 0UL) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         await using var cmd = new SqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;

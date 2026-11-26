@@ -150,7 +150,9 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - **`async ValueTask` wrappers that only `await` one call are wasteful.** Return the inner `ValueTask`/`ValueTask<T>` directly.
 - **Bogus `StrictMode` requires every property to have a rule.** When adding a new property to a DTO used in Faker-based tests, add a corresponding `.RuleFor(x => x.NewProp, ...)` or tests will throw at runtime.
 - **Concurrency token (int/long): same parameter used in both SET and WHERE.** `[Token] = @Token + 1` (SET) and `AND [Token] = @Token` (WHERE) share one parameter. For Guid tokens, only WHERE is augmented; the value is set by the caller as a normal writable column.
-- **`AdoGenConcurrencyException` thrown with fully-qualified `global::` prefix** to avoid ambiguity in projects referencing both `AdoGen.SqlServer` and `AdoGen.PostgreSql`.
+- **Concurrency exceptions are provider-prefixed (`SqlConcurrencyException` / `NpgsqlConcurrencyException`) and emitted `global::`-qualified.** Runtime public types must carry the `Sql`/`Npgsql` prefix so both namespaces can be imported together (F27).
+- **AdoGen closes connections it opened (`{Sql|Npgsql}ConnectionScope`).** Tests needing session state across calls (temp tables, `SET`, transactions) must open the connection first; `TestBase` does this.
+- **A C# raw string literal whose content ends with `"` needs a space before the closing `"""`** (e.g. PostgreSQL SQL ending in a quoted identifier).
 - **Test method naming: prefer `Subject_ShouldVerb_WhenCondition`** (e.g. `Exists_ShouldReturnTrue_WhenUserExists`) for new tests. The codebase still contains older free-form names (`InsertUser_ShouldInsertUser`); when extending an existing file, match the surrounding style rather than mixing conventions.
 - **AAA comments are mandatory when a test has more than one logical step.** Single-action tests (`Act` + `Assert` only) may omit `// Arrange`. Multi-step tests must have all three comments.
 - **`SELECT EXISTS`-style queries must use `TOP(1)` (SQL Server) or `LIMIT 1` (PostgreSQL)** to stop the engine from scanning past the first matching row.
@@ -179,7 +181,7 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - `.github/copilot-instructions.md` — full non-negotiable rule set
 - `src/AdoGen.SqlServer/GeneratorInterfaces.cs` — SQL Server marker interfaces
 - `src/AdoGen.PostgreSql/GeneratorInterfaces.cs` — PostgreSQL marker interfaces
-- `src/AdoGen.SqlServer/PropertyBuilder.cs` — SQL Server profile fluent API
+- `src/AdoGen.SqlServer/SqlProfile.cs` — SQL Server profile fluent API
 - `src/AdoGen.PostgreSql/NpgsqlProfile.cs` — PostgreSQL profile fluent API
 - `examples/AdoGen.Sample/` — real models and profiles used by all tests (includes dual-provider examples)
 - `src/AdoGen.Generator/Pipelines/Discovery.cs` — generator entry point

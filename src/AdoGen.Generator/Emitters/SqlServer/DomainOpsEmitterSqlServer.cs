@@ -54,7 +54,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                       public static async ValueTask<int> DeleteAsync(SqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                       {
                           if (ids is null || ids.Count == 0) return 0;
-                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                           
                           // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
                           const int RowsPerCommand = 1000;
@@ -95,7 +95,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                   
                       public static async ValueTask<bool> ExistsAsync(SqlConnection connection, {{keyType}} id, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                       {
-                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                           
                           await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
                           
@@ -129,7 +129,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                       public static async ValueTask<int> DeleteAsync(List<{{ctx.DtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                       {
                           if (models is null || models.Count == 0) return 0;
-                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                           
                           // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
                           const int RowsPerCommand = {{RowsPerCommand(keyCount)}};
@@ -170,7 +170,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                   
                       public static async ValueTask<bool> ExistsAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                       {
-                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                           await using var cmd = connection.CreateCommand(SqlExists, CommandType.Text, transaction, commandTimeout);
                   {{ParameterBindingEmitter.BindKeys(ctx, "model", 8)}}
                   
@@ -185,22 +185,30 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
         var truncateSql = SqlServerSqlTextBuilder.Truncate(ctx);
 
-        // Update/Delete/Upsert method bodies — vary based on whether a concurrency token is configured
-        var updateBody = ctx.ConcurrencyToken is not null
+        // Update/Delete method bodies — vary based on whether a concurrency token is configured
+        var concurrencyThrow = ctx.ConcurrencyToken is not null
             ? $$"""
                       var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                              if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                              return affected;
+                      if (affected == 0) throw new global::AdoGen.SqlServer.SqlConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
+                      return affected;
               """
             : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+        var updateBody = concurrencyThrow;
+        var deleteBody = concurrencyThrow;
 
-        var deleteBody = ctx.ConcurrencyToken is not null
+        // TryUpdate/TryDelete: never throw. With a concurrency token, 0 affected rows triggers a key lookup on the
+        // same command to tell a missing row (NotFound) from a stale token (Conflict).
+        var tryWriteBody = ctx.ConcurrencyToken is not null
             ? $$"""
-                      var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                              if (affected == 0) throw new global::AdoGen.SqlServer.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                              return affected;
+                      if (await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0) return SqlWriteResult.Applied;
+
+                      cmd.CommandText = SqlExists;
+                      cmd.Parameters.Clear();
+              {{ParameterBindingEmitter.BindKeys(ctx, "model", 8)}}
+                      var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                      return scalar is null or DBNull ? SqlWriteResult.NotFound : SqlWriteResult.Conflict;
               """
-            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? SqlWriteResult.Applied : SqlWriteResult.NotFound;";
 
         var src = 
             $$""""
@@ -234,7 +242,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
                 public static async ValueTask CreateTableAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                     
                     await using var cmd = connection.CreateCommand(SqlCreateTable, CommandType.Text, transaction, commandTimeout);
                     
@@ -243,7 +251,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
                 public static async ValueTask<int> InsertAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                     
                     await using var cmd = connection.CreateCommand(SqlInsert, CommandType.Text, transaction, commandTimeout);
                     
@@ -254,7 +262,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 public static async ValueTask<int> InsertAsync(List<{{ctx.DtoTypeName}}> models, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (models is null || models.Count == 0) return 0;
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
                     // SQL Server limits: 2100 parameters per command, 1000 rows per VALUES constructor.
                     // Larger lists are split into several commands; use a transaction for atomicity.
@@ -292,7 +300,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
                 public static async ValueTask<int> UpdateAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                     
                     await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
                     
@@ -302,7 +310,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
                 public static async ValueTask<{{ctx.DtoTypeName}}> InsertAndReturnAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                     
                     await using var cmd = connection.CreateCommand(SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
                     
@@ -316,7 +324,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
                 public static async ValueTask<int> DeleteAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                     
                     await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
                     
@@ -324,9 +332,29 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
             {{deleteBody}}
                 }
 
+                public static async ValueTask<SqlWriteResult> TryUpdateAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                {
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+                    
+                    await using var cmd = connection.CreateCommand(SqlUpdate, CommandType.Text, transaction, commandTimeout);
+                    
+            {{ParameterBindingEmitter.BindForUpdate(ctx, "model", 8)}}
+            {{tryWriteBody}}
+                }
+
+                public static async ValueTask<SqlWriteResult> TryDeleteAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
+                {
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+                    
+                    await using var cmd = connection.CreateCommand(SqlDelete, CommandType.Text, transaction, commandTimeout);
+                    
+            {{ParameterBindingEmitter.BindForDelete(ctx, "model", 8)}}
+            {{tryWriteBody}}
+                }
+
                 public static async ValueTask<int> UpsertAsync({{ctx.DtoTypeName}} model, SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                     
                     await using var cmd = connection.CreateCommand(SqlUpsert, CommandType.Text, transaction, commandTimeout);
                     
@@ -336,7 +364,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
                 public static async ValueTask<int> TruncateAsync(SqlConnection connection, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                     
                     await using var cmd = connection.CreateCommand(SqlTruncate, CommandType.Text, transaction, commandTimeout);
                     
@@ -442,7 +470,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
 
         var concurrencySet = PatchConcurrency.BuildSet(ctx, "@");
         var concurrencyWhere = PatchConcurrency.BuildWhere(ctx);
-        var concurrencyThrow = PatchConcurrency.BuildExecute(ctx, "global::AdoGen.SqlServer.AdoGenConcurrencyException");
+        var concurrencyThrow = PatchConcurrency.BuildExecute(ctx, "global::AdoGen.SqlServer.SqlConcurrencyException");
 
         var patchClassBody = ctx.ShouldGeneratePatchClass
             ? $$""""
@@ -475,7 +503,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                 public static async ValueTask<int> PatchAsync(SqlConnection connection, {{patchClassName}} patch, CancellationToken ct, SqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (patch.Mask == 0UL) return 0;
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
                     await using var cmd = new SqlCommand("", connection, transaction);
                     if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;

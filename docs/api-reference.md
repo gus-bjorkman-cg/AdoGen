@@ -158,7 +158,7 @@ public sealed class OrderProfile : SqlProfile<Order>
 
 ## Querying
 
-All query methods auto-open the connection if it is not already open (and leave it open — see [Runtime behaviour](#runtime-behaviour)).
+All query methods open a closed connection for the call and close it again afterwards; an already-open connection is left open (see [Connection lifetime](#connection-lifetime)).
 
 > Columns are matched **by name**, once per result set, so column order does not matter and extra columns are ignored. See [Runtime behaviour](#column-order-and-the-generated-mapper).
 
@@ -186,6 +186,19 @@ var results = await connection.QueryAsync<Order>(
 
 Returns `T?`. Same overloads as `QueryAsync<T>`.
 
+### `QueryUnbufferedAsync<T>`
+
+Returns `IAsyncEnumerable<T>` and maps each row as it is read, without building a list. Use it for large result sets. Same overloads as `QueryAsync<T>`.
+
+```csharp
+await foreach (var user in connection.QueryUnbufferedAsync<User>("SELECT * FROM Users", ct))
+    Process(user);
+```
+
+- The connection is busy until the enumeration ends: do not run other commands on it inside the loop (SQL Server allows it only with MARS).
+- Stopping early (`break`) disposes the reader. SQL Server cancels the command so the remaining rows are not transferred. PostgreSQL reads and discards the remaining rows, so add a `LIMIT` when you expect to stop early on a large result.
+- The `ct` passed to the method is combined with any token given to `WithCancellation`; either one cancels the enumeration.
+
 ### `QueryMultiAsync`
 
 Returns the raw `SqlDataReader` / `NpgsqlDataReader` for multi-result-set queries.
@@ -211,11 +224,13 @@ Available when the model implements `ISqlDomainModel` / `INpgsqlDomainModel`.
 | Method                            | Returns             | Notes                                                  |
 |-----------------------------------|---------------------|--------------------------------------------------------|
 | `InsertAsync(model, ct)`          | `int` rows affected |                                                        |
-| `InsertAsync(List<T>, ct)`        | `int` rows affected | Multi-row; SQL Server splits into chunks — see [limits](#parameter-and-row-limits-sql-server) |
+| `InsertAsync(List<T>, ct)`        | `int` rows affected | Multi-row; split into chunks — see [limits](#parameter-and-row-limits) |
 | `InsertAndReturnAsync(model, ct)` | `T`                 | Returns populated row; see [limitations](#limitations) |
-| `UpdateAsync(model, ct)`          | `int` rows affected | Throws `AdoGenConcurrencyException` if token mismatch  |
+| `UpdateAsync(model, ct)`          | `int` rows affected | Throws `SqlConcurrencyException` / `NpgsqlConcurrencyException` if token mismatch |
+| `TryUpdateAsync(model, ct)`       | `SqlWriteResult` / `NpgsqlWriteResult` | `Applied`, `NotFound` or `Conflict`; never throws on 0 rows — see [concurrency](#optimistic-concurrency-and-missing-rows) |
 | `UpsertAsync(model, ct)`          | `int` rows affected | Does not enforce concurrency token                     |
-| `DeleteAsync(model, ct)`          | `int` rows affected | Throws `AdoGenConcurrencyException` if token mismatch  |
+| `DeleteAsync(model, ct)`          | `int` rows affected | Throws `SqlConcurrencyException` / `NpgsqlConcurrencyException` if token mismatch |
+| `TryDeleteAsync(model, ct)`       | `SqlWriteResult` / `NpgsqlWriteResult` | Same as `TryUpdateAsync`                    |
 | `TruncateAsync<T>(ct)`            | `int` rows affected |                                                        |
 | `CreateTableAsync<T>(ct)`         | `void`              | DDL — creates the table from profile metadata          |
 
@@ -262,7 +277,7 @@ await connection.PatchAsync(new OrderPatch(id).WithProductName("X").WithExpected
 await connection.PatchAsync(new Order2Patch(id).WithProductName("X").WithExpectedVersion(current, Guid.NewGuid()), ct);
 ```
 
-With `WithExpected…` set, 0 affected rows throws `AdoGenConcurrencyException`. Without it, the patch targets the key only, the token is left untouched, and a missing row simply returns 0.
+With `WithExpected…` set, 0 affected rows throws `SqlConcurrencyException` / `NpgsqlConcurrencyException`. Without it, the patch targets the key only, the token is left untouched, and a missing row simply returns 0.
 
 ---
 
@@ -363,7 +378,7 @@ await using var connection = new SqlConnection(connectionString);
 await connection.OpenAsync(ct);
 await using var tx = (SqlTransaction)await connection.BeginTransactionAsync(ct);
 
-BulkApplyResult result = await bulk.SaveChangesAsync(connection, tx, ct);
+SqlBulkApplyResult result = await bulk.SaveChangesAsync(connection, tx, ct);   // NpgsqlBulkApplyResult for PostgreSQL
 Console.WriteLine($"Inserted: {result.Inserted}, Updated: {result.Updated}, Deleted: {result.Deleted}");
 
 await tx.CommitAsync(ct);
@@ -390,11 +405,15 @@ int rows = await connection.ExecuteAsync("DELETE FROM Logs WHERE CreatedAt < @cu
 Returns a single scalar value.
 
 ```csharp
-int count = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Users", ct);          // SQL Server
-long pgCount = await connection.ExecuteScalarAsync<long>("SELECT count(*) FROM \"Users\"", ct);  // PostgreSQL: count(*) is bigint
+int count = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Users", ct);
+int pgCount = await connection.ExecuteScalarAsync<int>("SELECT count(*) FROM \"Users\"", ct);  // bigint → int, overflow-checked
 ```
 
-The value is **cast** (unboxed), not converted. `T` must exactly match the provider's CLR type for the column. For example, PostgreSQL `count(*)` returns `long`, so `ExecuteScalarAsync<int>` throws `InvalidCastException`. A missing row or a `NULL` / `DBNull` result returns `default(T)`.
+- A missing row or a `NULL` / `DBNull` result returns `default(T)`.
+- When the value already is a `T`, it is returned as-is (no conversion cost).
+- Otherwise a numeric value is converted to a numeric `T` (`byte`, `short`, `int`, `long`, `float`, `double`, `decimal` and their nullable forms) with `Convert.ToXxx(value, CultureInfo.InvariantCulture)`. A value that does not fit throws `OverflowException`. Any other mismatch (e.g. `int` → `Guid`) throws `InvalidCastException`.
+
+`QueryScalarAsync<T>` / `QueryScalarFirstOrDefaultAsync<T>` read through `GetFieldValue<T>` and do **not** convert: there, `T` must match the provider type.
 
 ### `QueryScalarAsync<T>`
 
@@ -434,7 +453,7 @@ RuleFor(x => x.Version).ConcurrencyToken();   // int, long, or Guid
 | `Guid`         | `AND [Version] = @Version` | None — caller sets new value before calling `UpdateAsync` |
 
 - `DeleteAsync` also adds `AND [Version] = @Version` to the WHERE clause.
-- If 0 rows are affected, `AdoGenConcurrencyException` is thrown.
+- If 0 rows are affected, `UpdateAsync` / `DeleteAsync` throw `SqlConcurrencyException` / `NpgsqlConcurrencyException`. `TryUpdateAsync` / `TryDeleteAsync` return a result instead — see [Optimistic concurrency and missing rows](#optimistic-concurrency-and-missing-rows).
 - `UpsertAsync` does **not** enforce the concurrency token — use `UpdateAsync` if you need optimistic locking.
 - `PatchAsync` enforces it only when `WithExpected{Token}(...)` is called — see [Patch](#patch-partial-update).
 
@@ -491,9 +510,15 @@ When calling the generated mapper yourself, resolve the ordinals once per reader
 
 ### Connection lifetime
 
-Every extension method opens a closed connection automatically and **never closes it**. Dispose the connection yourself (`await using var connection = …`).
+Every extension method and generated method follows the same rule as Dapper: **if the connection is closed, it is opened for the call and closed again afterwards. If it is already open, it is left open.**
 
-### Parameter and row limits (SQL Server)
+- Pass a closed connection for one-off calls; the pool handles reuse.
+- Open the connection yourself (`await connection.OpenAsync(ct)`) when several calls must share a session: transactions, temp tables, `SET` options, or advisory locks. A transaction always requires an open connection.
+- `QueryMultiAsync` returns a reader. When it opened the connection, the reader is created with `CommandBehavior.CloseConnection`, so disposing the reader closes the connection.
+- `QueryUnbufferedAsync` keeps the connection open while the stream is enumerated, then closes it if it opened it.
+- Always dispose the connection yourself (`await using var connection = …`).
+
+### Parameter and row limits
 
 `InsertAsync(List<T>)` and `DeleteAsync(List<TKey>)` send one parameter per value. SQL Server limits a command to:
 
@@ -502,7 +527,9 @@ Every extension method opens a closed connection automatically and **never close
 | Parameters per command                                | 2 100 |
 | Rows in a single `VALUES` table-value constructor     | 1 000 |
 
-Both methods split the list into chunks that respect these limits and return the summed row count. The chunks are separate statements, so **wrap the call in a transaction** if you need all-or-nothing behaviour. For very large lists, the `*Bulk` class (`SqlBulkCopy`) is faster. PostgreSQL `InsertAsync(List<T>)` is limited to 65 535 parameters. PostgreSQL `DeleteAsync(List<TKey>)` uses one array parameter and has no practical limit.
+Both methods split the list into chunks that respect these limits and return the summed row count. The chunks are separate statements, so **wrap the call in a transaction** if you need all-or-nothing behaviour. For very large lists, the `*Bulk` class (`SqlBulkCopy`) is faster.
+
+PostgreSQL allows 65 535 bind parameters per statement. `InsertAsync(List<T>)` is split into chunks of `65535 / written columns` rows in the same way (use a transaction for atomicity; for very large lists the `*NpgsqlBulk` class with binary `COPY` is faster). PostgreSQL `DeleteAsync(List<TKey>)` uses one array parameter and has no practical limit.
 
 ### Default type mappings
 
@@ -542,12 +569,7 @@ The default schema is `dbo` on SQL Server and `public` on PostgreSQL. `CreateTab
 
 ### Using both providers in one file
 
-Both runtimes define `AdoGenConcurrencyException`, `BulkApplyResult`, `BulkOp` and `PropertyBuilder` in their own namespaces. With both `using AdoGen.SqlServer;` and `using AdoGen.PostgreSql;` in scope, references to these names are ambiguous (CS0104). Use aliases:
-
-```csharp
-using SqlConcurrencyException    = AdoGen.SqlServer.AdoGenConcurrencyException;
-using NpgsqlConcurrencyException = AdoGen.PostgreSql.AdoGenConcurrencyException;
-```
+Every public runtime type carries a provider prefix (`SqlConcurrencyException` / `NpgsqlConcurrencyException`, `SqlBulkApplyResult` / `NpgsqlBulkApplyResult`, `SqlBulkOp` / `NpgsqlBulkOp`, `SqlPropertyBuilder` / `NpgsqlPropertyBuilder`, `SqlWriteResult` / `NpgsqlWriteResult`, `SqlConnectionScope` / `NpgsqlConnectionScope`). `using AdoGen.SqlServer;` and `using AdoGen.PostgreSql;` can be in scope together without CS0104 ambiguities.
 
 ### Nested and struct DTOs
 
@@ -561,7 +583,23 @@ public readonly partial record struct GaugeTotal(uint Reads, ulong Total) : ISql
 
 ### Optimistic concurrency and missing rows
 
-`UpdateAsync` and `DeleteAsync` on a model with a concurrency token throw `AdoGenConcurrencyException` whenever 0 rows are affected. That includes the case where the row does not exist at all. If you need to tell the two apart, check `ExistsAsync` after catching the exception.
+`UpdateAsync` and `DeleteAsync` on a model with a concurrency token throw `SqlConcurrencyException` / `NpgsqlConcurrencyException` whenever 0 rows are affected. That includes the case where the row does not exist at all.
+
+To tell the cases apart without exceptions, use `TryUpdateAsync` / `TryDeleteAsync`:
+
+```csharp
+switch (await connection.TryUpdateAsync(order, ct))
+{
+    case SqlWriteResult.Applied:  /* written */          break;
+    case SqlWriteResult.NotFound: /* no row with key */  break;
+    case SqlWriteResult.Conflict: /* stale token */      break;
+}
+```
+
+- Without a concurrency token: `Applied` when a row was affected, otherwise `NotFound`. One round-trip.
+- With a concurrency token: when 0 rows were affected, a key lookup on the same connection (and transaction) decides between `NotFound` and `Conflict`. That second round-trip only happens on the failure path.
+- The lookup is not atomic with the write. A row deleted between the two statements is reported as `NotFound`; run inside a `SERIALIZABLE` / `REPEATABLE READ` transaction if that matters.
+- `PatchAsync` has no `Try` variant yet.
 
 ---
 
@@ -579,5 +617,5 @@ public readonly partial record struct GaugeTotal(uint Reads, ulong Total) : ISql
 - **Columns are settable properties.** A property is a column if it has a setter/`init` or a matching constructor parameter. Computed get-only properties (e.g. `FullName => …`) and indexers are ignored. Use `.Ignore()` to exclude a settable property.
 - **Column names must be valid identifiers** (AG016). `.Name("...")` values are used in both C# member names and SQL parameter names.
 - **Unsupported CLR types** (AG017). Types without a default mapping (e.g. arbitrary classes) need an explicit `.Type(...)`.
-- **`ExecuteScalarAsync<T>` casts, it does not convert.** See [Scalar & execute helpers](#executescalarasynct).
+- **`QueryScalarAsync<T>` does not convert numeric types** (unlike `ExecuteScalarAsync<T>`). See [Scalar & execute helpers](#executescalarasynct).
 

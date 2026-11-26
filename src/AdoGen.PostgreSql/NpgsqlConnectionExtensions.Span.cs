@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
@@ -32,11 +32,20 @@ public static partial class NpgsqlConnectionExtensions
             return await command.QueryMultiAsync(ct).ConfigureAwait(false);
     }
 
+    private static async IAsyncEnumerable<T> QueryUnbufferedOwnedAsync<T>(NpgsqlCommand command, [EnumeratorCancellation] CancellationToken ct)
+        where T : INpgsqlMapper<T>
+    {
+        await using (command.ConfigureAwait(false))
+        {
+            await foreach (var item in command.QueryUnbufferedAsync<T>(ct).ConfigureAwait(false)) yield return item;
+        }
+    }
+
     private static async ValueTask<int> ExecuteOwnedAsync(NpgsqlCommand command, CancellationToken ct)
     {
         await using (command.ConfigureAwait(false))
         {
-            if (command.Connection!.State != ConnectionState.Open) await command.Connection!.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
 
             return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
@@ -46,10 +55,10 @@ public static partial class NpgsqlConnectionExtensions
     {
         await using (command.ConfigureAwait(false))
         {
-            if (command.Connection!.State != ConnectionState.Open) await command.Connection!.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(command.Connection!, ct).ConfigureAwait(false);
 
             var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
-            return value is null or DBNull ? default : (T)value;
+            return ScalarConversion.Convert<T>(value);
         }
     }
 

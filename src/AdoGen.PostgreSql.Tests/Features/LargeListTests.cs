@@ -31,4 +31,18 @@ public sealed class LargeListTests(TestContext testContext) : TestBase(testConte
         affected.Should().Be(ids.Count);
         (await GetAllUsers()).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task InsertList_ShouldInsertAllRows_WhenListExceedsPostgreSqlBindParameterLimit()
+    {
+        // Arrange — 25,000 users × 3 columns = 75,000 parameters, above PostgreSQL's 65,535 per statement.
+        var users = UserFaker.Generate(25_000);
+
+        // Act
+        var affected = await Connection.InsertAsync(users, CancellationToken);
+
+        // Assert
+        affected.Should().Be(users.Count);
+        (await GetAllUsers()).Should().HaveCount(users.Count + DefaultUsers.Count);
+    }
 }

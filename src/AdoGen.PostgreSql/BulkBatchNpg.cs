@@ -23,7 +23,7 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     /// <summary>
     /// The list of operations corresponding to each item in the batch.
     /// </summary>
-    public List<BulkOp> Operations { get; }
+    public List<NpgsqlBulkOp> Operations { get; }
 
     /// <summary>
     /// Max number of parameters allowed for insert operations before falling back to the COPY approach.
@@ -109,7 +109,7 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     public BulkBatchNpg(int capacity)
     {
         Items = new List<T>(capacity);
-        Operations = new List<BulkOp>(capacity);
+        Operations = new List<NpgsqlBulkOp>(capacity);
     }
 
     /// <summary>
@@ -123,62 +123,62 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     /// Adds the item to the batch with insert operation.
     /// </summary>
     /// <param name="item"></param>
-    public void Add(T item) => AddEntity(item, BulkOp.Insert);
+    public void Add(T item) => AddEntity(item, NpgsqlBulkOp.Insert);
 
     /// <summary>
     /// Adds the items to the batch with insert operation.
     /// </summary>
     /// <param name="items"></param>
-    public void AddRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Insert);
+    public void AddRange(IEnumerable<T> items) => AddEntityRange(items, NpgsqlBulkOp.Insert);
 
     /// <summary>
     /// Adds the item to the batch with update operation.
     /// </summary>
     /// <param name="item"></param>
-    public void Update(T item) => AddEntity(item, BulkOp.Update);
+    public void Update(T item) => AddEntity(item, NpgsqlBulkOp.Update);
 
     /// <summary>
     /// Adds the items to the batch with update operation.
     /// </summary>
     /// <param name="items"></param>
-    public void UpdateRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Update);
+    public void UpdateRange(IEnumerable<T> items) => AddEntityRange(items, NpgsqlBulkOp.Update);
 
     /// <summary>
     /// Adds the item to the batch with delete operation.
     /// </summary>
     /// <param name="item"></param>
-    public void Remove(T item) => AddEntity(item, BulkOp.Delete);
+    public void Remove(T item) => AddEntity(item, NpgsqlBulkOp.Delete);
 
     /// <summary>
     /// Adds the items to the batch with delete operation.
     /// </summary>
     /// <param name="items"></param>
-    public void RemoveRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Delete);
+    public void RemoveRange(IEnumerable<T> items) => AddEntityRange(items, NpgsqlBulkOp.Delete);
 
     /// <summary>
     /// Adds the item to the batch with upsert (insert-or-update) operation.
     /// </summary>
     /// <param name="item"></param>
-    public void Upsert(T item) => AddEntity(item, BulkOp.Upsert);
+    public void Upsert(T item) => AddEntity(item, NpgsqlBulkOp.Upsert);
 
     /// <summary>
     /// Adds the items to the batch with upsert (insert-or-update) operation.
     /// </summary>
     /// <param name="items"></param>
-    public void UpsertRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Upsert);
+    public void UpsertRange(IEnumerable<T> items) => AddEntityRange(items, NpgsqlBulkOp.Upsert);
 
-    private void AddEntity(T item, BulkOp operation)
+    private void AddEntity(T item, NpgsqlBulkOp operation)
     {
         Items.Add(item);
         Operations.Add(operation);
 
-        if (operation == BulkOp.Insert) HasInserts = true;
-        else if (operation == BulkOp.Update) HasUpdates = true;
-        else if (operation == BulkOp.Delete) HasDeletes = true;
-        else if (operation == BulkOp.Upsert) HasUpserts = true;
+        if (operation == NpgsqlBulkOp.Insert) HasInserts = true;
+        else if (operation == NpgsqlBulkOp.Update) HasUpdates = true;
+        else if (operation == NpgsqlBulkOp.Delete) HasDeletes = true;
+        else if (operation == NpgsqlBulkOp.Upsert) HasUpserts = true;
     }
 
-    private void AddEntityRange(IEnumerable<T> items, BulkOp operation)
+    private void AddEntityRange(IEnumerable<T> items, NpgsqlBulkOp operation)
     {
         var before = Items.Count;
         foreach (var item in items)
@@ -189,10 +189,10 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
 
         if (Items.Count == before) return;
 
-        if (operation == BulkOp.Insert) HasInserts = true;
-        else if (operation == BulkOp.Update) HasUpdates = true;
-        else if (operation == BulkOp.Delete) HasDeletes = true;
-        else if (operation == BulkOp.Upsert) HasUpserts = true;
+        if (operation == NpgsqlBulkOp.Insert) HasInserts = true;
+        else if (operation == NpgsqlBulkOp.Update) HasUpdates = true;
+        else if (operation == NpgsqlBulkOp.Delete) HasDeletes = true;
+        else if (operation == NpgsqlBulkOp.Upsert) HasUpserts = true;
     }
 
     /// <summary>
@@ -204,7 +204,7 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     /// <param name="commandTimeout"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public async ValueTask<BulkApplyResult> SaveChangesAsync(
+    public async ValueTask<NpgsqlBulkApplyResult> SaveChangesAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         CancellationToken ct,
@@ -212,8 +212,8 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
     {
         ArgumentNullException.ThrowIfNull(transaction);
         
-        if (Items.Count == 0) return BulkApplyResult.Empty;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        if (Items.Count == 0) return NpgsqlBulkApplyResult.Empty;
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         if (HasInserts && !HasUpdates && !HasDeletes && !HasUpserts)
         {
@@ -223,7 +223,7 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
             if (parameterCount < ParameterThreshold)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, commandTimeout).ConfigureAwait(false);
-                return new BulkApplyResult(inserted, 0, 0);
+                return new NpgsqlBulkApplyResult(inserted, 0, 0);
             }
         }
 
@@ -262,7 +262,7 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
         if (updateMIdx >= 0) totalUpdated  += batch.BatchCommands[updateMIdx].RecordsAffected;
         if (insertMIdx >= 0) totalInserted += batch.BatchCommands[insertMIdx].RecordsAffected;
 
-        return new BulkApplyResult(totalInserted, totalUpdated, totalDeleted);
+        return new NpgsqlBulkApplyResult(totalInserted, totalUpdated, totalDeleted);
     }
 
     /// <summary>

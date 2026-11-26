@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using AdoGen.Generator.Models;
 using Microsoft.CodeAnalysis;
@@ -29,22 +30,30 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         var truncateSql = PostgreSqlSqlTextBuilder.Truncate(ctx);
         var existsSql = PostgreSqlSqlTextBuilder.Exists(ctx);
 
-        // Update/Delete/Upsert method bodies — vary based on whether a concurrency token is configured
-        var updateBody = ctx.ConcurrencyToken is not null
+        // Update/Delete method bodies — vary based on whether a concurrency token is configured
+        var concurrencyThrow = ctx.ConcurrencyToken is not null
             ? $$"""
                       var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                          if (affected == 0) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                          return affected;
+                      if (affected == 0) throw new global::AdoGen.PostgreSql.NpgsqlConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
+                      return affected;
               """
             : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+        var updateBody = concurrencyThrow;
+        var deleteBody = concurrencyThrow;
 
-        var deleteBody = ctx.ConcurrencyToken is not null
+        // TryUpdate/TryDelete: never throw. With a concurrency token, 0 affected rows triggers a key lookup on the
+        // same command to tell a missing row (NotFound) from a stale token (Conflict).
+        var tryWriteBody = ctx.ConcurrencyToken is not null
             ? $$"""
-                      var affected = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-                          if (affected == 0) throw new global::AdoGen.PostgreSql.AdoGenConcurrencyException("{{ctx.Profile.Schema}}.{{ctx.Profile.Table}}");
-                          return affected;
+                      if (await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0) return NpgsqlWriteResult.Applied;
+
+                      cmd.CommandText = Pg_SqlExists;
+                      cmd.Parameters.Clear();
+              {{ParameterBindingEmitter.BindKeys(ctx, "model", 8)}}
+                      var scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                      return scalar is null or DBNull ? NpgsqlWriteResult.NotFound : NpgsqlWriteResult.Conflict;
               """
-            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);";
+            : "        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? NpgsqlWriteResult.Applied : NpgsqlWriteResult.NotFound;";
 
 
         var idBasedSrc = "";
@@ -77,7 +86,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                        public static async ValueTask<int> DeleteAsync(NpgsqlConnection connection, List<{{keyType}}> ids, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                        {
                            if (ids is null || ids.Count == 0) return 0;
-                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                           await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                    
                            await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchAny, CommandType.Text, transaction, commandTimeout);
                            {{idsConversion}}
@@ -93,7 +102,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                    
                        public static async ValueTask<bool> ExistsAsync(NpgsqlConnection connection, {{keyType}} id, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                        {
-                           if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                           await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                            
                            await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
                            
@@ -122,7 +131,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                       public static async ValueTask<int> DeleteAsync(List<{{ctx.DtoTypeName}}> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                       {
                           if (models is null || models.Count == 0) return 0;
-                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
                           await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchUnnest, CommandType.Text, transaction, commandTimeout);
                           
@@ -133,7 +142,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                       public static async ValueTask<bool> ExistsAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                       {
-                          if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                          await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                           
                           await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
                           
@@ -181,7 +190,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                   public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlCreateTable, CommandType.Text, transaction, commandTimeout);
                       
@@ -190,7 +199,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                   public static async ValueTask<int> InsertAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlInsert, CommandType.Text, transaction, commandTimeout);
                       
@@ -202,30 +211,42 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                   {
                       if (models is null || models.Count == 0) return 0;
                       
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
-                      await using var cmd = new NpgsqlCommand("", connection, transaction);
-                      
-                      if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+                      // PostgreSQL limit: 65535 bind parameters per statement.
+                      // Larger lists are split into several commands; use a transaction for atomicity.
+                      const int RowsPerCommand = {{RowsPerCommand(ctx.Writables.Length)}};
+                      var affected = 0;
 
-                      var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * {{ParameterBindingEmitter.BatchInsertPerRowEstimate(ctx)}});
-                      sb.Append(Pg_SqlInsertBatchTemplate);
-                      var paramIndex = 0;
-
-                      for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+                      for (var start = 0; start < models.Count; start += RowsPerCommand)
                       {
-                          if (modelIndex > 0) sb.Append(',');
-              {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", "NpgsqlParameterNames", 12)}}
+                          var end = Math.Min(start + RowsPerCommand, models.Count);
+
+                          await using var cmd = new NpgsqlCommand("", connection, transaction);
+                          
+                          if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+                          var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + (end - start) * {{ParameterBindingEmitter.BatchInsertPerRowEstimate(ctx)}});
+                          sb.Append(Pg_SqlInsertBatchTemplate);
+                          var paramIndex = 0;
+
+                          for (var modelIndex = start; modelIndex < end; modelIndex++)
+                          {
+                              if (modelIndex > start) sb.Append(',');
+              {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", "NpgsqlParameterNames", 16)}}
+                          }
+
+                          cmd.CommandText = sb.ToString();
+                          
+                          affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                       }
 
-                      cmd.CommandText = sb.ToString();
-                      
-                      return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                      return affected;
                   }
 
                   public static async ValueTask<{{ctx.DtoTypeName}}> InsertAndReturnAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
                       
@@ -239,7 +260,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                   public static async ValueTask<int> UpdateAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
                       
@@ -249,7 +270,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
                   public static async ValueTask<int> DeleteAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
                       
@@ -257,9 +278,29 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               {{deleteBody}}
                   }
 
+                  public static async ValueTask<NpgsqlWriteResult> TryUpdateAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+                  {
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+                      
+                      await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
+                      
+              {{ParameterBindingEmitter.BindForUpdate(ctx, "model", 8)}}
+              {{tryWriteBody}}
+                  }
+
+                  public static async ValueTask<NpgsqlWriteResult> TryDeleteAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+                  {
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+                      
+                      await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
+                      
+              {{ParameterBindingEmitter.BindForDelete(ctx, "model", 8)}}
+              {{tryWriteBody}}
+                  }
+
                   public static async ValueTask<int> UpsertAsync({{ctx.DtoTypeName}} model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlUpsert, CommandType.Text, transaction, commandTimeout);
                       
@@ -269,7 +310,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
     
                   public static async ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                   {
-                      if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                      await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
                       
                       await using var cmd = connection.CreateCommand(Pg_SqlTruncate, CommandType.Text, transaction, commandTimeout);
                       
@@ -364,7 +405,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
 
         var concurrencySet = PatchConcurrency.BuildSet(ctx, "");
         var concurrencyWhere = PatchConcurrency.BuildWhere(ctx);
-        var concurrencyThrow = PatchConcurrency.BuildExecute(ctx, "global::AdoGen.PostgreSql.AdoGenConcurrencyException");
+        var concurrencyThrow = PatchConcurrency.BuildExecute(ctx, "global::AdoGen.PostgreSql.NpgsqlConcurrencyException");
 
         // Build class body (only when this provider owns the shared {Dto}Patch class)
         var keyPropsBuilder = new StringBuilder();
@@ -424,7 +465,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                 public static async ValueTask<int> PatchAsync(NpgsqlConnection connection, {{patchClassName}} patch, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
                 {
                     if (patch.Mask == 0UL) return 0;
-                    if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+                    await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
                     await using var cmd = new NpgsqlCommand("", connection, transaction);
                     if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
@@ -488,4 +529,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
             _ => result
         };
     }
+
+    // PostgreSQL caps a statement at 65535 bind parameters.
+    private static int RowsPerCommand(int paramsPerRow) => 65535 / Math.Max(1, paramsPerRow);
 }

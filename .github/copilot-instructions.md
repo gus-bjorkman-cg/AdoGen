@@ -86,7 +86,7 @@ Benchmarks (`AdoGen.Benchmarks`) are authoritative. Performance claims require b
 
 ### Optional column behaviors
 
-- `.ConcurrencyToken()` — `int`/`long` (auto-incremented in UPDATE) or `Guid` (caller sets new value). Adds `AND [Col] = @Col` to UPDATE/DELETE WHERE; throws `global::`-qualified `AdoGenConcurrencyException` on 0 affected rows. **Not** enforced by `UpsertAsync`; enforced by `PatchAsync` only when `WithExpected{Token}(...)` is called.
+- `.ConcurrencyToken()` — `int`/`long` (auto-incremented in UPDATE) or `Guid` (caller sets new value). Adds `AND [Col] = @Col` to UPDATE/DELETE WHERE; throws `global::`-qualified `SqlConcurrencyException` / `NpgsqlConcurrencyException` on 0 affected rows (generated `TryUpdateAsync`/`TryDeleteAsync` return `NotFound`/`Conflict` instead). **Not** enforced by `UpsertAsync`; enforced by `PatchAsync` only when `WithExpected{Token}(...)` is called.
 - `.ReadOnly()` — excluded from INSERT/UPDATE/bulk/patch writes; still in DDL and mapper read path. Pair with `.DefaultValue(sqlExpr)` for server-managed columns.
 
 Validation must produce a diagnostic at generation time. Runtime validation is a last resort.
@@ -98,7 +98,7 @@ Validation must produce a diagnostic at generation time. Runtime validation is a
 The generator emits SQL **only** for these operations, and only when the DTO implements the corresponding interface and a profile exists:
 
 **Domain (`ISqlDomainModel` / `INpgsqlDomainModel`):**
-`CreateTableAsync`, `InsertAsync`, `InsertAndReturnAsync`, `UpdateAsync`, `UpsertAsync`, `DeleteAsync`, `PatchAsync`, `TruncateAsync`, `ExistsAsync`
+`CreateTableAsync`, `InsertAsync`, `InsertAndReturnAsync`, `UpdateAsync`, `TryUpdateAsync`, `UpsertAsync`, `DeleteAsync`, `TryDeleteAsync`, `PatchAsync`, `TruncateAsync`, `ExistsAsync`
 
 **Bulk (`ISqlBulkModel` / `INpgsqlBulkModel`):**
 `InsertAsync(List<T>)` plus the `*Bulk` class with `AddRange` / `UpdateRange` / `UpsertRange` / `RemoveRange` + `SaveChangesAsync`. SQL Server uses `SqlBulkCopy`; PostgreSQL uses binary `COPY`.
@@ -107,7 +107,7 @@ The generator emits SQL **only** for these operations, and only when the DTO imp
 
 **Patch:** generator emits a `{Model}Patch` class per domain model; only fluent-set columns are written, concurrency check is opt-in via `WithExpected{Token}(...)`, read-only columns excluded.
 
-**Not generated:** arbitrary `SELECT`, ad-hoc queries, IQueryable, repository/UoW patterns. Callers write their own SQL and use `QueryAsync` / `QueryFirstOrDefaultAsync` / `QueryScalarAsync` / `QueryScalarFirstOrDefaultAsync` / `ExecuteAsync` with generated parameter factories.
+**Not generated:** arbitrary `SELECT`, ad-hoc queries, IQueryable, repository/UoW patterns. Callers write their own SQL and use `QueryAsync` / `QueryUnbufferedAsync` / `QueryFirstOrDefaultAsync` / `QueryScalarAsync` / `QueryScalarFirstOrDefaultAsync` / `ExecuteAsync` with generated parameter factories.
 
 Any attempt to widen this set must fail at generation time with a diagnostic. The limit is intentional.
 

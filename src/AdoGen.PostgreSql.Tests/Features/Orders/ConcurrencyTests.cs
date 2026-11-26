@@ -46,7 +46,7 @@ public sealed class ConcurrencyTests(TestContext testContext) : TestBase(testCon
         var act = async () => await Connection.UpdateAsync(DefaultOrders[0], CancellationToken);
 
         // Assert
-        (await act.Should().ThrowAsync<AdoGenConcurrencyException>()).Which.TableName.Should().Be("public.Orders");
+        (await act.Should().ThrowAsync<NpgsqlConcurrencyException>()).Which.TableName.Should().Be("public.Orders");
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class ConcurrencyTests(TestContext testContext) : TestBase(testCon
         var act = async () => await Connection.DeleteAsync(DefaultOrders[0], CancellationToken);
 
         // Assert
-        (await act.Should().ThrowAsync<AdoGenConcurrencyException>()).Which.TableName.Should().Be("public.Orders");
+        (await act.Should().ThrowAsync<NpgsqlConcurrencyException>()).Which.TableName.Should().Be("public.Orders");
     }
 
     // ── Guid version (Order2) ────────────────────────────────────────────────
@@ -85,7 +85,7 @@ public sealed class ConcurrencyTests(TestContext testContext) : TestBase(testCon
 
         var act = async () => await Connection.UpdateAsync(_order2, CancellationToken);
 
-        (await act.Should().ThrowAsync<AdoGenConcurrencyException>()).Which.TableName.Should().Be("public.Order2s");
+        (await act.Should().ThrowAsync<NpgsqlConcurrencyException>()).Which.TableName.Should().Be("public.Order2s");
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class ConcurrencyTests(TestContext testContext) : TestBase(testCon
 
         var act = async () => await Connection.DeleteAsync(_order2, CancellationToken);
 
-        (await act.Should().ThrowAsync<AdoGenConcurrencyException>()).Which.TableName.Should().Be("public.Order2s");
+        (await act.Should().ThrowAsync<NpgsqlConcurrencyException>()).Which.TableName.Should().Be("public.Order2s");
     }
 
     // ── Patch with optimistic concurrency ────────────────────────────────────
@@ -129,7 +129,7 @@ public sealed class ConcurrencyTests(TestContext testContext) : TestBase(testCon
         var act = async () => await Connection.PatchAsync(patch, CancellationToken);
 
         // Assert
-        (await act.Should().ThrowAsync<AdoGenConcurrencyException>()).Which.TableName.Should().Be("public.Orders");
+        (await act.Should().ThrowAsync<NpgsqlConcurrencyException>()).Which.TableName.Should().Be("public.Orders");
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public sealed class ConcurrencyTests(TestContext testContext) : TestBase(testCon
 
         // Assert
         firstAffected.Should().Be(1);
-        (await staleAct.Should().ThrowAsync<AdoGenConcurrencyException>()).Which.TableName.Should().Be("public.Order2s");
+        (await staleAct.Should().ThrowAsync<NpgsqlConcurrencyException>()).Which.TableName.Should().Be("public.Order2s");
         (await Connection.PatchAsync(fresh, CancellationToken)).Should().Be(1);
     }
 }

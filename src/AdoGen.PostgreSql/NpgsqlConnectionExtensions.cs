@@ -57,6 +57,24 @@ public static partial class NpgsqlConnectionExtensions
             => T.InsertAsync(models, connection, ct, transaction, commandTimeout);
 
         /// <summary>
+        /// Updates a database record and returns <see cref="NpgsqlWriteResult"/> instead of throwing on a missing row
+        /// or concurrency conflict.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<NpgsqlWriteResult> TryUpdateAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.TryUpdateAsync(model, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
+        /// Deletes a database record and returns <see cref="NpgsqlWriteResult"/> instead of throwing on a missing row
+        /// or concurrency conflict.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueTask<NpgsqlWriteResult> TryDeleteAsync<T>(T model, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+            where T : INpgsqlDomainModel<T>
+            => T.TryDeleteAsync(model, connection, ct, transaction, commandTimeout);
+
+        /// <summary>
         /// Updates a database record.
         /// </summary>
         /// <param name="model"></param>
@@ -65,7 +83,7 @@ public static partial class NpgsqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        /// <exception cref="AdoGenConcurrencyException">
+        /// <exception cref="NpgsqlConcurrencyException">
         /// Thrown when the DTO has a concurrency token configured and 0 rows were affected,
         /// indicating the row was modified or deleted by another process.
         /// </exception>
@@ -102,7 +120,7 @@ public static partial class NpgsqlConnectionExtensions
         /// <param name="commandTimeout"></param>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        /// <exception cref="AdoGenConcurrencyException">
+        /// <exception cref="NpgsqlConcurrencyException">
         /// Thrown when the DTO has a concurrency token configured and 0 rows were affected,
         /// indicating the row was modified or deleted by another process.
         /// </exception>
@@ -360,6 +378,80 @@ public static partial class NpgsqlConnectionExtensions
         }
 
         /// <summary>
+        /// Executes the SQL and streams the mapped rows without buffering them in a list.
+        /// See <see cref="NpgsqlCommandExtensions"/> <c>QueryUnbufferedAsync</c> for connection and early-exit behaviour.
+        /// </summary>
+        /// <returns>An async stream of mapped rows.</returns>
+        public async IAsyncEnumerable<T> QueryUnbufferedAsync<T>(
+            string sql,
+            [EnumeratorCancellation] CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+
+            await foreach (var item in command.QueryUnbufferedAsync<T>(ct).ConfigureAwait(false)) yield return item;
+        }
+
+        /// <summary>
+        /// Executes the SQL and streams the mapped rows without buffering them in a list.
+        /// See <see cref="NpgsqlCommandExtensions"/> <c>QueryUnbufferedAsync</c> for connection and early-exit behaviour.
+        /// </summary>
+        /// <returns>An async stream of mapped rows.</returns>
+        public async IAsyncEnumerable<T> QueryUnbufferedAsync<T>(
+            string sql,
+            NpgsqlParameter parameter,
+            [EnumeratorCancellation] CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+            command.Parameters.Add(parameter);
+
+            await foreach (var item in command.QueryUnbufferedAsync<T>(ct).ConfigureAwait(false)) yield return item;
+        }
+
+        /// <summary>
+        /// Executes the SQL and streams the mapped rows without buffering them in a list.
+        /// See <see cref="NpgsqlCommandExtensions"/> <c>QueryUnbufferedAsync</c> for connection and early-exit behaviour.
+        /// </summary>
+        /// <returns>An async stream of mapped rows.</returns>
+        public async IAsyncEnumerable<T> QueryUnbufferedAsync<T>(
+            string sql,
+            IEnumerable<NpgsqlParameter> parameters,
+            [EnumeratorCancellation] CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+        {
+            await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+
+            foreach (var parameter in parameters) command.Parameters.Add(parameter);
+
+            await foreach (var item in command.QueryUnbufferedAsync<T>(ct).ConfigureAwait(false)) yield return item;
+        }
+
+        /// <summary>
+        /// Executes the SQL and streams the mapped rows without buffering them in a list.
+        /// See <see cref="NpgsqlCommandExtensions"/> <c>QueryUnbufferedAsync</c> for connection and early-exit behaviour.
+        /// </summary>
+        /// <returns>An async stream of mapped rows.</returns>
+        public IAsyncEnumerable<T> QueryUnbufferedAsync<T>(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+            => QueryUnbufferedOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
         /// Creates an NpgsqlCommand.
         /// </summary>
         /// <param name="sql"></param>
@@ -399,7 +491,7 @@ public static partial class NpgsqlConnectionExtensions
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
         {
-            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             
@@ -424,7 +516,7 @@ public static partial class NpgsqlConnectionExtensions
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
         {
-            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
@@ -450,7 +542,7 @@ public static partial class NpgsqlConnectionExtensions
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
         {
-            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             
@@ -461,7 +553,7 @@ public static partial class NpgsqlConnectionExtensions
         
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
-        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
+        /// or <c>default</c> when there are no rows or the value is NULL. A numeric value of a different CLR type (e.g. <c>long</c> from <c>count(*)</c>) is converted to a numeric <typeparamref name="T"/> with an overflow check; other mismatches throw <see cref="InvalidCastException"/>.
         /// </summary>
         /// <param name="sql"></param>
         /// <param name="ct"></param>
@@ -476,17 +568,17 @@ public static partial class NpgsqlConnectionExtensions
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
         {
-            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             
             var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
-            return value is null or DBNull ? default : (T)value;
+            return ScalarConversion.Convert<T>(value);
         }
 
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
-        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
+        /// or <c>default</c> when there are no rows or the value is NULL. A numeric value of a different CLR type (e.g. <c>long</c> from <c>count(*)</c>) is converted to a numeric <typeparamref name="T"/> with an overflow check; other mismatches throw <see cref="InvalidCastException"/>.
         /// </summary>
         /// <param name="sql"></param>
         /// <param name="parameter"></param>
@@ -503,18 +595,18 @@ public static partial class NpgsqlConnectionExtensions
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
         {
-            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             command.Parameters.Add(parameter);
             
             var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
-            return value is null or DBNull ? default : (T)value;
+            return ScalarConversion.Convert<T>(value);
         }
         
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
-        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
+        /// or <c>default</c> when there are no rows or the value is NULL. A numeric value of a different CLR type (e.g. <c>long</c> from <c>count(*)</c>) is converted to a numeric <typeparamref name="T"/> with an overflow check; other mismatches throw <see cref="InvalidCastException"/>.
         /// </summary>
         /// <param name="sql"></param>
         /// <param name="parameters"></param>
@@ -531,14 +623,14 @@ public static partial class NpgsqlConnectionExtensions
             NpgsqlTransaction? transaction = null,
             int? commandTimeout = null)
         {
-            if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
             
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
                         
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
             
             var value = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
-            return value is null or DBNull ? default : (T)value;
+            return ScalarConversion.Convert<T>(value);
         }
         
         /// <summary>
@@ -693,7 +785,7 @@ public static partial class NpgsqlConnectionExtensions
 
         /// <summary>
         /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
-        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
+        /// or <c>default</c> when there are no rows or the value is NULL. A numeric value of a different CLR type (e.g. <c>long</c> from <c>count(*)</c>) is converted to a numeric <typeparamref name="T"/> with an overflow check; other mismatches throw <see cref="InvalidCastException"/>.
         /// </summary>
         public ValueTask<T?> ExecuteScalarAsync<T>(
             string sql,

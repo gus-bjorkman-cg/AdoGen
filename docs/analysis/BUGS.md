@@ -20,7 +20,7 @@ Severity ranges from **Critical** (silent wrong data or a broken release), throu
 | B5  | High     | Generator / PostgreSQL  | `ON CONFLICT ()` for identity-key upsert; AG009 never reported                       | Fixed — PostgreSQL uses `MERGE` when the key contains an identity (PG 15+); AG009 removed |
 | B6  | High     | Generator               | Key-only models: `UPDATE … SET  WHERE` / `DO UPDATE SET ;`                           | Fixed — no-op `SET k = k` for UPDATE; upsert skips UPDATE / uses `DO NOTHING` |
 | B7  | High     | Generator / PostgreSQL  | `.Char(n)` / `.Varbit(n)` silently ignored                                           | Fixed — `.Char(n)` / `.Varbit(n)` chain handlers added |
-| B8  | High     | Runtime                 | `ExecuteScalarAsync<T>` throws on NULL/DBNull/numeric mismatch                       | Fixed — null/DBNull return `default`; exact-type cast documented |
+| B8  | High     | Runtime                 | `ExecuteScalarAsync<T>` throws on NULL/DBNull/numeric mismatch                       | Fixed — null/DBNull return `default`; numeric results converted (F21) |
 | B9  | High     | Runtime / SQL Server    | `CreateParameter` with null value → "parameter not supplied"                         | Fixed — null sent as `DBNull.Value` |
 | B10 | Medium   | Generator               | `sealed` forced onto every DTO (breaks inheritance/abstract)                         | Fixed — `sealed` no longer emitted; inherited markers ignored; AG014 for abstract |
 | B11 | Medium   | Generator               | Nested DTOs generate uncompilable code                                               | Fixed — nested DTOs supported (F17); AG015 for non-partial/generic containers |
@@ -35,10 +35,10 @@ Severity ranges from **Critical** (silent wrong data or a broken release), throu
 | B20 | Low      | Runtime / SQL Server    | `SqlDataReaderExtensions` lacks `ConfigureAwait(false)`                              | Fixed |
 | B21 | Low      | Runtime                 | Pass-through `async`/`await` wrappers in single-id `DeleteAsync`                     | Fixed |
 | B22 | Low      | Runtime / docs          | `QueryMultiAsync` untested; doc example skipped a result set (doc fixed)             | Fixed — tests added |
-| B23 | Low      | Generator               | Concurrency exception also thrown when row doesn't exist                             | Documented (api-reference "Optimistic concurrency and missing rows") |
+| B23 | Low      | Generator               | Concurrency exception also thrown when row doesn't exist                             | Fixed — `TryUpdateAsync` / `TryDeleteAsync` return `NotFound` vs `Conflict` (F24) |
 | B24 | Low      | Generator / SQL Server  | `UpsertAsync` not race-safe without `UPDLOCK, SERIALIZABLE`                          | Fixed — insert-first with `UPDLOCK, HOLDLOCK` |
 | B25 | Low      | Runtime / bulk          | `AddRange(empty)` marks batch dirty                                                  | Fixed |
-| B26 | Low      | Runtime / API           | Same type names in both providers → CS0104 with both usings                          | Documented (aliases); rename deferred to next major |
+| B26 | Low      | Runtime / API           | Same type names in both providers → CS0104 with both usings                          | Fixed — provider-prefixed names (F27) |
 | B27 | Low      | Generator               | Pipeline model "value equality" comment is false                                     | Fixed — comment corrected (caching itself tracked as P10) |
 | B28 | Low      | Analyzer release        | AG013 title mismatch in `AnalyzerReleases.Shipped.md`                                | Fixed |
 | B29 | High     | Generator / DDL / docs  | `DefaultValue(expr)` is emitted verbatim without `DEFAULT`; the documented usage gives invalid DDL | Fixed — generator emits `DEFAULT {expr}`, strips a leading `DEFAULT` |
@@ -254,7 +254,7 @@ The `char` (System.Char) properties map to `CHAR(1)` through the default type ma
 - Add an "unknown chain method" diagnostic so future API/handler drift fails loudly (see FEATURES F4).
 
 ### B8. `ExecuteScalarAsync<T>` throws on NULL / DBNull results and on numeric type mismatches 🔍
-**Status:** Fixed — null/DBNull return `default`; exact-type cast documented.
+**Status:** Fixed — null/DBNull return `default`; numeric results are converted to `T` (`Convert.ToXxx`, F21); other mismatches throw `InvalidCastException`.
 
 **Files:**
 - `src/AdoGen.SqlServer/SqlConnectionExtensions.cs` (lines ~476, 502, 529)
@@ -448,7 +448,7 @@ Library code should not capture the SynchronizationContext. Doing so risks deadl
 The command is disposed (`await using var command`) before the returned reader is consumed. SqlClient tolerates this; Npgsql behaviour should be verified. No integration test covers `QueryMultiAsync` for either provider.
 
 ### B23. Concurrency exception also thrown when the row does not exist ⚠️
-**Status:** Documented (api-reference "Optimistic concurrency and missing rows").
+**Status:** Fixed — generated `TryUpdateAsync` / `TryDeleteAsync` return `SqlWriteResult` / `NpgsqlWriteResult` (`Applied`, `NotFound`, `Conflict`); the existence check runs only on the 0-rows path (F24). `UpdateAsync` / `DeleteAsync` still throw on both.
 
 Generated `UpdateAsync`/`DeleteAsync` for token models throw `AdoGenConcurrencyException` on `affected == 0`. That covers both "stale" and "deleted / never existed", so callers cannot distinguish them. Document it, or check existence on the failure path only.
 
@@ -465,7 +465,7 @@ Generated `UpdateAsync`/`DeleteAsync` for token models throw `AdoGenConcurrencyE
 `HasInserts` and the other flags are set to `true` even when the enumerable is empty. In `SaveChangesAsync` the "open connection if closed" check is effectively dead, because a non-null transaction implies an open connection.
 
 ### B26. Provider type names collide when both providers are imported ⚠️
-**Status:** Documented (aliases); rename deferred to next major.
+**Status:** Fixed — renamed to `SqlConcurrencyException` / `NpgsqlConcurrencyException`, `SqlBulkApplyResult` / `NpgsqlBulkApplyResult`, `SqlBulkOp` / `NpgsqlBulkOp`, `SqlPropertyBuilder` / `NpgsqlPropertyBuilder` (F27).
 
 `AdoGenConcurrencyException`, `BulkApplyResult`, `BulkOp` and `PropertyBuilder` exist in both `AdoGen.SqlServer` and `AdoGen.PostgreSql`. A project with `global using` for both namespaces, as `examples/AdoGen.Sample` has, gets CS0104 (ambiguous reference) as soon as user code writes `catch (AdoGenConcurrencyException)`.
 

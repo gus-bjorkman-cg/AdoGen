@@ -52,6 +52,8 @@ public abstract class TestBase : IAsyncLifetime
 
     async ValueTask IAsyncLifetime.InitializeAsync()
     {
+        // AdoGen closes connections it opened itself; keep this one open so tests can share transactions and sessions.
+        await Connection.OpenAsync(CancellationToken);
         await Connection.InsertAsync(DefaultUsers, CancellationToken);
         await Connection.InsertAsync(DefaultOrders, CancellationToken);
         await InitializeAsync();

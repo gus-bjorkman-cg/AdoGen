@@ -23,7 +23,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     /// <summary>
     /// The list of operations corresponding to each item in the batch. 
     /// </summary>
-    public List<BulkOp> Operations { get; }
+    public List<SqlBulkOp> Operations { get; }
     
     /// <summary>
     /// The batch size for the SqlBulkCopy operation.
@@ -100,7 +100,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     public BulkBatchSql(int capacity)
     {
         Items = new List<T>(capacity);
-        Operations = new List<BulkOp>(capacity);
+        Operations = new List<SqlBulkOp>(capacity);
     }
     
     /// <summary>
@@ -123,67 +123,67 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     /// The actual insertion will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="item"></param>
-    public void Add(T item) => AddEntity(item, BulkOp.Insert);
+    public void Add(T item) => AddEntity(item, SqlBulkOp.Insert);
     
     /// <summary>
     /// Adds the items to the batch with insert operation.
     /// The actual insertion will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="items"></param>
-    public void AddRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Insert);
+    public void AddRange(IEnumerable<T> items) => AddEntityRange(items, SqlBulkOp.Insert);
 
     /// <summary>
     /// Adds the item to the batch with update operation.
     /// The actual update will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="item"></param>
-    public void Update(T item) => AddEntity(item, BulkOp.Update);
+    public void Update(T item) => AddEntity(item, SqlBulkOp.Update);
     /// <summary>
     /// Adds the items to the batch with update operation.
     /// The actual update will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="items"></param>
-    public void UpdateRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Update);
+    public void UpdateRange(IEnumerable<T> items) => AddEntityRange(items, SqlBulkOp.Update);
 
     /// <summary>
     /// Adds the item to the batch with delete operation.
     /// The actual deletion will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="item"></param>
-    public void Remove(T item) => AddEntity(item, BulkOp.Delete);
+    public void Remove(T item) => AddEntity(item, SqlBulkOp.Delete);
     /// <summary>
     /// Adds the items to the batch with delete operation.
     /// The actual deletion will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="items"></param>
-    public void RemoveRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Delete);
+    public void RemoveRange(IEnumerable<T> items) => AddEntityRange(items, SqlBulkOp.Delete);
 
     /// <summary>
     /// Adds the item to the batch with upsert (insert-or-update) operation.
     /// The actual upsert will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="item"></param>
-    public void Upsert(T item) => AddEntity(item, BulkOp.Upsert);
+    public void Upsert(T item) => AddEntity(item, SqlBulkOp.Upsert);
 
     /// <summary>
     /// Adds the items to the batch with upsert (insert-or-update) operation.
     /// The actual upsert will happen when SaveChangesAsync is called.
     /// </summary>
     /// <param name="items"></param>
-    public void UpsertRange(IEnumerable<T> items) => AddEntityRange(items, BulkOp.Upsert);
+    public void UpsertRange(IEnumerable<T> items) => AddEntityRange(items, SqlBulkOp.Upsert);
 
-    private void AddEntity(T item, BulkOp operation)
+    private void AddEntity(T item, SqlBulkOp operation)
     {
         Items.Add(item);
         Operations.Add(operation);
         
-        if (operation == BulkOp.Insert) HasInserts = true;
-        else if (operation == BulkOp.Update) HasUpdates = true;
-        else if (operation == BulkOp.Delete) HasDeletes = true;
-        else if (operation == BulkOp.Upsert) HasUpserts = true;
+        if (operation == SqlBulkOp.Insert) HasInserts = true;
+        else if (operation == SqlBulkOp.Update) HasUpdates = true;
+        else if (operation == SqlBulkOp.Delete) HasDeletes = true;
+        else if (operation == SqlBulkOp.Upsert) HasUpserts = true;
     }
 
-    private void AddEntityRange(IEnumerable<T> items, BulkOp operation)
+    private void AddEntityRange(IEnumerable<T> items, SqlBulkOp operation)
     {
         var before = Items.Count;
         foreach (var item in items)
@@ -194,10 +194,10 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
 
         if (Items.Count == before) return;
 
-        if (operation == BulkOp.Insert) HasInserts = true;
-        else if (operation == BulkOp.Update) HasUpdates = true;
-        else if (operation == BulkOp.Delete) HasDeletes = true;
-        else if (operation == BulkOp.Upsert) HasUpserts = true;
+        if (operation == SqlBulkOp.Insert) HasInserts = true;
+        else if (operation == SqlBulkOp.Update) HasUpdates = true;
+        else if (operation == SqlBulkOp.Delete) HasDeletes = true;
+        else if (operation == SqlBulkOp.Upsert) HasUpserts = true;
     }
 
     /// <summary>
@@ -211,7 +211,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     /// <param name="enableStreaming">For large datasets like nvarchar(MAX)</param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public async ValueTask<BulkApplyResult> SaveChangesAsync(
+    public async ValueTask<SqlBulkApplyResult> SaveChangesAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         CancellationToken ct,
@@ -221,8 +221,8 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     {
         ArgumentNullException.ThrowIfNull(transaction);
         
-        if (Items.Count == 0) return BulkApplyResult.Empty;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        if (Items.Count == 0) return SqlBulkApplyResult.Empty;
+        await using var connectionScope = await SqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         var timeout = commandTimeout ?? DefaultTimeoutSeconds;
 
@@ -234,7 +234,7 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
             if (parameterCount <= ParameterThreshold)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, timeout).ConfigureAwait(false);
-                return new BulkApplyResult(inserted, 0, 0);
+                return new SqlBulkApplyResult(inserted, 0, 0);
             }
         }
 
@@ -259,9 +259,9 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
         
         await using var resultReader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
-        if (!await resultReader.ReadAsync(ct).ConfigureAwait(false)) return BulkApplyResult.Empty;
+        if (!await resultReader.ReadAsync(ct).ConfigureAwait(false)) return SqlBulkApplyResult.Empty;
 
-        return new BulkApplyResult(
+        return new SqlBulkApplyResult(
             Inserted: resultReader.GetInt32(0),
             Updated: resultReader.GetInt32(1),
             Deleted: resultReader.GetInt32(2));

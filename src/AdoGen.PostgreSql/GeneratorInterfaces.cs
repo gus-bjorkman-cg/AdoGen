@@ -73,6 +73,24 @@ public interface INpgsqlDomainModel<T> where T : INpgsqlDomainModel<T>
     static abstract ValueTask<int> DeleteAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
 
     /// <summary>
+    /// Updates a database record and reports the outcome instead of throwing.
+    /// </summary>
+    /// <remarks>
+    /// Returns <see cref="NpgsqlWriteResult.Applied"/> when a row was updated, <see cref="NpgsqlWriteResult.NotFound"/>
+    /// when no row has the key, and <see cref="NpgsqlWriteResult.Conflict"/> when the row exists but its concurrency
+    /// token did not match. Conflict detection runs a follow-up key lookup only when 0 rows were affected and the model
+    /// has a concurrency token; it is not atomic with the write (a concurrent delete can make a conflict look like
+    /// <see cref="NpgsqlWriteResult.NotFound"/>). Models without a concurrency token never return Conflict.
+    /// </remarks>
+    static abstract ValueTask<NpgsqlWriteResult> TryUpdateAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+
+    /// <summary>
+    /// Deletes a database record and reports the outcome instead of throwing.
+    /// </summary>
+    /// <remarks>Same result semantics as <see cref="TryUpdateAsync"/>.</remarks>
+    static abstract ValueTask<NpgsqlWriteResult> TryDeleteAsync(T model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
+    
+    /// <summary>
     /// Truncates a database table.
     /// </summary>
     static abstract ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null);
@@ -116,12 +134,12 @@ public interface INpgsqlDomainModel<T> where T : INpgsqlDomainModel<T>
 /// Struct that represents the result of a bulk apply operation,
 /// containing the number of inserted, updated, and deleted records.
 /// </summary>
-public readonly record struct BulkApplyResult(int Inserted, int Updated, int Deleted)
+public readonly record struct NpgsqlBulkApplyResult(int Inserted, int Updated, int Deleted)
 {
     /// <summary>
     /// Static property that represents an empty result.
     /// </summary>
-    public static BulkApplyResult Empty { get; } = new(0, 0, 0);
+    public static NpgsqlBulkApplyResult Empty { get; } = new(0, 0, 0);
 }
 
 /// <summary>
@@ -134,3 +152,17 @@ public interface INpgsqlBulkModel : INpgsqlDomainModel;
 /// </summary>
 public interface INpgsqlBulkModel<T> : INpgsqlBulkModel, INpgsqlDomainModel<T> where T : INpgsqlBulkModel<T>;
 
+/// <summary>
+/// Outcome of <c>TryUpdateAsync</c> / <c>TryDeleteAsync</c>.
+/// </summary>
+public enum NpgsqlWriteResult
+{
+    /// <summary>The row was written.</summary>
+    Applied = 0,
+
+    /// <summary>No row with the given key exists.</summary>
+    NotFound = 1,
+
+    /// <summary>The row exists but its concurrency token did not match the expected value.</summary>
+    Conflict = 2,
+}

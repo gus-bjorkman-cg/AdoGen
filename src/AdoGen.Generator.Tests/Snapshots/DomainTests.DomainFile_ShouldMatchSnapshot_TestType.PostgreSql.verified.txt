@@ -20,7 +20,7 @@ public partial record TestType : INpgsqlCompositeKeyModel<global::AdoGen.Generat
     public static async ValueTask<int> DeleteAsync(List<global::AdoGen.Generator.Tests.TestType> models, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (models is null || models.Count == 0) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         await using var cmd = connection.CreateCommand(Pg_SqlDeleteBatchUnnest, CommandType.Text, transaction, commandTimeout);
         
@@ -46,7 +46,7 @@ public partial record TestType : INpgsqlCompositeKeyModel<global::AdoGen.Generat
 
     public static async ValueTask<bool> ExistsAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlExists, CommandType.Text, transaction, commandTimeout);
         
@@ -106,7 +106,7 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
 
     public static async ValueTask CreateTableAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlCreateTable, CommandType.Text, transaction, commandTimeout);
         
@@ -115,7 +115,7 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
 
     public static async ValueTask<int> InsertAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlInsert, CommandType.Text, transaction, commandTimeout);
         
@@ -154,110 +154,122 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
     {
         if (models is null || models.Count == 0) return 0;
         
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
-        await using var cmd = new NpgsqlCommand("", connection, transaction);
-        
-        if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+        // PostgreSQL limit: 65535 bind parameters per statement.
+        // Larger lists are split into several commands; use a transaction for atomicity.
+        const int RowsPerCommand = 2427;
+        var affected = 0;
 
-        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 164);
-        sb.Append(Pg_SqlInsertBatchTemplate);
-        var paramIndex = 0;
-
-        for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+        for (var start = 0; start < models.Count; start += RowsPerCommand)
         {
-            if (modelIndex > 0) sb.Append(',');
-            var name0 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append('(').Append(name0);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(models[modelIndex].Int, name0));
-            var name1 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name1);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(models[modelIndex].NullableInt, name1));
-            var name2 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name2);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(models[modelIndex].Decimal, name2));
-            var name3 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name3);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(models[modelIndex].NullableDecimal, name3));
-            var name4 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name4);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(models[modelIndex].NullableGuid, name4));
-            var name5 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name5);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(models[modelIndex].NullableStringVarchar, name5));
-            var name6 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name6);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(models[modelIndex].NullableStringNVarchar, name6));
-            var name7 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name7);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(models[modelIndex].StringVarcharRuledNull, name7));
-            var name8 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name8);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(models[modelIndex].CharString, name8));
-            var name9 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name9);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(models[modelIndex].NCharString, name9));
-            var name10 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name10);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(models[modelIndex].Float, name10));
-            var name11 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name11);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(models[modelIndex].NullableFloat, name11));
-            var name12 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name12);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(models[modelIndex].DateTime, name12));
-            var name13 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name13);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(models[modelIndex].NullableDateTime, name13));
-            var name14 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name14);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(models[modelIndex].Double, name14));
-            var name15 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name15);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(models[modelIndex].NullableDouble, name15));
-            var name16 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name16);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(models[modelIndex].Char, name16));
-            var name17 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name17);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(models[modelIndex].NChar, name17));
-            var name18 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name18);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(models[modelIndex].NullableChar, name18));
-            var name19 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name19);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(models[modelIndex].NullableBytes, name19));
-            var name20 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name20);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(models[modelIndex].Bytes, name20));
-            var name21 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name21);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(models[modelIndex].Fruits, name21));
-            var name22 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name22);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(models[modelIndex].Flags, name22));
-            var name23 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name23);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(models[modelIndex].ByteEnum, name23));
-            var name24 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name24);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(models[modelIndex].ShortEnum, name24));
-            var name25 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name25);
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(models[modelIndex].IntEnum, name25));
-            var name26 = NpgsqlParameterNames.Get(paramIndex++);
-            sb.Append(',').Append(name26).Append(')');
-            cmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(models[modelIndex].LongEnum, name26));
+            var end = Math.Min(start + RowsPerCommand, models.Count);
+
+            await using var cmd = new NpgsqlCommand("", connection, transaction);
+            
+            if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
+
+            var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + (end - start) * 164);
+            sb.Append(Pg_SqlInsertBatchTemplate);
+            var paramIndex = 0;
+
+            for (var modelIndex = start; modelIndex < end; modelIndex++)
+            {
+                if (modelIndex > start) sb.Append(',');
+                var name0 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append('(').Append(name0);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(models[modelIndex].Int, name0));
+                var name1 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name1);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(models[modelIndex].NullableInt, name1));
+                var name2 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name2);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(models[modelIndex].Decimal, name2));
+                var name3 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name3);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(models[modelIndex].NullableDecimal, name3));
+                var name4 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name4);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(models[modelIndex].NullableGuid, name4));
+                var name5 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name5);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(models[modelIndex].NullableStringVarchar, name5));
+                var name6 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name6);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(models[modelIndex].NullableStringNVarchar, name6));
+                var name7 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name7);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(models[modelIndex].StringVarcharRuledNull, name7));
+                var name8 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name8);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(models[modelIndex].CharString, name8));
+                var name9 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name9);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(models[modelIndex].NCharString, name9));
+                var name10 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name10);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(models[modelIndex].Float, name10));
+                var name11 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name11);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(models[modelIndex].NullableFloat, name11));
+                var name12 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name12);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(models[modelIndex].DateTime, name12));
+                var name13 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name13);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(models[modelIndex].NullableDateTime, name13));
+                var name14 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name14);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(models[modelIndex].Double, name14));
+                var name15 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name15);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(models[modelIndex].NullableDouble, name15));
+                var name16 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name16);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(models[modelIndex].Char, name16));
+                var name17 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name17);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(models[modelIndex].NChar, name17));
+                var name18 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name18);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(models[modelIndex].NullableChar, name18));
+                var name19 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name19);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(models[modelIndex].NullableBytes, name19));
+                var name20 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name20);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(models[modelIndex].Bytes, name20));
+                var name21 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name21);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(models[modelIndex].Fruits, name21));
+                var name22 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name22);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(models[modelIndex].Flags, name22));
+                var name23 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name23);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(models[modelIndex].ByteEnum, name23));
+                var name24 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name24);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(models[modelIndex].ShortEnum, name24));
+                var name25 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name25);
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(models[modelIndex].IntEnum, name25));
+                var name26 = NpgsqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name26).Append(')');
+                cmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(models[modelIndex].LongEnum, name26));
+            }
+
+            cmd.CommandText = sb.ToString();
+            
+            affected += await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        cmd.CommandText = sb.ToString();
-        
-        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        return affected;
     }
 
     public static async ValueTask<global::AdoGen.Generator.Tests.TestType> InsertAndReturnAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlInsertAndReturn, CommandType.Text, transaction, commandTimeout);
         
@@ -298,7 +310,7 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
 
     public static async ValueTask<int> UpdateAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
         
@@ -335,7 +347,7 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
 
     public static async ValueTask<int> DeleteAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
         
@@ -345,9 +357,58 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    public static async ValueTask<NpgsqlWriteResult> TryUpdateAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(Pg_SqlUpdate, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableInt(model.NullableInt));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDecimal(model.NullableDecimal));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableGuid(model.NullableGuid));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringVarchar(model.NullableStringVarchar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableStringNVarchar(model.NullableStringNVarchar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterStringVarcharRuledNull(model.StringVarcharRuledNull));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterCharString(model.CharString));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNCharString(model.NCharString));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFloat(model.Float));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableFloat(model.NullableFloat));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDateTime(model.DateTime));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDateTime(model.NullableDateTime));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDouble(model.Double));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableDouble(model.NullableDouble));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterChar(model.Char));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNChar(model.NChar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableChar(model.NullableChar));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterNullableBytes(model.NullableBytes));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterBytes(model.Bytes));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFruits(model.Fruits));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterFlags(model.Flags));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterByteEnum(model.ByteEnum));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterShortEnum(model.ShortEnum));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterIntEnum(model.IntEnum));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterLongEnum(model.LongEnum));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? NpgsqlWriteResult.Applied : NpgsqlWriteResult.NotFound;
+    }
+
+    public static async ValueTask<NpgsqlWriteResult> TryDeleteAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
+    {
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
+        
+        await using var cmd = connection.CreateCommand(Pg_SqlDelete, CommandType.Text, transaction, commandTimeout);
+        
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterInt(model.Int));
+        cmd.Parameters.Add(TestTypeNpgsql.CreateParameterDecimal(model.Decimal));
+
+        return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0 ? NpgsqlWriteResult.Applied : NpgsqlWriteResult.NotFound;
+    }
+
     public static async ValueTask<int> UpsertAsync(global::AdoGen.Generator.Tests.TestType model, NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlUpsert, CommandType.Text, transaction, commandTimeout);
         
@@ -384,7 +445,7 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
 
     public static async ValueTask<int> TruncateAsync(NpgsqlConnection connection, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
         
         await using var cmd = connection.CreateCommand(Pg_SqlTruncate, CommandType.Text, transaction, commandTimeout);
         
@@ -633,7 +694,7 @@ public partial record TestType
     public static async ValueTask<int> PatchAsync(NpgsqlConnection connection, TestTypePatch patch, CancellationToken ct, NpgsqlTransaction? transaction = null, int? commandTimeout = null)
     {
         if (patch.Mask == 0UL) return 0;
-        if (connection.State != ConnectionState.Open) await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connectionScope = await NpgsqlConnectionScope.OpenAsync(connection, ct).ConfigureAwait(false);
 
         await using var cmd = new NpgsqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;

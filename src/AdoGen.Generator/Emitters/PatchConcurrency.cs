@@ -25,7 +25,7 @@ internal static class PatchConcurrency
             return
                 $"    /// <summary>Expected current value of <c>{name}</c>; when set, the patch only applies if it matches and the token is incremented.</summary>\n" +
                 $"    public {type}? Expected{name} {{ get; private set; }}\n" +
-                $"    /// <summary>Enables the optimistic-concurrency check: throws <c>AdoGenConcurrencyException</c> if the stored <c>{name}</c> differs.</summary>\n" +
+                $"    /// <summary>Enables the optimistic-concurrency check: throws the provider concurrency exception (<c>SqlConcurrencyException</c> / <c>NpgsqlConcurrencyException</c>) if the stored <c>{name}</c> differs.</summary>\n" +
                 $"    public {patchClassName} WithExpected{name}({type} expected) {{ Expected{name} = expected; return this; }}\n";
         }
 
@@ -34,7 +34,7 @@ internal static class PatchConcurrency
             $"    public {type}? Expected{name} {{ get; private set; }}\n" +
             $"    /// <summary>New value written to <c>{name}</c> when the concurrency check passes.</summary>\n" +
             $"    public {type}? Next{name} {{ get; private set; }}\n" +
-            $"    /// <summary>Enables the optimistic-concurrency check: throws <c>AdoGenConcurrencyException</c> if the stored <c>{name}</c> differs, otherwise writes <paramref name=\"next\"/>.</summary>\n" +
+            $"    /// <summary>Enables the optimistic-concurrency check: throws the provider concurrency exception (<c>SqlConcurrencyException</c> / <c>NpgsqlConcurrencyException</c>) if the stored <c>{name}</c> differs, otherwise writes <paramref name=\"next\"/>.</summary>\n" +
             $"    public {patchClassName} WithExpected{name}({type} expected, {type} next) {{ Expected{name} = expected; Next{name} = next; return this; }}\n";
     }
 

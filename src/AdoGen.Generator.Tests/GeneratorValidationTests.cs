@@ -666,11 +666,12 @@ public sealed class GeneratorValidationTests
     {
         // Arrange
         var (usings, _, _, (genType, domain, profile)) = Provider(provider);
+        var builderType = provider == "SqlServer" ? "SqlPropertyBuilder" : "NpgsqlPropertyBuilder";
         var source = usings + $$"""
 
             public static class PropertyBuilderExtensions
             {
-                public static PropertyBuilder<T> Indexed<T>(this PropertyBuilder<T> builder) => builder;
+                public static {{builderType}}<T> Indexed<T>(this {{builderType}}<T> builder) => builder;
             }
             public sealed partial record Widget(Guid Id, int Size) : {{domain}};
             public sealed class WidgetProfile : {{profile}}<Widget>

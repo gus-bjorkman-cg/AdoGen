@@ -35,7 +35,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(10, 0, 0));
+        actual.Should().Be(new NpgsqlBulkApplyResult(10, 0, 0));
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(0, users.Count, 0));
+        actual.Should().Be(new NpgsqlBulkApplyResult(0, users.Count, 0));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(0, 0, DefaultUsers.Count));
+        actual.Should().Be(new NpgsqlBulkApplyResult(0, 0, DefaultUsers.Count));
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
         await transaction.CommitAsync(CancellationToken);
 
         // Assert
-        actual.Should().Be(new BulkApplyResult(usersToAdd.Count + usersToUpsert.Count, usersToUpdate.Count, usersToDelete.Count));
+        actual.Should().Be(new NpgsqlBulkApplyResult(usersToAdd.Count + usersToUpsert.Count, usersToUpdate.Count, usersToDelete.Count));
     }
     
     [Fact]
@@ -184,16 +184,16 @@ public sealed class BulkTests(TestContext testContext) : TestBase(testContext)
     }
     
     [Fact]
-    public void BulkOp_Insert_ShouldHaveValueI() => BulkOp.Insert.Value.Should().Be('I');
+    public void BulkOp_Insert_ShouldHaveValueI() => NpgsqlBulkOp.Insert.Value.Should().Be('I');
     
     [Fact]
-    public void BulkOp_Update_ShouldHaveValueU() => BulkOp.Update.Value.Should().Be('U');
+    public void BulkOp_Update_ShouldHaveValueU() => NpgsqlBulkOp.Update.Value.Should().Be('U');
     
     [Fact]
-    public void BulkOp_Delete_ShouldHaveValueD() => BulkOp.Delete.Value.Should().Be('D');
+    public void BulkOp_Delete_ShouldHaveValueD() => NpgsqlBulkOp.Delete.Value.Should().Be('D');
     
     [Fact]
-    public void BulkOp_Upsert_ShouldHaveValueM() => BulkOp.Upsert.Value.Should().Be('M');
+    public void BulkOp_Upsert_ShouldHaveValueM() => NpgsqlBulkOp.Upsert.Value.Should().Be('M');
 
     [Fact]
     public void BulkBatch_HasInserts_ShouldBeTrueAfterInsert()
