@@ -11,7 +11,7 @@ namespace AdoGen.SqlServer;
 /// <summary>
 /// Extensions class for SqlConnection. 
 /// </summary>
-public static class SqlConnectionExtensions
+public static partial class SqlConnectionExtensions
 {
     extension(SqlConnection connection)
     {
@@ -631,6 +631,119 @@ public static class SqlConnectionExtensions
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
             return await command.QueryScalarFirstOrDefaultAsync<T>(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
+        /// </summary>
+        /// <returns>An empty list or a list with mapped object from the database</returns>
+        public ValueTask<List<T>> QueryAsync<T>(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : ISqlMapper<T>
+            => QueryOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
+        /// </summary>
+        /// <returns>Null or the mapped object from the database</returns>
+        public ValueTask<T?> QueryFirstOrDefaultAsync<T>(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : ISqlMapper<T>
+            => QueryFirstOrDefaultOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the reader.
+        /// </summary>
+        public ValueTask<SqlDataReader> QueryMultiAsync(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => QueryMultiOwnedAsync(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        public ValueTask<int> ExecuteAsync(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => ExecuteOwnedAsync(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
+        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
+        /// </summary>
+        public ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => ExecuteScalarOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => QueryScalarOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            SqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => QueryScalarFirstOrDefaultOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        private SqlCommand CreateCommandWithParameters(
+            string sql,
+            ReadOnlySpan<SqlParameter> parameters,
+            CommandType commandType,
+            SqlTransaction? transaction,
+            int? commandTimeout)
+        {
+            var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+
+            try
+            {
+                foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            }
+            catch
+            {
+                command.Dispose();
+                throw;
+            }
+
+            return command;
         }
     }
 }

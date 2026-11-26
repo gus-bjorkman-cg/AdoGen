@@ -217,7 +217,8 @@ public abstract class BulkBatchNpg<T> where T : INpgsqlBulkModel<T>
         
         if (HasInserts && !HasUpdates && !HasDeletes && !HasUpserts)
         {
-            var parameterCount = Items.Count * FieldCount;
+            // FieldCount includes the staging-only Operation column, which the INSERT does not send.
+            var parameterCount = Items.Count * (FieldCount - 1);
             
             if (parameterCount < ParameterThreshold)
             {

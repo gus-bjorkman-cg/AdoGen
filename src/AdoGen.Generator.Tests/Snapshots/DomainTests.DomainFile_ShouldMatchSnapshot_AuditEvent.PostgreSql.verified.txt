@@ -6,7 +6,6 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
 using Npgsql;
 using NpgsqlTypes;
 using AdoGen.PostgreSql;
@@ -29,7 +28,7 @@ public partial record AuditEvent : INpgsqlSingleIdModel<global::AdoGen.Generator
         {
             ParameterName = "ids",
             NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Bigint,
-            Value = ids.ToArray(),
+            Value = ids,
         });
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -100,22 +99,22 @@ public partial record AuditEvent : INpgsqlDomainModel<global::AdoGen.Generator.T
         
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 17);
+        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 20);
         sb.Append(Pg_SqlInsertBatchTemplate);
         var paramIndex = 0;
 
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
             if (modelIndex > 0) sb.Append(',');
-            sb.Append($"(@p{paramIndex}");
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex}");
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(models[modelIndex].EventType, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex})");
-            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, $"@p{paramIndex}"));
-            paramIndex++;
+            var name0 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append('(').Append(name0);
+            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt(models[modelIndex].CreatedAt, name0));
+            var name1 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append(',').Append(name1);
+            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType(models[modelIndex].EventType, name1));
+            var name2 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append(',').Append(name2).Append(')');
+            cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload(models[modelIndex].JsonPayload, name2));
         }
 
         cmd.CommandText = sb.ToString();
@@ -273,12 +272,13 @@ public partial record AuditEvent
         await using var cmd = new NpgsqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder("UPDATE \"log\".\"Audits\" SET ");
+        var sb = new StringBuilder(144);
+        sb.Append("UPDATE \"log\".\"Audits\" SET ");
         var separator = "";
         
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("\"CreatedAt\" = @CreatedAt"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterCreatedAt((global::System.DateTimeOffset)patch.CreatedAtValue!)); }
-        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator + "\"Type\" = @Type"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType((string)patch.EventTypeValue!)); }
-        if ((patch.Mask & (1UL << 2)) != 0) { sb.Append(separator + "\"JsonPayload\" = @JsonPayload"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload((byte[])patch.JsonPayloadValue!)); }
+        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator).Append("\"Type\" = @Type"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterEventType((string)patch.EventTypeValue!)); }
+        if ((patch.Mask & (1UL << 2)) != 0) { sb.Append(separator).Append("\"JsonPayload\" = @JsonPayload"); separator = ", "; cmd.Parameters.Add(AuditEventNpgsql.CreateParameterJsonPayload((byte[])patch.JsonPayloadValue!)); }
 
         sb.Append(" WHERE \"EventId\" = @EventId");
 

@@ -63,21 +63,25 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           for (var start = 0; start < ids.Count; start += RowsPerCommand)
                           {
                               var end = Math.Min(start + RowsPerCommand, ids.Count);
+                              // Pad to a power-of-two bucket by repeating the last id (harmless for DELETE),
+                              // so the SQL text and its cached plan are shared across list sizes.
+                              var slots = SqlParameterNames.BucketSize(end - start, RowsPerCommand);
                               
                               await using var cmd = new SqlCommand("", connection, transaction);
                               
                               if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
                               
-                              cmd.EnableOptimizedParameterBinding = end - start > 24;
+                              cmd.EnableOptimizedParameterBinding = slots > 24;
                               
-                              var sb = new StringBuilder(SqlDeleteBatchPrefix);
+                              var sb = new StringBuilder(SqlDeleteBatchPrefix.Length + SqlDeleteBatchSuffix.Length + slots * 9);
+                              sb.Append(SqlDeleteBatchPrefix);
                               
-                              for (var i = start; i < end; i++)
+                              for (var p = 0; p < slots; p++)
                               {
-                                  if (i > start) sb.Append(',');
-                                  var p = i - start;
-                                  sb.Append($"(@p{p})");
-                                  cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(ids[i], $"@p{p}"));
+                                  var name = SqlParameterNames.Get(p);
+                                  if (p > 0) sb.Append(',');
+                                  sb.Append('(').Append(name).Append(')');
+                                  cmd.Parameters.Add({{dto.Name}}Sql.CreateParameter{{keyName}}(ids[Math.Min(start + p, end - 1)], name));
                               }
                               
                               sb.Append(SqlDeleteBatchSuffix);
@@ -134,20 +138,25 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                           for (var start = 0; start < models.Count; start += RowsPerCommand)
                           {
                               var end = Math.Min(start + RowsPerCommand, models.Count);
+                              // Pad to a power-of-two bucket by repeating the last key (harmless for DELETE),
+                              // so the SQL text and its cached plan are shared across list sizes.
+                              var slots = SqlParameterNames.BucketSize(end - start, RowsPerCommand);
                               
                               await using var cmd = new SqlCommand("", connection, transaction);
                               
                               if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
                               
-                              cmd.EnableOptimizedParameterBinding = (end - start) * KeyPropertyCount > 24;
+                              cmd.EnableOptimizedParameterBinding = slots * KeyPropertyCount > 24;
                               
-                              var sb = new StringBuilder(SqlDeleteBatchPrefix);
+                              var sb = new StringBuilder(SqlDeleteBatchPrefix.Length + SqlDeleteBatchSuffix.Length + slots * (KeyPropertyCount * 7 + 2));
+                              sb.Append(SqlDeleteBatchPrefix);
                               var paramIndex = 0;
                               
-                              for (var i = start; i < end; i++)
+                              for (var row = 0; row < slots; row++)
                               {
-                                  if (i > start) sb.Append(',');
-                  {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "models[i]", "paramIndex", "sb", 16)}}
+                                  var model = models[Math.Min(start + row, end - 1)];
+                                  if (row > 0) sb.Append(',');
+                  {{ParameterBindingEmitter.BindKeysInlineLoop(ctx, "model", "paramIndex", "sb", "SqlParameterNames", 16)}}
                               }
                               
                               sb.Append(SqlDeleteBatchSuffix);
@@ -270,7 +279,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                         for (var modelIndex = start; modelIndex < end; modelIndex++)
                         {
                             if (modelIndex > start) sb.Append(',');
-            {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", 16)}}
+            {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", "SqlParameterNames", 16)}}
                         }
 
                         cmd.CommandText = sb.ToString();
@@ -414,12 +423,20 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         var concurrencyField = PatchConcurrency.BuildMembers(ctx, patchClassName);
 
         var setClauseItems = new StringBuilder();
+        // Upper bound of the final SQL length, so the patch StringBuilder never regrows.
+        var patchSqlCapacity = $"UPDATE {ctx.SchemaTableQuoted} SET ".Length + $" WHERE {ctx.WhereByKey}".Length + 2;
         for (var i = 0; i < patchColumns.Length; i++)
         {
             var col = patchColumns[i];
+            var assignment = $"[{col.ParameterName}] = @{col.ParameterName}";
+            patchSqlCapacity += assignment.Length + 2;
+            var append = i > 0 ? $"sb.Append(separator).Append(\"{assignment}\");" : $"sb.Append(\"{assignment}\");";
             setClauseItems.AppendLine(
-                $"        if ((patch.Mask & (1UL << {i})) != 0) {{ sb.Append({(i > 0 ? "separator + " : "")}\"[{col.ParameterName}] = @{col.ParameterName}\"); separator = \", \"; cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}(({col.PropertyType.TrimEnd('?')})patch.{col.Name}Value!)); }}");
+                $"        if ((patch.Mask & (1UL << {i})) != 0) {{ {append} separator = \", \"; cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}(({col.PropertyType.TrimEnd('?')})patch.{col.Name}Value!)); }}");
         }
+
+        if (ctx.ConcurrencyToken is { } patchToken)
+            patchSqlCapacity += 2 * (patchToken.ColumnNameQuoted.Length + patchToken.ParameterName.Length) + 24;
 
         var concurrencySet = PatchConcurrency.BuildSet(ctx, "@");
         var concurrencyWhere = PatchConcurrency.BuildWhere(ctx);
@@ -461,7 +478,8 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
                     await using var cmd = new SqlCommand("", connection, transaction);
                     if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-                    var sb = new StringBuilder("UPDATE {{ctx.SchemaTableQuoted}} SET ");
+                    var sb = new StringBuilder({{patchSqlCapacity}});
+                    sb.Append("UPDATE {{ctx.SchemaTableQuoted}} SET ");
                     var separator = "";
                     
             {{setClauseItems.ToString().TrimEnd()}}

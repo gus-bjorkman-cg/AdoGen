@@ -31,25 +31,30 @@ public partial record TestType : ISqlCompositeKeyModel<global::AdoGen.Generator.
         for (var start = 0; start < models.Count; start += RowsPerCommand)
         {
             var end = Math.Min(start + RowsPerCommand, models.Count);
+            // Pad to a power-of-two bucket by repeating the last key (harmless for DELETE),
+            // so the SQL text and its cached plan are shared across list sizes.
+            var slots = SqlParameterNames.BucketSize(end - start, RowsPerCommand);
             
             await using var cmd = new SqlCommand("", connection, transaction);
             
             if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
             
-            cmd.EnableOptimizedParameterBinding = (end - start) * KeyPropertyCount > 24;
+            cmd.EnableOptimizedParameterBinding = slots * KeyPropertyCount > 24;
             
-            var sb = new StringBuilder(SqlDeleteBatchPrefix);
+            var sb = new StringBuilder(SqlDeleteBatchPrefix.Length + SqlDeleteBatchSuffix.Length + slots * (KeyPropertyCount * 7 + 2));
+            sb.Append(SqlDeleteBatchPrefix);
             var paramIndex = 0;
             
-            for (var i = start; i < end; i++)
+            for (var row = 0; row < slots; row++)
             {
-                if (i > start) sb.Append(',');
-                sb.Append($"(@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterInt(models[i].Int, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex})");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(models[i].Decimal, $"@p{paramIndex}"));
-                paramIndex++;
+                var model = models[Math.Min(start + row, end - 1)];
+                if (row > 0) sb.Append(',');
+                var name0 = SqlParameterNames.Get(paramIndex++);
+                sb.Append('(').Append(name0);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterInt(model.Int, name0));
+                var name1 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name1).Append(')');
+                cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(model.Decimal, name1));
             }
             
             sb.Append(SqlDeleteBatchSuffix);
@@ -184,7 +189,7 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
             
             cmd.EnableOptimizedParameterBinding = ((end - start) * 27) > 24;
 
-            var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * 137);
+            var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * 164);
             sb.Append(SqlInsertBatchTemplate);
 
             var paramIndex = 0;
@@ -192,87 +197,87 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
             for (var modelIndex = start; modelIndex < end; modelIndex++)
             {
                 if (modelIndex > start) sb.Append(',');
-                sb.Append($"(@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterInt(models[modelIndex].Int, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(models[modelIndex].NullableInt, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(models[modelIndex].Decimal, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(models[modelIndex].NullableDecimal, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(models[modelIndex].NullableGuid, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(models[modelIndex].NullableStringVarchar, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(models[modelIndex].NullableStringNVarchar, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(models[modelIndex].StringVarcharRuledNull, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterCharString(models[modelIndex].CharString, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(models[modelIndex].NCharString, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterFloat(models[modelIndex].Float, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(models[modelIndex].NullableFloat, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(models[modelIndex].DateTime, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(models[modelIndex].NullableDateTime, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterDouble(models[modelIndex].Double, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(models[modelIndex].NullableDouble, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterChar(models[modelIndex].Char, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNChar(models[modelIndex].NChar, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(models[modelIndex].NullableChar, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(models[modelIndex].NullableBytes, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterBytes(models[modelIndex].Bytes, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterFruits(models[modelIndex].Fruits, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterFlags(models[modelIndex].Flags, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(models[modelIndex].ByteEnum, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(models[modelIndex].ShortEnum, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(models[modelIndex].IntEnum, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex})");
-                cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(models[modelIndex].LongEnum, $"@p{paramIndex}"));
-                paramIndex++;
+                var name0 = SqlParameterNames.Get(paramIndex++);
+                sb.Append('(').Append(name0);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterInt(models[modelIndex].Int, name0));
+                var name1 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name1);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt(models[modelIndex].NullableInt, name1));
+                var name2 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name2);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterDecimal(models[modelIndex].Decimal, name2));
+                var name3 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name3);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal(models[modelIndex].NullableDecimal, name3));
+                var name4 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name4);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid(models[modelIndex].NullableGuid, name4));
+                var name5 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name5);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar(models[modelIndex].NullableStringVarchar, name5));
+                var name6 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name6);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar(models[modelIndex].NullableStringNVarchar, name6));
+                var name7 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name7);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull(models[modelIndex].StringVarcharRuledNull, name7));
+                var name8 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name8);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterCharString(models[modelIndex].CharString, name8));
+                var name9 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name9);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString(models[modelIndex].NCharString, name9));
+                var name10 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name10);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterFloat(models[modelIndex].Float, name10));
+                var name11 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name11);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat(models[modelIndex].NullableFloat, name11));
+                var name12 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name12);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime(models[modelIndex].DateTime, name12));
+                var name13 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name13);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime(models[modelIndex].NullableDateTime, name13));
+                var name14 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name14);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterDouble(models[modelIndex].Double, name14));
+                var name15 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name15);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble(models[modelIndex].NullableDouble, name15));
+                var name16 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name16);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterChar(models[modelIndex].Char, name16));
+                var name17 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name17);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNChar(models[modelIndex].NChar, name17));
+                var name18 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name18);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar(models[modelIndex].NullableChar, name18));
+                var name19 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name19);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes(models[modelIndex].NullableBytes, name19));
+                var name20 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name20);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterBytes(models[modelIndex].Bytes, name20));
+                var name21 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name21);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterFruits(models[modelIndex].Fruits, name21));
+                var name22 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name22);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterFlags(models[modelIndex].Flags, name22));
+                var name23 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name23);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum(models[modelIndex].ByteEnum, name23));
+                var name24 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name24);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum(models[modelIndex].ShortEnum, name24));
+                var name25 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name25);
+                cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum(models[modelIndex].IntEnum, name25));
+                var name26 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name26).Append(')');
+                cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum(models[modelIndex].LongEnum, name26));
             }
 
             cmd.CommandText = sb.ToString();
@@ -666,34 +671,35 @@ public partial record TestType
         await using var cmd = new SqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder("UPDATE [dbo].[TestTypes] SET ");
+        var sb = new StringBuilder(811);
+        sb.Append("UPDATE [dbo].[TestTypes] SET ");
         var separator = "";
         
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("[NullableInt] = @NullableInt"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableInt((int)patch.NullableIntValue!)); }
-        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator + "[NullableDecimal] = @NullableDecimal"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal((decimal)patch.NullableDecimalValue!)); }
-        if ((patch.Mask & (1UL << 2)) != 0) { sb.Append(separator + "[NullableGuid] = @NullableGuid"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid((Guid)patch.NullableGuidValue!)); }
-        if ((patch.Mask & (1UL << 3)) != 0) { sb.Append(separator + "[NullableStringVarchar] = @NullableStringVarchar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar((string)patch.NullableStringVarcharValue!)); }
-        if ((patch.Mask & (1UL << 4)) != 0) { sb.Append(separator + "[NullableStringNVarchar] = @NullableStringNVarchar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar((string)patch.NullableStringNVarcharValue!)); }
-        if ((patch.Mask & (1UL << 5)) != 0) { sb.Append(separator + "[StringVarcharRuledNull] = @StringVarcharRuledNull"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull((string)patch.StringVarcharRuledNullValue!)); }
-        if ((patch.Mask & (1UL << 6)) != 0) { sb.Append(separator + "[CharString] = @CharString"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterCharString((string)patch.CharStringValue!)); }
-        if ((patch.Mask & (1UL << 7)) != 0) { sb.Append(separator + "[NCharString] = @NCharString"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString((string)patch.NCharStringValue!)); }
-        if ((patch.Mask & (1UL << 8)) != 0) { sb.Append(separator + "[Float] = @Float"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFloat((float)patch.FloatValue!)); }
-        if ((patch.Mask & (1UL << 9)) != 0) { sb.Append(separator + "[NullableFloat] = @NullableFloat"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat((float)patch.NullableFloatValue!)); }
-        if ((patch.Mask & (1UL << 10)) != 0) { sb.Append(separator + "[DateTime] = @DateTime"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime((DateTime)patch.DateTimeValue!)); }
-        if ((patch.Mask & (1UL << 11)) != 0) { sb.Append(separator + "[NullableDateTime] = @NullableDateTime"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime((DateTime)patch.NullableDateTimeValue!)); }
-        if ((patch.Mask & (1UL << 12)) != 0) { sb.Append(separator + "[Double] = @Double"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterDouble((double)patch.DoubleValue!)); }
-        if ((patch.Mask & (1UL << 13)) != 0) { sb.Append(separator + "[NullableDouble] = @NullableDouble"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble((double)patch.NullableDoubleValue!)); }
-        if ((patch.Mask & (1UL << 14)) != 0) { sb.Append(separator + "[Char] = @Char"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterChar((char)patch.CharValue!)); }
-        if ((patch.Mask & (1UL << 15)) != 0) { sb.Append(separator + "[NChar] = @NChar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNChar((char)patch.NCharValue!)); }
-        if ((patch.Mask & (1UL << 16)) != 0) { sb.Append(separator + "[NullableChar] = @NullableChar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar((char)patch.NullableCharValue!)); }
-        if ((patch.Mask & (1UL << 17)) != 0) { sb.Append(separator + "[NullableBytes] = @NullableBytes"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes((byte[])patch.NullableBytesValue!)); }
-        if ((patch.Mask & (1UL << 18)) != 0) { sb.Append(separator + "[Bytes] = @Bytes"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterBytes((byte[])patch.BytesValue!)); }
-        if ((patch.Mask & (1UL << 19)) != 0) { sb.Append(separator + "[Fruits] = @Fruits"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFruits((global::AdoGen.Generator.Tests.Fruits)patch.FruitsValue!)); }
-        if ((patch.Mask & (1UL << 20)) != 0) { sb.Append(separator + "[Flags] = @Flags"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFlags((global::AdoGen.Generator.Tests.Flags)patch.FlagsValue!)); }
-        if ((patch.Mask & (1UL << 21)) != 0) { sb.Append(separator + "[ByteEnum] = @ByteEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum((global::AdoGen.Generator.Tests.ByteEnum)patch.ByteEnumValue!)); }
-        if ((patch.Mask & (1UL << 22)) != 0) { sb.Append(separator + "[ShortEnum] = @ShortEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum((global::AdoGen.Generator.Tests.ShortEnum)patch.ShortEnumValue!)); }
-        if ((patch.Mask & (1UL << 23)) != 0) { sb.Append(separator + "[IntEnum] = @IntEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum((global::AdoGen.Generator.Tests.IntEnum)patch.IntEnumValue!)); }
-        if ((patch.Mask & (1UL << 24)) != 0) { sb.Append(separator + "[LongEnum] = @LongEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum((global::AdoGen.Generator.Tests.LongEnum)patch.LongEnumValue!)); }
+        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator).Append("[NullableDecimal] = @NullableDecimal"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDecimal((decimal)patch.NullableDecimalValue!)); }
+        if ((patch.Mask & (1UL << 2)) != 0) { sb.Append(separator).Append("[NullableGuid] = @NullableGuid"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableGuid((Guid)patch.NullableGuidValue!)); }
+        if ((patch.Mask & (1UL << 3)) != 0) { sb.Append(separator).Append("[NullableStringVarchar] = @NullableStringVarchar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringVarchar((string)patch.NullableStringVarcharValue!)); }
+        if ((patch.Mask & (1UL << 4)) != 0) { sb.Append(separator).Append("[NullableStringNVarchar] = @NullableStringNVarchar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableStringNVarchar((string)patch.NullableStringNVarcharValue!)); }
+        if ((patch.Mask & (1UL << 5)) != 0) { sb.Append(separator).Append("[StringVarcharRuledNull] = @StringVarcharRuledNull"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterStringVarcharRuledNull((string)patch.StringVarcharRuledNullValue!)); }
+        if ((patch.Mask & (1UL << 6)) != 0) { sb.Append(separator).Append("[CharString] = @CharString"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterCharString((string)patch.CharStringValue!)); }
+        if ((patch.Mask & (1UL << 7)) != 0) { sb.Append(separator).Append("[NCharString] = @NCharString"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNCharString((string)patch.NCharStringValue!)); }
+        if ((patch.Mask & (1UL << 8)) != 0) { sb.Append(separator).Append("[Float] = @Float"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFloat((float)patch.FloatValue!)); }
+        if ((patch.Mask & (1UL << 9)) != 0) { sb.Append(separator).Append("[NullableFloat] = @NullableFloat"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableFloat((float)patch.NullableFloatValue!)); }
+        if ((patch.Mask & (1UL << 10)) != 0) { sb.Append(separator).Append("[DateTime] = @DateTime"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterDateTime((DateTime)patch.DateTimeValue!)); }
+        if ((patch.Mask & (1UL << 11)) != 0) { sb.Append(separator).Append("[NullableDateTime] = @NullableDateTime"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDateTime((DateTime)patch.NullableDateTimeValue!)); }
+        if ((patch.Mask & (1UL << 12)) != 0) { sb.Append(separator).Append("[Double] = @Double"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterDouble((double)patch.DoubleValue!)); }
+        if ((patch.Mask & (1UL << 13)) != 0) { sb.Append(separator).Append("[NullableDouble] = @NullableDouble"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableDouble((double)patch.NullableDoubleValue!)); }
+        if ((patch.Mask & (1UL << 14)) != 0) { sb.Append(separator).Append("[Char] = @Char"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterChar((char)patch.CharValue!)); }
+        if ((patch.Mask & (1UL << 15)) != 0) { sb.Append(separator).Append("[NChar] = @NChar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNChar((char)patch.NCharValue!)); }
+        if ((patch.Mask & (1UL << 16)) != 0) { sb.Append(separator).Append("[NullableChar] = @NullableChar"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableChar((char)patch.NullableCharValue!)); }
+        if ((patch.Mask & (1UL << 17)) != 0) { sb.Append(separator).Append("[NullableBytes] = @NullableBytes"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterNullableBytes((byte[])patch.NullableBytesValue!)); }
+        if ((patch.Mask & (1UL << 18)) != 0) { sb.Append(separator).Append("[Bytes] = @Bytes"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterBytes((byte[])patch.BytesValue!)); }
+        if ((patch.Mask & (1UL << 19)) != 0) { sb.Append(separator).Append("[Fruits] = @Fruits"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFruits((global::AdoGen.Generator.Tests.Fruits)patch.FruitsValue!)); }
+        if ((patch.Mask & (1UL << 20)) != 0) { sb.Append(separator).Append("[Flags] = @Flags"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterFlags((global::AdoGen.Generator.Tests.Flags)patch.FlagsValue!)); }
+        if ((patch.Mask & (1UL << 21)) != 0) { sb.Append(separator).Append("[ByteEnum] = @ByteEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterByteEnum((global::AdoGen.Generator.Tests.ByteEnum)patch.ByteEnumValue!)); }
+        if ((patch.Mask & (1UL << 22)) != 0) { sb.Append(separator).Append("[ShortEnum] = @ShortEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterShortEnum((global::AdoGen.Generator.Tests.ShortEnum)patch.ShortEnumValue!)); }
+        if ((patch.Mask & (1UL << 23)) != 0) { sb.Append(separator).Append("[IntEnum] = @IntEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterIntEnum((global::AdoGen.Generator.Tests.IntEnum)patch.IntEnumValue!)); }
+        if ((patch.Mask & (1UL << 24)) != 0) { sb.Append(separator).Append("[LongEnum] = @LongEnum"); separator = ", "; cmd.Parameters.Add(TestTypeSql.CreateParameterLongEnum((global::AdoGen.Generator.Tests.LongEnum)patch.LongEnumValue!)); }
 
         sb.Append(" WHERE [Int] = @Int AND [Decimal] = @Decimal");
 

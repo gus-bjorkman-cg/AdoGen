@@ -6,7 +6,6 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
 using Npgsql;
 using NpgsqlTypes;
 using AdoGen.PostgreSql;
@@ -29,7 +28,7 @@ public partial record User : INpgsqlSingleIdModel<global::AdoGen.Generator.Tests
         {
             ParameterName = "ids",
             NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid,
-            Value = ids.ToArray(),
+            Value = ids,
         });
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -99,22 +98,22 @@ public partial record User : INpgsqlDomainModel<global::AdoGen.Generator.Tests.U
         
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 17);
+        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 20);
         sb.Append(Pg_SqlInsertBatchTemplate);
         var paramIndex = 0;
 
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
             if (modelIndex > 0) sb.Append(',');
-            sb.Append($"(@p{paramIndex}");
-            cmd.Parameters.Add(UserNpgsql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex}");
-            cmd.Parameters.Add(UserNpgsql.CreateParameterName(models[modelIndex].Name, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex})");
-            cmd.Parameters.Add(UserNpgsql.CreateParameterEmail(models[modelIndex].Email, $"@p{paramIndex}"));
-            paramIndex++;
+            var name0 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append('(').Append(name0);
+            cmd.Parameters.Add(UserNpgsql.CreateParameterId(models[modelIndex].Id, name0));
+            var name1 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append(',').Append(name1);
+            cmd.Parameters.Add(UserNpgsql.CreateParameterName(models[modelIndex].Name, name1));
+            var name2 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append(',').Append(name2).Append(')');
+            cmd.Parameters.Add(UserNpgsql.CreateParameterEmail(models[modelIndex].Email, name2));
         }
 
         cmd.CommandText = sb.ToString();
@@ -265,11 +264,12 @@ public partial record User
         await using var cmd = new NpgsqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder("UPDATE \"public\".\"Users\" SET ");
+        var sb = new StringBuilder(98);
+        sb.Append("UPDATE \"public\".\"Users\" SET ");
         var separator = "";
         
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("\"Name\" = @Name"); separator = ", "; cmd.Parameters.Add(UserNpgsql.CreateParameterName((string)patch.NameValue!)); }
-        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator + "\"Email\" = @Email"); separator = ", "; cmd.Parameters.Add(UserNpgsql.CreateParameterEmail((string)patch.EmailValue!)); }
+        if ((patch.Mask & (1UL << 1)) != 0) { sb.Append(separator).Append("\"Email\" = @Email"); separator = ", "; cmd.Parameters.Add(UserNpgsql.CreateParameterEmail((string)patch.EmailValue!)); }
 
         sb.Append(" WHERE \"Id\" = @Id");
 

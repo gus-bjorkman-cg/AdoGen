@@ -110,20 +110,28 @@ internal static class ParameterBindingEmitter
     /// Must be placed inside a <c>for (var i = 0; i &lt; models.Count; i++)</c> loop after
     /// <c>sb.Append('(')</c> and before <c>sb.Append(')')</c>.
     /// </summary>
-    public static string BindKeysInlineLoop(EmitContext ctx, string modelVar, string indexVar, string sbVar, int indent)
+    public static string BindKeysInlineLoop(EmitContext ctx, string modelVar, string indexVar, string sbVar, string namesClass, int indent)
+        => BindInlineLoop(ctx, ctx.Keys, modelVar, indexVar, sbVar, namesClass, indent);
+
+    /// <summary>
+    /// Emits, per column, a cached positional parameter name (<c>{namesClass}.Get(index++)</c>), its placement in the
+    /// value tuple and the matching <c>cmd.Parameters.Add</c>. Names come from the runtime cache, so no strings are allocated.
+    /// </summary>
+    private static string BindInlineLoop(EmitContext ctx, System.Collections.Immutable.ImmutableArray<ColumnInfo> columns,
+        string modelVar, string indexVar, string sbVar, string namesClass, int indent)
     {
         var prefix = new string(' ', indent);
         var sb = new StringBuilder();
-        var last = ctx.Keys.Length - 1;
+        var last = columns.Length - 1;
 
-        for (var k = 0; k < ctx.Keys.Length; k++)
+        for (var k = 0; k < columns.Length; k++)
         {
-            var col = ctx.Keys[k];
-            var open = k == 0 ? "(" : ",";
-            var close = k == last ? ")" : "";
-            sb.AppendLine($"{prefix}{sbVar}.Append($\"{open}@p{{{indexVar}}}{close}\");");
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, $\"@p{{{indexVar}}}\"));");
-            sb.AppendLine($"{prefix}{indexVar}++;");
+            var col = columns[k];
+            var open = k == 0 ? "'('" : "','";
+            var close = k == last ? ".Append(')')" : "";
+            sb.AppendLine($"{prefix}var name{k} = {namesClass}.Get({indexVar}++);");
+            sb.AppendLine($"{prefix}{sbVar}.Append({open}).Append(name{k}){close};");
+            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, name{k}));");
         }
 
         return sb.ToString().TrimEnd();
@@ -136,29 +144,12 @@ internal static class ParameterBindingEmitter
     /// Must be placed inside a <c>for (var modelIndex = 0; ...)</c> loop after
     /// <c>sb.Append('(')</c> and before <c>sb.Append(')')</c>.
     /// </summary>
-    public static string BindWritablesInlineLoop(EmitContext ctx, string modelVar, string indexVar, string sbVar, int indent)
-    {
-        var prefix = new string(' ', indent);
-        var sb = new StringBuilder();
-        var last = ctx.Writables.Length - 1;
-
-        for (var k = 0; k < ctx.Writables.Length; k++)
-        {
-            var col = ctx.Writables[k];
-            var open = k == 0 ? "(" : ",";
-            var close = k == last ? ")" : "";
-            sb.AppendLine($"{prefix}{sbVar}.Append($\"{open}@p{{{indexVar}}}{close}\");");
-            sb.AppendLine($"{prefix}cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}({modelVar}.{col.Name}, $\"@p{{{indexVar}}}\"));");
-            sb.AppendLine($"{prefix}{indexVar}++;");
-        }
-
-        return sb.ToString().TrimEnd();
-    }
+    public static string BindWritablesInlineLoop(EmitContext ctx, string modelVar, string indexVar, string sbVar, string namesClass, int indent)
+        => BindInlineLoop(ctx, ctx.Writables, modelVar, indexVar, sbVar, namesClass, indent);
 
     /// <summary>
     /// Produces cmd.Parameters.Add calls for composite-key batch delete via unnest.
-    /// Each key column gets a single array parameter (@{col}s) containing all values extracted from the list.
-    /// e.g.: cmd.Parameters.Add(new NpgsqlParameter { ParameterName = "Ids", NpgsqlDbType = Array | Uuid, Value = models.Select(m => m.Id).ToArray() });
+    /// Each key column gets a single typed array parameter (@{col}s) filled by a plain loop (no LINQ).
     /// </summary>
     public static string BindKeyArraysNpgsql(EmitContext ctx, string listVar, int indent)
     {
@@ -167,26 +158,28 @@ internal static class ParameterBindingEmitter
 
         foreach (var col in ctx.Keys)
         {
-            var npgsqlDbType = col.SqlType; // not what we want — use DbType from profile
-            // NpgsqlDbType enum member is stored per column in ctx.Profile.ParamsByProperty
             var dbTypeMember = ctx.Profile.ParamsByProperty[col.Name].DbType!.Value.EnumMember;
+            var arrayVar = $"{LowerFirst(col.Name)}Values";
+            sb.AppendLine($"{prefix}var {arrayVar} = new {col.PropertyType}[{listVar}.Count];");
+            sb.AppendLine($"{prefix}for (var i = 0; i < {listVar}.Count; i++) {arrayVar}[i] = {listVar}[i].{col.Name};");
             sb.AppendLine($"{prefix}cmd.Parameters.Add(new global::Npgsql.NpgsqlParameter");
             sb.AppendLine($"{prefix}{{");
             sb.AppendLine($"{prefix}    ParameterName = \"{col.ParameterName}s\",");
             sb.AppendLine($"{prefix}    NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.{dbTypeMember},");
-            sb.AppendLine($"{prefix}    Value = {listVar}.Select(static m => m.{col.Name}).ToArray(),");
+            sb.AppendLine($"{prefix}    Value = {arrayVar},");
             sb.AppendLine($"{prefix}}});");
         }
 
         return sb.ToString().TrimEnd();
     }
 
+    private static string LowerFirst(string s) => s.Length == 0 ? s : char.ToLowerInvariant(s[0]) + s.Substring(1);
+
     /// <summary>
     /// Returns the estimated per-row character count for a batch insert value tuple,
     /// e.g. "(@p0,@p1,@p2)" — used to pre-size the StringBuilder.
-    /// Formula: each param slot is ~5 chars (@p + up to 3 digits), plus 2 for the parens,
-    /// minus 1 because the first column has no leading comma.
+    /// Each param slot is ~6 chars ("@p" + up to 4 digits), plus 2 for the parens.
     /// </summary>
     public static int BatchInsertPerRowEstimate(EmitContext ctx)
-        => ctx.Writables.Length * 5 + 2;
+        => ctx.Writables.Length * 6 + 2;
 }

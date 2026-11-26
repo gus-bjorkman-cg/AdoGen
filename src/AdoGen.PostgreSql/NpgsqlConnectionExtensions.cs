@@ -11,7 +11,7 @@ namespace AdoGen.PostgreSql;
 /// <summary>
 /// Extensions class for NpgsqlConnection.
 /// </summary>
-public static class NpgsqlConnectionExtensions
+public static partial class NpgsqlConnectionExtensions
 {
     extension(NpgsqlConnection connection)
     {
@@ -637,6 +637,119 @@ public static class NpgsqlConnectionExtensions
             await using var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
             foreach (var parameter in parameters) command.Parameters.Add(parameter);
             return await command.QueryScalarFirstOrDefaultAsync<T>(ct);
+        }
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the objects by using the source generated mapper.
+        /// </summary>
+        /// <returns>An empty list or a list with mapped object from the database</returns>
+        public ValueTask<List<T>> QueryAsync<T>(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+            => QueryOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and maps the object by using the source generated mapper.
+        /// </summary>
+        /// <returns>Null or the mapped object from the database</returns>
+        public ValueTask<T?> QueryFirstOrDefaultAsync<T>(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            where T : INpgsqlMapper<T>
+            => QueryFirstOrDefaultOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the reader.
+        /// </summary>
+        public ValueTask<NpgsqlDataReader> QueryMultiAsync(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => QueryMultiOwnedAsync(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened and executes the SQL and returns the number of affected rows.
+        /// </summary>
+        public ValueTask<int> ExecuteAsync(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => ExecuteOwnedAsync(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Opens the connection if not opened, executes the SQL and returns the first column of the first row,
+        /// or <c>default</c> when there are no rows or the value is NULL. <typeparamref name="T"/> must match the provider CLR type exactly.
+        /// </summary>
+        public ValueTask<T?> ExecuteScalarAsync<T>(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => ExecuteScalarOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Executes the SQL and returns a list of scalar values from the first column.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public ValueTask<List<T?>> QueryScalarAsync<T>(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => QueryScalarOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        /// <summary>
+        /// Executes the SQL and returns the first scalar value from the first column, or default if no rows.
+        /// Use for primitive/scalar types (int, string, Guid, etc.). Handles DBNull as default(T).
+        /// </summary>
+        public ValueTask<T?> QueryScalarFirstOrDefaultAsync<T>(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CancellationToken ct,
+            CommandType commandType = CommandType.Text,
+            NpgsqlTransaction? transaction = null,
+            int? commandTimeout = null)
+            => QueryScalarFirstOrDefaultOwnedAsync<T>(connection.CreateCommandWithParameters(sql, parameters, commandType, transaction, commandTimeout), ct);
+
+        private NpgsqlCommand CreateCommandWithParameters(
+            string sql,
+            ReadOnlySpan<NpgsqlParameter> parameters,
+            CommandType commandType,
+            NpgsqlTransaction? transaction,
+            int? commandTimeout)
+        {
+            var command = connection.CreateCommand(sql, commandType, transaction, commandTimeout);
+
+            try
+            {
+                foreach (var parameter in parameters) command.Parameters.Add(parameter);
+            }
+            catch
+            {
+                command.Dispose();
+                throw;
+            }
+
+            return command;
         }
     }
 }

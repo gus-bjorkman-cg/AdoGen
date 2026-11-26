@@ -355,6 +355,8 @@ await tx.CommitAsync(ct);
 
 SQL Server uses `SqlBulkCopy` via a temp table. PostgreSQL uses `COPY` (binary format) via Npgsql.
 
+When a batch contains only inserts and `rows × written columns` is within `ParameterThreshold` (default 2000 on SQL Server, 3000 on PostgreSQL; settable on the `*Bulk` instance), `SaveChangesAsync` uses a multi-row `INSERT` instead.
+
 ---
 
 ## Scalar & execute helpers
@@ -396,7 +398,7 @@ var name = await connection.QueryScalarFirstOrDefaultAsync<string>(
     UserSql.CreateParameterId(userId), ct);
 ```
 
-All scalar/execute methods have three overloads: no parameters, single `SqlParameter` / `NpgsqlParameter`, and `IEnumerable<SqlParameter>` / `IEnumerable<NpgsqlParameter>`.
+All query/scalar/execute methods have four overloads: no parameters, a single `SqlParameter` / `NpgsqlParameter`, `ReadOnlySpan<SqlParameter>` / `ReadOnlySpan<NpgsqlParameter>`, and `IEnumerable<SqlParameter>` / `IEnumerable<NpgsqlParameter>`. A collection expression such as `[p1, p2]` binds to the span overload, so no array is allocated. A `List<T>` binds to `IEnumerable`.
 
 ---
 

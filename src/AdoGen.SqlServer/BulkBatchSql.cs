@@ -30,6 +30,13 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
     /// Adjust this based on the size of your data and the performance characteristics of your database.
     /// </summary>
     public int BulkCopyBatchSize { get; set; } = 5000;
+
+    /// <summary>
+    /// Max number of parameters (rows × inserted columns) for which an insert-only batch uses a multi-row
+    /// <c>INSERT … VALUES</c> instead of <see cref="SqlBulkCopy"/>. Set to 0 to always use <see cref="SqlBulkCopy"/>.
+    /// Values above 2000 are allowed; the insert is then split into several commands.
+    /// </summary>
+    public int ParameterThreshold { get; set; } = 2000;
     
     /// <summary>
     /// The default timeout in seconds for the bulk copy and apply commands.
@@ -221,10 +228,10 @@ public abstract class BulkBatchSql<T> where T : ISqlBulkModel<T>
 
         if (HasInserts && !HasUpdates && !HasDeletes && !HasUpserts)
         {
-            // Small insert-only batches fit in a single multi-row INSERT (≤ 1000 rows, < 2000 parameters).
-            var parameterCount = Items.Count * FieldCount;
+            // FieldCount includes the staging-only Operation column, which the INSERT does not send.
+            var parameterCount = Items.Count * (FieldCount - 1);
             
-            if (Items.Count <= 1000 && parameterCount < 2000)
+            if (parameterCount <= ParameterThreshold)
             {
                 var inserted = await T.InsertAsync(Items, connection, ct, transaction, timeout).ConfigureAwait(false);
                 return new BulkApplyResult(inserted, 0, 0);

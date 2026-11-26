@@ -32,7 +32,8 @@ internal static class Discovery
     private static IncrementalValueProvider<ImmutableArray<INamedTypeSymbol>> CreateDtoCandidates(
         IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
-                static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax,
+                // A DTO needs a base list to implement a marker interface; at least one partial part declares it.
+                static (node, _) => node is ClassDeclarationSyntax { BaseList: not null } or RecordDeclarationSyntax { BaseList: not null },
                 static (ctx, ct) =>
                     ctx.SemanticModel.GetDeclaredSymbol((TypeDeclarationSyntax)ctx.Node, ct) as INamedTypeSymbol)
             .Where(static x => x is not null)
@@ -112,7 +113,8 @@ internal static class Discovery
     private static IncrementalValueProvider<ImmutableArray<DiscoveryModel>> BuildProfilesIndex(
         IncrementalGeneratorInitializationContext context)
         => context.SyntaxProvider.CreateSyntaxProvider(
-                static (node, _) => node is ClassDeclarationSyntax,
+                // Profiles derive from a generic SqlProfile<T> / NpgsqlProfile<T> base class.
+                static (node, _) => node is ClassDeclarationSyntax { BaseList.Types: [{ Type: GenericNameSyntax or QualifiedNameSyntax { Right: GenericNameSyntax } or AliasQualifiedNameSyntax { Name: GenericNameSyntax } }, ..] },
                 static (ctx, ct) =>
                 {
                     if (ctx.SemanticModel.GetDeclaredSymbol((ClassDeclarationSyntax)ctx.Node, ct) is not

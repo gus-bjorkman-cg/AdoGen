@@ -2,12 +2,16 @@
 
 Per `.github/copilot-instructions.md`, benchmarks (`src/AdoGen.Benchmarks`) are authoritative. Every item below is a **hypothesis to benchmark** before merging, and each one includes a suggested benchmark. Items are ordered by expected impact.
 
+> **Status (resolution pass):** P1, P4–P9 and P11 are fixed; P2 and P10 are partially fixed; P3 and P12 are deferred pending benchmarks. See the **Status:** line under each entry.
+
 Cross-reference: several bug fixes in `BUGS.md` have performance implications. They are flagged here so the fix and its benchmark are designed together.
 
 ---
 
 ## P1. Redesign mapper ordinal resolution (pairs with bug B1)
 **Where:** generated `Map(reader)` (DtoMapperEmitter*)
+
+**Status:** Fixed via B1: ordinals are resolved by name once per result set (`GetOrdinals` + `Map(reader, ordinals)`).
 
 Today the mapper uses a process-wide static ordinal cache, with a `Volatile.Read` on every row. That is fast but incorrect (B1). Options, in performance order:
 
@@ -24,6 +28,8 @@ Today the mapper uses a process-wide static ordinal cache, with a `Volatile.Read
 ## P2. SQL Server plan-cache pollution from count-dependent SQL text
 **Where:** generated `InsertAsync(List<T>)` and `DeleteAsync(List<TKey>)` (SQL Server); the composite-key delete
 
+**Status:** Partially fixed. SQL Server `DeleteAsync(ids)` and the composite-key `DeleteAsync(List<T>)` pad each chunk to a power-of-two bucket (`SqlParameterNames.BucketSize`) by repeating the last key, which gives at most about 11 plans per DTO. Integration tests cover non-power-of-two counts and duplicate keys. INSERT padding was **not** done: `SELECT DISTINCT` would also collapse genuinely duplicate user rows and is not valid for every column type. OPENJSON/TVP remain options; benchmark before adopting either.
+
 The command text is `… VALUES (@p0,@p1,…),(…)` with a shape that depends on the row count. Every distinct list length compiles and caches a new plan. A service that inserts batches of varying size can fill the plan cache with single-use plans, causing CPU spent on compiles and cache churn. This is the same problem the mandatory Size/Precision rule exists to prevent.
 
 **Options:**
@@ -36,6 +42,8 @@ The command text is `… VALUES (@p0,@p1,…),(…)` with a shape that depends o
 ## P3. PostgreSQL multi-row insert via `UNNEST` arrays
 **Where:** generated PostgreSQL `InsertAsync(List<T>)`
 
+**Status:** Deferred. This is a shape change that needs the suggested benchmark first.
+
 The current shape uses `VALUES ($1,$2,…),(…)`: N×M parameters, a different statement per count (so prepared statements are not reused), and a 65 535-parameter limit.
 
 The alternative is:
@@ -47,6 +55,8 @@ That uses one typed array parameter per column, the same SQL text for every coun
 ## P4. Avoid per-parameter string allocation for generated names
 **Where:** generated `InsertAsync(List<T>)` and `DeleteAsync(ids)` (both providers)
 
+**Status:** Fixed. A runtime `SqlParameterNames.Get(i)` / `NpgsqlParameterNames.Get(i)` lazily caches `@pN` strings. Generated insert-list and delete-by-ids code appends the cached name and reuses it for the parameter.
+
 Each parameter gets a fresh `$"@p{i}"` string, plus `sb.Append($"(@p{i}")`. For 1 000 rows × 4 columns, that is 4 000 small string allocations per call.
 
 **Fix:** use a static, lazily-grown `string[] ParamNames` in the runtime (`"@p0"` … `"@p2099"`), shared by all DTOs. Append it with `sb.Append(ParamNames[i])`. This is zero-allocation after warm-up.
@@ -56,10 +66,14 @@ Each parameter gets a fresh `$"@p{i}"` string, plus `sb.Append($"(@p{i}")`. For 
 ## P5. PostgreSQL `DeleteAsync(ids)` copies the list
 **Where:** `DomainOpsEmitterNpgSql`, `Value = ids.ToArray()`
 
+**Status:** Fixed. `Value = ids`, and the emitted `using System.Linq;` was removed. PostgreSQL composite-key delete also fills arrays with a `for` loop instead of `Select().ToArray()`.
+
 Npgsql accepts `List<T>` directly as an array parameter value, so the copy is unnecessary. Also drop the emitted `using System.Linq;`, which is not needed and conflicts with the "no LINQ" rule.
 
 ## P6. `params ReadOnlySpan<TParameter>` overloads for multi-parameter APIs
 **Where:** `SqlConnectionExtensions` / `NpgsqlConnectionExtensions`, all `IEnumerable<SqlParameter>` overloads
+
+**Status:** Fixed. Non-params `ReadOnlySpan<TParameter>` overloads were added (keeping the `CancellationToken` position) for `QueryAsync`, `QueryFirstOrDefaultAsync`, `QueryMultiAsync`, `ExecuteAsync`, `ExecuteScalarAsync`, `QueryScalarAsync` and `QueryScalarFirstOrDefaultAsync` on both providers. `[p1, p2]` binds to them, while `List<T>` still binds to `IEnumerable`.
 
 Callers write `[p1, p2]`. A collection expression that targets `IEnumerable<T>` allocates an array, and `foreach` over `IEnumerable<T>` boxes an enumerator. Adding a `params ReadOnlySpan<SqlParameter>` overload makes the call site allocation-free with C# 13 overload resolution. Keep the `IEnumerable` overload for compatibility.
 
@@ -70,18 +84,26 @@ The `CancellationToken` must stay before `params`. That changes the parameter or
 ## P7. Patch SQL building allocations
 **Where:** generated `PatchAsync` (both providers)
 
+**Status:** Fixed. `sb.Append(separator).Append(...)` is used, and the StringBuilder is pre-sized to a capacity computed at generation time. The per-mask SQL cache was not done.
+
 - `sb.Append(separator + "[Col] = @Col")` allocates a concatenated string per set column. Use `sb.Append(separator).Append("[Col] = @Col")`.
 - `new StringBuilder("UPDATE … SET ")` starts at the default capacity and regrows. Pre-size it, or build into a pooled `ValueStringBuilder`/`stackalloc char[]` (patch SQL is short).
 - Optionally cache the SQL text per mask in a small static array when the column count is ≤ 8.
 
 ## P8. `ConfigureAwait(false)` in `SqlDataReaderExtensions` (bug B20)
+
+**Status:** Fixed (B20).
 Without it, every `ReadAsync` continuation under a SynchronizationContext posts back to it. That matters for any consumer that has a context. Zero cost to fix.
 
 ## P9. Remove pass-through `async`/`await` wrappers (bug B21)
+
+**Status:** Fixed (B21).
 `SqlConnectionSingleIdExtensions.DeleteAsync` (and one Npgsql equivalent) should return the inner `ValueTask` directly, which saves one state machine per call.
 
 ## P10. Generator incremental pipeline does a full re-run on every edit
 **Where:** `Pipelines/Discovery.cs` (`CreateDtoCandidates`), `Models/*`
+
+**Status:** Partially fixed. The syntax predicates were narrowed: DTOs must have a base list, and profiles must have a generic first base type. The `partial` filter was not added because the not-partial diagnostic must still fire. Equatable pipeline models remain open (B27).
 
 There are two causes:
 - The syntax predicate accepts every `class` and `record`, the transform calls `GetDeclaredSymbol`, and the result is `Combine`d with `CompilationProvider`. Any change to the compilation re-runs discovery, validation and emit for all DTOs.
@@ -99,6 +121,8 @@ This is a developer-experience improvement, not a runtime one; the generator REA
 ## P11. Bulk insert-only fast path threshold (pairs with B18)
 **Where:** `BulkBatchSql.SaveChangesAsync`
 
+**Status:** Fixed. SQL Server `BulkBatchSql.ParameterThreshold` (default 2000) was added. Both providers compare `Items.Count * (FieldCount - 1)`, excluding the Operation column. The crossover default still needs benchmarking.
+
 The fast path is chosen by `Items.Count * FieldCount < 2100`. Besides the 1000-row correctness bug:
 - The `FieldCount` used includes the `Operation` column, which is not sent in the INSERT. The threshold is therefore conservative by one column per row.
 - The crossover point where `SqlBulkCopy` wins over a multi-row INSERT is likely lower than about 500 rows.
@@ -107,6 +131,8 @@ Benchmark and expose the threshold as a property, as `BulkBatchNpg.ParameterThre
 
 ## P12. `ExistsAsync` boxes the scalar
 **Where:** generated `ExistsAsync` (both providers)
+
+**Status:** Deferred. The item itself says to benchmark first, and the current approach is likely faster.
 
 `ExecuteScalarAsync` returns a boxed `int` (`1`). This is minor. Using `ExecuteReaderAsync(CommandBehavior.SingleRow | SingleResult)` and `reader.ReadAsync()` avoids the box, but it allocates a reader. **Benchmark before changing**; the current approach may well be faster.
 

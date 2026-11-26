@@ -76,7 +76,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                            {
                                ParameterName = "ids",
                                NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.{{keyDbType}},
-                               Value = ids.ToArray(),
+                               Value = ids,
                            });
                            
                            return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -149,7 +149,6 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               using System.Collections.Generic;
               using System.Threading;
               using System.Threading.Tasks;
-              using System.Linq;
               using Npgsql;
               using NpgsqlTypes;
               using AdoGen.PostgreSql;
@@ -207,7 +206,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                       for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
                       {
                           if (modelIndex > 0) sb.Append(',');
-              {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", 12)}}
+              {{ParameterBindingEmitter.BindWritablesInlineLoop(ctx, "models[modelIndex]", "paramIndex", "sb", "NpgsqlParameterNames", 12)}}
                       }
 
                       cmd.CommandText = sb.ToString();
@@ -328,13 +327,21 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         }
 
         var setClauseItems = new StringBuilder();
+        // Upper bound of the final SQL length, so the patch StringBuilder never regrows.
+        var patchSqlCapacity = ctx.SchemaTableQuoted.Length + 32;
+        foreach (var key in ctx.Keys) patchSqlCapacity += 2 * key.ParameterName.Length + 12;
         for (var i = 0; i < patchColumns.Length; i++)
         {
             var col = patchColumns[i];
             var colSql = $"\\\"{col.ParameterName}\\\" = @{col.ParameterName}";
+            patchSqlCapacity += 2 * col.ParameterName.Length + 8;
+            var append = i > 0 ? $"sb.Append(separator).Append(\"{colSql}\");" : $"sb.Append(\"{colSql}\");";
             setClauseItems.AppendLine(
-                $"        if ((patch.Mask & (1UL << {i})) != 0) {{ sb.Append({(i > 0 ? "separator + " : "")}\"{colSql}\"); separator = \", \"; cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}(({col.PropertyType.TrimEnd('?')})patch.{col.Name}Value!)); }}");
+                $"        if ((patch.Mask & (1UL << {i})) != 0) {{ {append} separator = \", \"; cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{col.Name}(({col.PropertyType.TrimEnd('?')})patch.{col.Name}Value!)); }}");
         }
+
+        if (ctx.ConcurrencyToken is { } patchToken)
+            patchSqlCapacity += 2 * (patchToken.ColumnNameQuoted.Length + patchToken.ParameterName.Length) + 24;
 
         // WHERE clause from keys
         var whereByKeyPg = new StringBuilder();
@@ -411,7 +418,8 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
                     await using var cmd = new NpgsqlCommand("", connection, transaction);
                     if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-                    var sb = new StringBuilder("UPDATE {{schemaTableEscaped}} SET ");
+                    var sb = new StringBuilder({{patchSqlCapacity}});
+                    sb.Append("UPDATE {{schemaTableEscaped}} SET ");
                     var separator = "";
                     
             {{setClauseItems.ToString().TrimEnd()}}

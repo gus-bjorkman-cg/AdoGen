@@ -6,7 +6,6 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
 using Npgsql;
 using NpgsqlTypes;
 using AdoGen.PostgreSql;
@@ -29,7 +28,7 @@ public partial record VersionedOrderGuid : INpgsqlSingleIdModel<global::AdoGen.G
         {
             ParameterName = "ids",
             NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Uuid,
-            Value = ids.ToArray(),
+            Value = ids,
         });
         
         return await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -99,22 +98,22 @@ public partial record VersionedOrderGuid : INpgsqlDomainModel<global::AdoGen.Gen
         
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 17);
+        var sb = new StringBuilder(Pg_SqlInsertBatchTemplate.Length + models.Count * 20);
         sb.Append(Pg_SqlInsertBatchTemplate);
         var paramIndex = 0;
 
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
             if (modelIndex > 0) sb.Append(',');
-            sb.Append($"(@p{paramIndex}");
-            cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex}");
-            cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterProductName(models[modelIndex].ProductName, $"@p{paramIndex}"));
-            paramIndex++;
-            sb.Append($",@p{paramIndex})");
-            cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterRowVersion(models[modelIndex].RowVersion, $"@p{paramIndex}"));
-            paramIndex++;
+            var name0 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append('(').Append(name0);
+            cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterId(models[modelIndex].Id, name0));
+            var name1 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append(',').Append(name1);
+            cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterProductName(models[modelIndex].ProductName, name1));
+            var name2 = NpgsqlParameterNames.Get(paramIndex++);
+            sb.Append(',').Append(name2).Append(')');
+            cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterRowVersion(models[modelIndex].RowVersion, name2));
         }
 
         cmd.CommandText = sb.ToString();
@@ -273,13 +272,14 @@ public partial record VersionedOrderGuid
         await using var cmd = new NpgsqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder("UPDATE \"public\".\"VersionedOrderGuids\" SET ");
+        var sb = new StringBuilder(176);
+        sb.Append("UPDATE \"public\".\"VersionedOrderGuids\" SET ");
         var separator = "";
         
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("\"ProductName\" = @ProductName"); separator = ", "; cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterProductName((string)patch.ProductNameValue!)); }
         if (patch.ExpectedRowVersion.HasValue)
         {
-            sb.Append(separator + "\"RowVersion\" = @RowVersionNext");
+            sb.Append(separator).Append("\"RowVersion\" = @RowVersionNext");
             cmd.Parameters.Add(VersionedOrderGuidNpgsql.CreateParameterRowVersion(patch.NextRowVersion!.Value, "RowVersionNext"));
         }
         sb.Append(" WHERE \"Id\" = @Id");

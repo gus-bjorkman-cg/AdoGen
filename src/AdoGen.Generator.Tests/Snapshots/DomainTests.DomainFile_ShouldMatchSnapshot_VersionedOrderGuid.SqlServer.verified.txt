@@ -30,21 +30,25 @@ public partial record VersionedOrderGuid : ISqlSingleIdModel<global::AdoGen.Gene
         for (var start = 0; start < ids.Count; start += RowsPerCommand)
         {
             var end = Math.Min(start + RowsPerCommand, ids.Count);
+            // Pad to a power-of-two bucket by repeating the last id (harmless for DELETE),
+            // so the SQL text and its cached plan are shared across list sizes.
+            var slots = SqlParameterNames.BucketSize(end - start, RowsPerCommand);
             
             await using var cmd = new SqlCommand("", connection, transaction);
             
             if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
             
-            cmd.EnableOptimizedParameterBinding = end - start > 24;
+            cmd.EnableOptimizedParameterBinding = slots > 24;
             
-            var sb = new StringBuilder(SqlDeleteBatchPrefix);
+            var sb = new StringBuilder(SqlDeleteBatchPrefix.Length + SqlDeleteBatchSuffix.Length + slots * 9);
+            sb.Append(SqlDeleteBatchPrefix);
             
-            for (var i = start; i < end; i++)
+            for (var p = 0; p < slots; p++)
             {
-                if (i > start) sb.Append(',');
-                var p = i - start;
-                sb.Append($"(@p{p})");
-                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(ids[i], $"@p{p}"));
+                var name = SqlParameterNames.Get(p);
+                if (p > 0) sb.Append(',');
+                sb.Append('(').Append(name).Append(')');
+                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(ids[Math.Min(start + p, end - 1)], name));
             }
             
             sb.Append(SqlDeleteBatchSuffix);
@@ -129,7 +133,7 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
             
             cmd.EnableOptimizedParameterBinding = ((end - start) * 3) > 24;
 
-            var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * 17);
+            var sb = new StringBuilder(SqlInsertBatchTemplate.Length + (end - start) * 20);
             sb.Append(SqlInsertBatchTemplate);
 
             var paramIndex = 0;
@@ -137,15 +141,15 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
             for (var modelIndex = start; modelIndex < end; modelIndex++)
             {
                 if (modelIndex > start) sb.Append(',');
-                sb.Append($"(@p{paramIndex}");
-                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(models[modelIndex].Id, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex}");
-                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName(models[modelIndex].ProductName, $"@p{paramIndex}"));
-                paramIndex++;
-                sb.Append($",@p{paramIndex})");
-                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(models[modelIndex].RowVersion, $"@p{paramIndex}"));
-                paramIndex++;
+                var name0 = SqlParameterNames.Get(paramIndex++);
+                sb.Append('(').Append(name0);
+                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterId(models[modelIndex].Id, name0));
+                var name1 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name1);
+                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName(models[modelIndex].ProductName, name1));
+                var name2 = SqlParameterNames.Get(paramIndex++);
+                sb.Append(',').Append(name2).Append(')');
+                cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(models[modelIndex].RowVersion, name2));
             }
 
             cmd.CommandText = sb.ToString();
@@ -307,13 +311,14 @@ public partial record VersionedOrderGuid
         await using var cmd = new SqlCommand("", connection, transaction);
         if (commandTimeout.HasValue) cmd.CommandTimeout = commandTimeout.Value;
 
-        var sb = new StringBuilder("UPDATE [dbo].[VersionedOrderGuids] SET ");
+        var sb = new StringBuilder(156);
+        sb.Append("UPDATE [dbo].[VersionedOrderGuids] SET ");
         var separator = "";
         
         if ((patch.Mask & (1UL << 0)) != 0) { sb.Append("[ProductName] = @ProductName"); separator = ", "; cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterProductName((string)patch.ProductNameValue!)); }
         if (patch.ExpectedRowVersion.HasValue)
         {
-            sb.Append(separator + "[RowVersion] = @RowVersionNext");
+            sb.Append(separator).Append("[RowVersion] = @RowVersionNext");
             cmd.Parameters.Add(VersionedOrderGuidSql.CreateParameterRowVersion(patch.NextRowVersion!.Value, "@RowVersionNext"));
         }
         sb.Append(" WHERE [Id] = @Id");

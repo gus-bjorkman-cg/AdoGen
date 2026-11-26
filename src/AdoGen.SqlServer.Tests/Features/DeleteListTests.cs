@@ -20,6 +20,33 @@ public class DeleteListTests : TestBase
     }
     
     [Fact]
+    public async Task Delete_ShouldReturnExactAffectedCount_WhenCountIsNotPowerOfTwo()
+    {
+        // Arrange — ids are padded to a power-of-two bucket by repeating the last id
+        var toDelete = _ids.Take(3).ToList();
+
+        // Act
+        var affected = await Connection.DeleteAsync<User>(toDelete, CancellationToken);
+
+        // Assert
+        affected.Should().Be(3);
+        (await GetAllUsers()).Should().BeEquivalentTo(DefaultUsers.Skip(3));
+    }
+
+    [Fact]
+    public async Task Delete_ShouldReturnExactAffectedCount_WhenIdsContainDuplicates()
+    {
+        // Arrange
+        List<Guid> toDelete = [_ids[0], _ids[0], _ids[1]];
+
+        // Act
+        var affected = await Connection.DeleteAsync<User>(toDelete, CancellationToken);
+
+        // Assert
+        affected.Should().Be(2);
+    }
+
+    [Fact]
     public async Task Execute_ShouldThrowOperationCanceledException_WhenCtsIsCancelled()
     {
         // Arrange

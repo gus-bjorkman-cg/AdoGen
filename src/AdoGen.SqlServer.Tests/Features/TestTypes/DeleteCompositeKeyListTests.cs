@@ -48,6 +48,20 @@ public sealed class DeleteCompositeKeyListTests(TestContext testContext) : TestB
     }
 
     [Fact]
+    public async Task Delete_ShouldReturnExactAffectedCount_WhenCountIsNotPowerOfTwo()
+    {
+        // Arrange — 3 rows are padded to a bucket of 4 by repeating the last key
+        var toDelete = _seeded.Take(3).ToList();
+
+        // Act
+        var affected = await Connection.DeleteAsync(toDelete, CancellationToken);
+
+        // Assert
+        affected.Should().Be(3);
+        (await GetAll()).Should().HaveCount(7);
+    }
+
+    [Fact]
     public async Task Delete_ShouldReturnZero_WhenListIsEmpty()
     {
         // Act

@@ -47,13 +47,13 @@ internal static class PatchConcurrency
         var name = token.Name;
 
         if (IsIntOrLong(token.PropertyType))
-            return $"        if (patch.Expected{name}.HasValue) sb.Append(separator + \"{column} = @{token.ParameterName} + 1\");";
+            return $"        if (patch.Expected{name}.HasValue) sb.Append(separator).Append(\"{column} = @{token.ParameterName} + 1\");";
 
         var nextParam = $"{token.ParameterName}Next";
         return
             $"        if (patch.Expected{name}.HasValue)\n" +
             "        {\n" +
-            $"            sb.Append(separator + \"{column} = @{nextParam}\");\n" +
+            $"            sb.Append(separator).Append(\"{column} = @{nextParam}\");\n" +
             $"            cmd.Parameters.Add({ctx.FactoryClassName}.CreateParameter{name}(patch.Next{name}!.Value, \"{parameterPrefix}{nextParam}\"));\n" +
             "        }";
     }
