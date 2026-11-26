@@ -55,7 +55,7 @@ public partial record VersionedOrder : INpgsqlDomainModel<global::AdoGen.Generat
         "Id" UUID DEFAULT gen_random_uuid() NOT NULL,
         "ProductName" VARCHAR(50) NOT NULL,
         "Version" INTEGER NOT NULL
-    ,CONSTRAINT "PK_VersionedOrders" PRIMARY KEY ("Id"));
+        ,CONSTRAINT "PK_VersionedOrders" PRIMARY KEY ("Id"));
     """;
     
     private const string Pg_SqlInsert = """INSERT INTO "public"."VersionedOrders" ("Id", "ProductName", "Version") VALUES (@Id, @ProductName, @Version);""";

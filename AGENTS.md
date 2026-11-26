@@ -172,6 +172,7 @@ Use `AdoGenType` (e.g. `AdoGenType.SqlBulkModel`) and `TestTypes` (e.g. `TestTyp
 - **Never declare a second `extension(SqlConnection connection)` block for the same receiver in another partial file (CA1708 error).** Add members to the existing block; private static helpers may live in the other partial.
 - **RULE: Fully qualify BCL types (`global::System.DBNull`) in emitted code; PostgreSQL mapper files have no `using System;`.**
 - **RULE: Emit nested DTO output through `TypeDeclarations.WrapInContainers`, and keep extension classes top-level (CS1109).**
+- **`CreateTable` SQL builders return unindented `\n`-joined text; emitters indent continuation lines via `SqlTextHelpers.IndentContinuationLines` to the raw-string closing-quote column** (8 for SQL Server, 4 for PostgreSQL), otherwise the generated file fails with CS9003-style raw-string errors.
 - **Before documenting a profile method, confirm a chain handler exists for it** in `Parsing/SharedChainHandlers.cs` or `Parsing/{SqlServer,PostgreSql}/ChainMethodHandler*.cs`; methods without a handler are silently ignored (e.g. PostgreSQL `Char`/`Varbit`, B7).
 
 ---

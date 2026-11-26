@@ -5,6 +5,7 @@ using AdoGen.Sample.Features.Orders;
 using AdoGen.Sample.Features.TestTypes;
 using AdoGen.Sample.Features.Users;
 using AdoGen.Sample.Features.Gauges;
+using AdoGen.Sample.Features.Tags;
 
 namespace AdoGen.SqlServer.Tests;
 
@@ -15,7 +16,6 @@ public sealed class TestContext : IAsyncLifetime
     public static CancellationToken CancellationToken => Xunit.TestContext.Current.CancellationToken;
 
     private const string SqlCreateDb = "CREATE DATABASE [TestDb];";
-    private const string SqlCreateLogSchema = "CREATE SCHEMA [log] AUTHORIZATION [dbo];";
     
     async ValueTask IAsyncLifetime.InitializeAsync()
     {
@@ -27,8 +27,6 @@ public sealed class TestContext : IAsyncLifetime
         
         await using var command = connection.CreateCommand(SqlCreateDb);
         await command.ExecuteNonQueryAsync(CancellationToken);
-        await using var schemaCommand = connection.CreateCommand(SqlCreateLogSchema);
-        await schemaCommand.ExecuteNonQueryAsync(CancellationToken);
         
         await connection.CreateTableAsync<User>(CancellationToken);
         await connection.CreateTableAsync<Order>(CancellationToken);
@@ -37,6 +35,7 @@ public sealed class TestContext : IAsyncLifetime
         await connection.CreateTableAsync<AuditEvent>(CancellationToken);
         await connection.CreateTableAsync<UserRole>(CancellationToken);
         await connection.CreateTableAsync<Telemetry.Gauge>(CancellationToken);
+        await connection.CreateTableAsync<Tag>(CancellationToken);
     }
 
     public async ValueTask DisposeAsync() => await _msSqlContainer.DisposeAsync();

@@ -20,7 +20,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
         var typeKeyword = TypeDeclarations.Keyword(dto);
 
         // SQL strings — produced by PostgreSqlSqlTextBuilder
-        var createTableSql = PostgreSqlSqlTextBuilder.CreateTable(ctx);
+        var createTableSql = SqlTextHelpers.IndentContinuationLines(PostgreSqlSqlTextBuilder.CreateTable(ctx), 4);
         var insertSql = PostgreSqlSqlTextBuilder.Insert(ctx);
         var insertBatchSql = PostgreSqlSqlTextBuilder.InsertBatchPrefix(ctx);
         var insertAndReturnSql = PostgreSqlSqlTextBuilder.InsertAndReturn(ctx);
@@ -177,7 +177,7 @@ internal sealed class DomainOpsEmitterNpgSql : IEmitter
               {
                   private const string Pg_SqlCreateTable = 
                   """
-              {{createTableSql}}
+                  {{createTableSql}}
                   """;
                   
                   private const string Pg_SqlInsert = """{{insertSql}}""";

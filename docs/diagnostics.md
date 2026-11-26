@@ -26,6 +26,7 @@ All IDs are prefixed `AG`. Descriptors live in `src/AdoGen.Generator/Diagnostics
 | [AG022](#ag022--ignored-property-is-in-use) | Error    | Ignored property is in use                           | Both     |
 | [AG023](#ag023--asstring-requires-a-non-flags-enum) | Error | AsString requires a non-flags enum              | Both     |
 | [AG024](#ag024--struct-model-not-supported) | Error    | Struct model not supported                           | Both     |
+| [AG025](#ag025--column-type-cannot-be-indexed) | Error | Column type cannot be indexed                        | SQL Server |
 
 **Removed rules:** AG003 (*Missing required parameter configuration*) was never reported in practice — AG004–AG006 cover the same cases. AG009 (*Upsert cannot be generated*) was never reported; identity-keyed models now get a working upsert (SQL Server: insert-first + `IF @@ROWCOUNT = 0 UPDATE`; PostgreSQL: `MERGE`).
 
@@ -175,7 +176,7 @@ RuleFor(x => x.Count).Name("Item Count");  // AG016
 
 ## AG019 — Unsupported profile expression
 
-**Trigger:** `RuleFor`/`Key`/`Identity` is given something other than an inline lambda selecting a property of the DTO (e.g. a stored `Expression<…>` field, a method call, or a nested member).
+**Trigger:** `RuleFor`/`Key`/`Identity`/`HasIndex` is given something other than an inline lambda selecting a property of the DTO (e.g. a stored `Expression<…>` field, a method call, or a nested member). For `HasIndex`, an anonymous object is accepted only when every member is a direct DTO property (`x => new { x.A, x.B }`) with no duplicates.
 
 **Fix:**
 ```csharp
@@ -186,9 +187,9 @@ Calls prefixed with `this.` (`this.RuleFor(...)`) are supported.
 
 ## AG022 — Ignored property is in use
 
-**Trigger:** a property marked `.Ignore()` is also the key (by convention or `Key(...)`), an identity column, or a concurrency token.
+**Trigger:** a property marked `.Ignore()` is also the key (by convention or `Key(...)`), an identity column, a concurrency token, marked `.Unique()`, or used in `HasIndex(...)`.
 
-**Fix:** remove `.Ignore()` or pick a different key / identity / concurrency token.
+**Fix:** remove `.Ignore()` or pick a different key / identity / concurrency token / index column.
 
 ## AG023 — AsString requires a non-flags enum
 
@@ -201,3 +202,9 @@ Calls prefixed with `this.` (`this.RuleFor(...)`) are supported.
 **Trigger:** a `struct` / `record struct` implements a Domain or Bulk marker interface, or a `ref struct` implements any marker interface.
 
 **Fix:** structs are supported only as mapper-only models (`ISqlMapper` / `INpgsqlMapper`). Use a class or record for Domain/Bulk models.
+
+## AG025 — Column type cannot be indexed
+
+**Trigger:** (SQL Server) a column marked `.Unique()` or used in `HasIndex(...)` maps to a type SQL Server cannot use as an index key: `(MAX)` types (e.g. `.NVarChar(-1)`, `.VarBinary(-1)`), `text`, `ntext`, `image` or `xml`.
+
+**Fix:** give the column a bounded size (e.g. `.NVarChar(450)`), or drop the unique constraint / index.

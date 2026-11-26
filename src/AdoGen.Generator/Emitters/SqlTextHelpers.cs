@@ -26,6 +26,17 @@ internal static class SqlTextHelpers
     }
 
     /// <summary>
+    /// Escapes a value for use inside a single-quoted SQL string literal.
+    /// </summary>
+    public static string StringLiteralContent(string value) => value.Replace("'", "''");
+
+    /// <summary>
+    /// Indents every line after the first, so multi-line SQL can be interpolated into an indented C# raw string literal.
+    /// </summary>
+    public static string IndentContinuationLines(string text, int spaces) =>
+        text.Replace("\n", "\n" + new string(' ', spaces));
+
+    /// <summary>
     /// Returns a self-assignment (<c>"col" = "col"</c>) for models without writable non-key columns,
     /// preferring a non-identity key column (identity columns cannot be assigned on SQL Server).
     /// </summary>

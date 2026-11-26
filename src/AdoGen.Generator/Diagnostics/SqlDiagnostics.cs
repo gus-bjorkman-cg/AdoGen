@@ -162,4 +162,11 @@ internal static class SqlDiagnostics
         messageFormat: "Type '{0}' is a struct; structs are only supported as mapper-only models (ISqlMapper or INpgsqlMapper) and ref structs are not supported",
         category: "Design",
         DiagnosticSeverity.Error, true);
+
+    public static readonly DiagnosticDescriptor NonIndexableColumn = new(
+        id: "AG025",
+        title: "Column type cannot be indexed",
+        messageFormat: "Property '{1}' of '{0}' is used in a unique constraint or index, but its SQL Server type '{2}' cannot be an index key; configure a bounded size",
+        category: "Usage",
+        DiagnosticSeverity.Error, true);
 }

@@ -156,11 +156,14 @@ public sealed class SqlServerSqlTextBuilderTests
 
         actual.Should().Be(
             """
+            IF OBJECT_ID(N'[dbo].[Users]', N'U') IS NULL
+            BEGIN
             CREATE TABLE [dbo].[Users](
-                        [Id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
-                        [Name] VARCHAR(20) NOT NULL,
-                        [Email] VARCHAR(50) NOT NULL
-                    ,CONSTRAINT [PK_Users] PRIMARY KEY ([Id]));
+                [Id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+                [Name] VARCHAR(20) NOT NULL,
+                [Email] VARCHAR(50) NOT NULL
+                ,CONSTRAINT [PK_Users] PRIMARY KEY ([Id]));
+            END
             """);
     }
 
@@ -171,12 +174,39 @@ public sealed class SqlServerSqlTextBuilderTests
         
         actual.Should().Be(
             """
+            IF SCHEMA_ID(N'log') IS NULL EXEC(N'CREATE SCHEMA [log]');
+            IF OBJECT_ID(N'[log].[Audits]', N'U') IS NULL
+            BEGIN
             CREATE TABLE [log].[Audits](
-                        [EventId] BIGINT IDENTITY(1,1) NOT NULL,
-                        [CreatedAt] DATETIMEOFFSET NOT NULL,
-                        [Type] NVARCHAR(50) NOT NULL,
-                        [JsonPayload] VARBINARY(8000) NOT NULL
-                    ,CONSTRAINT [PK_Audits] PRIMARY KEY ([EventId]));
+                [EventId] BIGINT IDENTITY(1,1) NOT NULL,
+                [CreatedAt] DATETIMEOFFSET NOT NULL,
+                [Type] NVARCHAR(50) NOT NULL,
+                [JsonPayload] VARBINARY(8000) NOT NULL
+                ,CONSTRAINT [PK_Audits] PRIMARY KEY ([EventId]));
+            END
+            """);
+    }
+
+    [Fact]
+    public void CreateTable_ShouldIncludeUniqueConstraintsAndIndexes_WhenProfileDeclaresThem()
+    {
+        var actual = SqlServerSqlTextBuilder.CreateTable(EmitContextFixtures.SqlServerTag());
+
+        actual.Should().Be(
+            """
+            IF SCHEMA_ID(N'catalog') IS NULL EXEC(N'CREATE SCHEMA [catalog]');
+            IF OBJECT_ID(N'[catalog].[Tags]', N'U') IS NULL
+            BEGIN
+            CREATE TABLE [catalog].[Tags](
+                [Id] UNIQUEIDENTIFIER NOT NULL,
+                [Slug] VARCHAR(50) NOT NULL,
+                [Name] NVARCHAR(50) NOT NULL,
+                [Category] INT NOT NULL
+                ,CONSTRAINT [PK_Tags] PRIMARY KEY ([Id])
+                ,CONSTRAINT [UQ_Tags_Slug] UNIQUE ([Slug]));
+            CREATE INDEX [IX_Tags_Category_Name] ON [catalog].[Tags] ([Category], [Name]);
+            CREATE UNIQUE INDEX [UX_Tags_Name] ON [catalog].[Tags] ([Name]);
+            END
             """);
     }
 

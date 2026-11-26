@@ -4,6 +4,7 @@ using AdoGen.Sample.Features.Orders;
 using AdoGen.Sample.Features.TestTypes;
 using AdoGen.Sample.Features.Users;
 using AdoGen.Sample.Features.Gauges;
+using AdoGen.Sample.Features.Tags;
 using Testcontainers.PostgreSql;
 
 namespace AdoGen.PostgreSql.Tests;
@@ -30,12 +31,6 @@ public sealed class TestContext : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync(CancellationToken);
 
-        // Schema "log" is used by AuditEvent in the sample.
-        await using (var schema = connection.CreateCommand("CREATE SCHEMA log;"))
-        {
-            await schema.ExecuteNonQueryAsync(CancellationToken);
-        }
-
         await connection.CreateTableAsync<User>(CancellationToken);
         await connection.CreateTableAsync<Order>(CancellationToken);
         await connection.CreateTableAsync<Order2>(CancellationToken);
@@ -43,6 +38,7 @@ public sealed class TestContext : IAsyncLifetime
         await connection.CreateTableAsync<AuditEvent>(CancellationToken);
         await connection.CreateTableAsync<UserRole>(CancellationToken);
         await connection.CreateTableAsync<Telemetry.Gauge>(CancellationToken);
+        await connection.CreateTableAsync<Tag>(CancellationToken);
     }
 
     public async ValueTask DisposeAsync() => await _pgContainer.DisposeAsync();

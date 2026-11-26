@@ -11,7 +11,8 @@ internal sealed record ProfileInfo(
     ImmutableArray<IPropertySymbol> DtoProperties,
     ImmutableDictionary<string, ParamConfig> ParamsByProperty,
     string Namespace,
-    ImmutableArray<string> IgnoredProperties = default
+    ImmutableArray<string> IgnoredProperties = default,
+    ImmutableArray<IndexInfo> Indexes = default
 )
 {
     public static readonly ProfileInfo Empty = new(

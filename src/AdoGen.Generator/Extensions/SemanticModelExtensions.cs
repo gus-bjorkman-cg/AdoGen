@@ -42,6 +42,15 @@ internal static class SemanticModelExtensions
             return false;
         }
 
+        public bool TryGetConstBool(ExpressionSyntax arg, CancellationToken ct, out bool value)
+        {
+            var cv = model.GetConstantValue(arg, ct);
+            if (cv is { HasValue: true, Value: bool b }) { value = b; return true; }
+
+            value = default;
+            return false;
+        }
+
         public bool TryGetConstByte(ExpressionSyntax arg, CancellationToken ct, out byte value)
         {
             var cv = model.GetConstantValue(arg, ct);

@@ -16,6 +16,7 @@ internal readonly record struct ColumnInfo(
     bool IsReadOnly,
     bool IsConcurrencyToken,
     string? DefaultSqlExpression,
-    ColumnRole Role
+    ColumnRole Role,
+    bool IsUnique = false      // single-column UNIQUE constraint in CREATE TABLE DDL
 );
 

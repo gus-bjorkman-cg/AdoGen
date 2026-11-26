@@ -16,6 +16,7 @@
 | AG022   | Usage    | Error    | Ignored property is in use           |
 | AG023   | Usage    | Error    | AsString requires a non-flags enum   |
 | AG024   | Design   | Error    | Struct model not supported           |
+| AG025   | Usage    | Error    | Column type cannot be indexed        |
 
 ### Removed Rules
 

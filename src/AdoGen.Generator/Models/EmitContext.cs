@@ -33,7 +33,8 @@ internal sealed record EmitContext(
     IIdentifierQuoter Quoter,
     ProfileInfo Profile,                     // back-reference for edge cases
     ColumnInfo? ConcurrencyToken,            // null if no concurrency token configured
-    bool ShouldGeneratePatchClass            // true for exactly one provider per DTO — emits the shared {Dto}Patch class
+    bool ShouldGeneratePatchClass,           // true for exactly one provider per DTO — emits the shared {Dto}Patch class
+    ImmutableArray<IndexDefinition> Indexes = default // CREATE INDEX statements emitted after CREATE TABLE
 )
 {
     public bool IsIdentity(string columnName) => Profile.IdentityKeys.Contains(columnName);

@@ -46,6 +46,20 @@ internal static class EmitContextFixtures
             new ColumnInfo("Quantity", "[Quantity]", "Quantity", "INT", "global::System.Int32", false, false, false, false, false, null, ColumnRole.Plain)
         ]);
 
+    /// <summary>Tag: schema="catalog", unique Slug, composite and unique indexes.</summary>
+    public static EmitContext SqlServerTag() => Build(
+        SqlProviderKind.SqlServer, SqlServerIdentifierQuoter.Instance, "catalog", "Tags",
+        [
+            new ColumnInfo("Id", "[Id]", "Id", "UNIQUEIDENTIFIER", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("Slug", "[Slug]", "Slug", "VARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain, IsUnique: true),
+            new ColumnInfo("Name", "[Name]", "Name", "NVARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("Category", "[Category]", "Category", "INT", "global::System.Int32", false, false, false, false, false, null, ColumnRole.Plain)
+        ],
+        [
+            new IndexDefinition("[IX_Tags_Category_Name]", ["[Category]", "[Name]"], false),
+            new IndexDefinition("[UX_Tags_Name]", ["[Name]"], true)
+        ]);
+
     // ── PostgreSQL ────────────────────────────────────────────────────────────
 
     /// <summary>User: single non-identity key (Guid Id), two plain string columns.</summary>
@@ -91,6 +105,20 @@ internal static class EmitContextFixtures
             new ColumnInfo("CounterId", "\"CounterId\"", "CounterId", "BIGINT", "global::System.Int64", false, true, true, false, false, null, ColumnRole.Identity)
         ]);
 
+    /// <summary>Tag: schema="catalog", unique Slug, composite and unique indexes.</summary>
+    public static EmitContext PostgreSqlTag() => Build(
+        SqlProviderKind.PostgreSql, PostgreSqlIdentifierQuoter.Instance, "catalog", "Tags",
+        [
+            new ColumnInfo("Id", "\"Id\"", "Id", "UUID", "global::System.Guid", false, false, true, false, false, null, ColumnRole.Key),
+            new ColumnInfo("Slug", "\"Slug\"", "Slug", "VARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain, IsUnique: true),
+            new ColumnInfo("Name", "\"Name\"", "Name", "VARCHAR(50)", "global::System.String", false, false, false, false, false, null, ColumnRole.Plain),
+            new ColumnInfo("Category", "\"Category\"", "Category", "INTEGER", "global::System.Int32", false, false, false, false, false, null, ColumnRole.Plain)
+        ],
+        [
+            new IndexDefinition("\"IX_Tags_Category_Name\"", ["\"Category\"", "\"Name\""], false),
+            new IndexDefinition("\"UX_Tags_Name\"", ["\"Name\""], true)
+        ]);
+
     // ── Builder ───────────────────────────────────────────────────────────────
 
     private static EmitContext Build(
@@ -98,7 +126,8 @@ internal static class EmitContextFixtures
         IIdentifierQuoter quoter,
         string schema,
         string table,
-        ColumnInfo[] columns)
+        ColumnInfo[] columns,
+        IndexDefinition[]? indexes = null)
     {
         var allColumns = ImmutableArray.CreateRange(columns);
         var keysBuilder = ImmutableArray.CreateBuilder<ColumnInfo>();
@@ -167,7 +196,8 @@ internal static class EmitContextFixtures
             Quoter: quoter,
             Profile: profile,
             ConcurrencyToken: concurrencyToken,
-            ShouldGeneratePatchClass: false
+            ShouldGeneratePatchClass: false,
+            Indexes: indexes is null ? ImmutableArray<IndexDefinition>.Empty : ImmutableArray.Create(indexes)
         );
     }
 

@@ -19,7 +19,7 @@ internal sealed class DomainOpsEmitterSqlServer : IEmitter
         var dto = discoveryDto.Dto;
 
         // SQL strings — produced by SqlServerSqlTextBuilder
-        var createTableSql = SqlServerSqlTextBuilder.CreateTable(ctx);
+        var createTableSql = SqlTextHelpers.IndentContinuationLines(SqlServerSqlTextBuilder.CreateTable(ctx), 8);
         var insertSql = SqlServerSqlTextBuilder.Insert(ctx);
         var insertBatchSql = SqlServerSqlTextBuilder.InsertBatchPrefix(ctx);
         var insertAndReturnSql = SqlServerSqlTextBuilder.InsertAndReturn(ctx);

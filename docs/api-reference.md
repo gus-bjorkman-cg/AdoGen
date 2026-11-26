@@ -64,7 +64,7 @@ A profile is required for every `ISqlDomainModel` / `ISqlBulkModel` / `INpgsqlDo
 
 Add a profile if you need those factories.
 
-Exactly one profile per DTO per provider is allowed. Profile constructor statements must be plain `RuleFor(...)`, `Table(...)`, `Schema(...)`, `Key(...)` and `Identity(...)` calls with compile-time constant arguments (see [diagnostics](diagnostics.md)). Call `Key(...)` once per column for a composite key.
+Exactly one profile per DTO per provider is allowed. Profile constructor statements must be plain `RuleFor(...)`, `Table(...)`, `Schema(...)`, `Key(...)`, `Identity(...)` and `HasIndex(...)` calls with compile-time constant arguments (see [diagnostics](diagnostics.md)). Call `Key(...)` once per column for a composite key.
 
 ```csharp
 public sealed class UserProfile : SqlProfile<User>      // or NpgsqlProfile<User>
@@ -84,6 +84,7 @@ public sealed class UserProfile : SqlProfile<User>      // or NpgsqlProfile<User
 | `Schema("name")`        | `dbo` (SQL Server) / `public` (PostgreSQL) | Custom schema                                  |
 | `Key(x => x.Prop)`      | Property named `Id`                        | Primary key override                           |
 | `Identity(x => x.Prop)` | —                                          | Identity / SERIAL column; excluded from INSERT |
+| `HasIndex(x => x.Prop, unique: false)` / `HasIndex(x => new { x.A, x.B })` | — | DDL only: emits `CREATE [UNIQUE] INDEX` named `IX_{Table}_{Cols}` (`UX_` when unique). Composite indexes keep the anonymous-object member order. Identical declarations are deduplicated |
 
 ### Property configuration
 
@@ -105,6 +106,7 @@ Common modifiers available on all properties:
 | `.ReadOnly()`                | Excluded from INSERT/UPDATE/bulk writes; included in DDL and mapper |
 | `.DefaultValue(sqlExpr)`     | Emitted as `DEFAULT {sqlExpr}` in the column DDL (`"GETUTCDATE()"` / `"now()"`). A leading `DEFAULT` keyword is accepted for backward compatibility |
 | `.ConcurrencyToken()`        | See [Concurrency tokens](#concurrency-tokens)                       |
+| `.Unique()`                  | DDL only: adds `CONSTRAINT UQ_{Table}_{Column} UNIQUE (...)` to `CREATE TABLE`. On SQL Server a unique constraint allows a single `NULL`. SQL Server rejects `(MAX)`/`text`/`xml` columns (AG025) |
 | `.Ignore()`                  | Not a column: excluded from DDL, writes, bulk and `Map()`. Ignored constructor parameters receive `default`. Cannot be combined with key / identity / concurrency token (AG022) |
 | `.AsString(n)`               | Enum only: stored as `varchar(n)` holding the member name instead of the underlying integer. Conversion uses generated `switch` expressions (no reflection); an unknown name read from the database throws `InvalidOperationException`. `[Flags]` enums are rejected (AG023) |
 
@@ -565,7 +567,12 @@ Turn pluralization off for a whole assembly with the provider's naming attribute
 [assembly: AdoGen.PostgreSql.NpgsqlNaming(Pluralize = false)]  // PostgreSQL profiles
 ```
 
-The default schema is `dbo` on SQL Server and `public` on PostgreSQL. `CreateTableAsync` does not create a missing schema. On PostgreSQL it uses `CREATE TABLE IF NOT EXISTS`, while on SQL Server it fails if the table already exists.
+The default schema is `dbo` on SQL Server and `public` on PostgreSQL. `CreateTableAsync` is idempotent on both providers and creates a missing non-default schema first:
+
+- SQL Server: `IF SCHEMA_ID(N'x') IS NULL EXEC(N'CREATE SCHEMA [x]')`, then `IF OBJECT_ID(N'[x].[T]', N'U') IS NULL BEGIN CREATE TABLE …; CREATE INDEX …; END`.
+- PostgreSQL: a `DO` block that runs `CREATE SCHEMA` only when `pg_namespace` lacks it (so callers without database `CREATE` privilege succeed when the schema exists), then `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`.
+
+It is creation, not migration: an existing table is left untouched, so columns, constraints or indexes added to the profile later are not applied to it (on SQL Server, indexes are only created together with the table).
 
 ### Using both providers in one file
 

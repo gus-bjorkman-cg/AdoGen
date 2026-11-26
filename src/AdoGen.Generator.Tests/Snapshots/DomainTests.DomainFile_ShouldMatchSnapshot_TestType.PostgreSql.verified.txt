@@ -93,7 +93,7 @@ public partial record TestType : INpgsqlDomainModel<global::AdoGen.Generator.Tes
         "IntEnum" INTEGER NOT NULL,
         "LongEnum" BIGINT NOT NULL,
         "CreatedAt" TIMESTAMPTZ DEFAULT now() NOT NULL
-    ,CONSTRAINT "PK_TestTypes" PRIMARY KEY ("Int", "Decimal"));
+        ,CONSTRAINT "PK_TestTypes" PRIMARY KEY ("Int", "Decimal"));
     """;
     
     private const string Pg_SqlInsert = """INSERT INTO "public"."TestTypes" ("Int", "NullableInt", "Decimal", "NullableDecimal", "NullableGuid", "NullableStringVarchar", "NullableStringNVarchar", "StringVarcharRuledNull", "CharString", "NCharString", "Float", "NullableFloat", "DateTime", "NullableDateTime", "Double", "NullableDouble", "Char", "NChar", "NullableChar", "NullableBytes", "Bytes", "Fruits", "Flags", "ByteEnum", "ShortEnum", "IntEnum", "LongEnum") VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);""";

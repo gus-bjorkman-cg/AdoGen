@@ -170,6 +170,8 @@ internal static class DiscoveryValidation
                     dto.Dto.Name));
             }
 
+            if (dto.Provider is SqlProviderKind.SqlServer) ReportNonIndexableColumns(dto, profile, diagnostics);
+
             // Validate concurrency tokens
             var concurrencyTokenCount = 0;
             
@@ -236,6 +238,45 @@ internal static class DiscoveryValidation
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// SQL Server cannot use LOB types (<c>(MAX)</c>, <c>text</c>, <c>ntext</c>, <c>image</c>, <c>xml</c>) as index keys,
+    /// so a unique constraint or index on them would only fail when <c>CreateTableAsync</c> runs.
+    /// </summary>
+    private static void ReportNonIndexableColumns(DiscoveryDto dto, ProfileInfo profile, ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        var reported = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var kvp in profile.ParamsByProperty)
+        {
+            if (kvp.Value.IsUnique) Report(kvp.Value);
+        }
+
+        if (!profile.Indexes.IsDefaultOrEmpty)
+        {
+            foreach (var index in profile.Indexes)
+            {
+                foreach (var property in index.Properties)
+                {
+                    if (profile.ParamsByProperty.TryGetValue(property, out var cfg)) Report(cfg);
+                }
+            }
+        }
+
+        void Report(ParamConfig cfg)
+        {
+            var sqlType = cfg.SqlTypeLiteral;
+            var isLob = sqlType.EndsWith("(MAX)", StringComparison.OrdinalIgnoreCase) ||
+                        sqlType is "TEXT" or "NTEXT" or "IMAGE" or "XML";
+            if (!isLob || !reported.Add(cfg.PropertyName)) return;
+
+            var location = profile.DtoProperties.FirstOrDefault(p => p.Name == cfg.PropertyName)?.Locations.FirstOrDefault()
+                           ?? dto.Dto.Locations.FirstOrDefault()
+                           ?? Location.None;
+
+            diagnostics.Add(Diagnostic.Create(SqlDiagnostics.NonIndexableColumn, location, dto.Dto.Name, cfg.PropertyName, sqlType));
+        }
     }
 
     private static string ProfileBaseName(SqlProviderKind provider) =>

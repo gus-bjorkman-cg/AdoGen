@@ -77,11 +77,14 @@ public partial record VersionedOrderGuid : ISqlDomainModel<global::AdoGen.Genera
 {
     private const string SqlCreateTable = 
         """
+        IF OBJECT_ID(N'[dbo].[VersionedOrderGuids]', N'U') IS NULL
+        BEGIN
         CREATE TABLE [dbo].[VersionedOrderGuids](
             [Id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
             [ProductName] VARCHAR(50) NOT NULL,
             [RowVersion] UNIQUEIDENTIFIER NOT NULL
-        ,CONSTRAINT [PK_VersionedOrderGuids] PRIMARY KEY ([Id]));
+            ,CONSTRAINT [PK_VersionedOrderGuids] PRIMARY KEY ([Id]));
+        END
         """;
     private const string SqlInsert = "INSERT INTO [dbo].[VersionedOrderGuids] ([Id], [ProductName], [RowVersion]) VALUES (@Id, @ProductName, @RowVersion);";
     private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[VersionedOrderGuids] ([Id], [ProductName], [RowVersion]) VALUES";

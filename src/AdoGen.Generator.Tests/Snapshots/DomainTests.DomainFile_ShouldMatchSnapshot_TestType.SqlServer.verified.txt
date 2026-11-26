@@ -84,6 +84,8 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
 {
     private const string SqlCreateTable = 
         """
+        IF OBJECT_ID(N'[dbo].[TestTypes]', N'U') IS NULL
+        BEGIN
         CREATE TABLE [dbo].[TestTypes](
             [Int] INT NOT NULL,
             [NullableInt] INT NULL,
@@ -113,7 +115,8 @@ public partial record TestType : ISqlDomainModel<global::AdoGen.Generator.Tests.
             [IntEnum] INT NOT NULL,
             [LongEnum] BIGINT NOT NULL,
             [CreatedAt] DATETIMEOFFSET DEFAULT SYSUTCDATETIME() NOT NULL
-        ,CONSTRAINT [PK_TestTypes] PRIMARY KEY ([Int], [Decimal]));
+            ,CONSTRAINT [PK_TestTypes] PRIMARY KEY ([Int], [Decimal]));
+        END
         """;
     private const string SqlInsert = "INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) VALUES (@Int, @NullableInt, @Decimal, @NullableDecimal, @NullableGuid, @NullableStringVarchar, @NullableStringNVarchar, @StringVarcharRuledNull, @CharString, @NCharString, @Float, @NullableFloat, @DateTime, @NullableDateTime, @Double, @NullableDouble, @Char, @NChar, @NullableChar, @NullableBytes, @Bytes, @Fruits, @Flags, @ByteEnum, @ShortEnum, @IntEnum, @LongEnum);";
     private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[TestTypes] ([Int], [NullableInt], [Decimal], [NullableDecimal], [NullableGuid], [NullableStringVarchar], [NullableStringNVarchar], [StringVarcharRuledNull], [CharString], [NCharString], [Float], [NullableFloat], [DateTime], [NullableDateTime], [Double], [NullableDouble], [Char], [NChar], [NullableChar], [NullableBytes], [Bytes], [Fruits], [Flags], [ByteEnum], [ShortEnum], [IntEnum], [LongEnum]) VALUES";

@@ -55,7 +55,7 @@ public partial record User : INpgsqlDomainModel<global::AdoGen.Generator.Tests.U
         "Id" UUID DEFAULT gen_random_uuid() NOT NULL,
         "Name" VARCHAR(20) NOT NULL,
         "Email" VARCHAR(50) NOT NULL
-    ,CONSTRAINT "PK_Users" PRIMARY KEY ("Id"));
+        ,CONSTRAINT "PK_Users" PRIMARY KEY ("Id"));
     """;
     
     private const string Pg_SqlInsert = """INSERT INTO "public"."Users" ("Id", "Name", "Email") VALUES (@Id, @Name, @Email);""";

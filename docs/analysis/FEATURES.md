@@ -60,9 +60,9 @@ The project's priority #2 is "invalid config fails at generation time". Several 
 
 | ID  | Proposal                                                                                                                                                                                                                                   | Priority |
 |-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| F29 | **Idempotent `CreateTableAsync` on SQL Server.** PostgreSQL already uses `CREATE TABLE IF NOT EXISTS`. SQL Server should use `IF OBJECT_ID(N'[schema].[table]', N'U') IS NULL CREATE TABLE …` for parity.                                    | P2       |
-| F30 | **Schema creation.** Neither provider creates a non-default schema. The test contexts create `log` manually. Options: emit `CREATE SCHEMA IF NOT EXISTS` (PG) and `IF SCHEMA_ID(...) IS NULL EXEC('CREATE SCHEMA ...')` (SQL Server), or document that it is the caller's job. | P3       |
-| F31 | **Indexes and unique constraints in profiles.** Add `.Unique()` and `HasIndex(x => x.Email)` that only affect DDL. Low risk, and useful for test databases.                                                                                  | P3       |
+| F29 | **Idempotent `CreateTableAsync` on SQL Server.** PostgreSQL already uses `CREATE TABLE IF NOT EXISTS`. SQL Server should use `IF OBJECT_ID(N'[schema].[table]', N'U') IS NULL CREATE TABLE …` for parity. ✅ Done: whole DDL wrapped in `IF OBJECT_ID(...) IS NULL BEGIN … END`. | P2       |
+| F30 | **Schema creation.** Neither provider creates a non-default schema. The test contexts create `log` manually. Options: emit `CREATE SCHEMA IF NOT EXISTS` (PG) and `IF SCHEMA_ID(...) IS NULL EXEC('CREATE SCHEMA ...')` (SQL Server), or document that it is the caller's job. ✅ Done: emitted in `CreateTableAsync` (PG via a `DO` block checking `pg_namespace`). | P3       |
+| F31 | **Indexes and unique constraints in profiles.** Add `.Unique()` and `HasIndex(x => x.Email)` that only affect DDL. Low risk, and useful for test databases. ✅ Done: `.Unique()` → `UQ_` constraint, `HasIndex(selector, unique)` → `IX_`/`UX_` index; AG025 for non-indexable SQL Server types. | P3       |
 
 ## E. Build, release & tests
 

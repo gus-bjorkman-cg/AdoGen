@@ -18,4 +18,5 @@ internal sealed class ParamConfig
     public bool IsConcurrencyToken { get; set; }
     public bool IsIgnored { get; set; }
     public bool IsEnumAsString { get; set; }
+    public bool IsUnique { get; set; }
 }

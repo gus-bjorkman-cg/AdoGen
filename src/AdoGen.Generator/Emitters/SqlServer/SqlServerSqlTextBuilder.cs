@@ -12,9 +12,27 @@ namespace AdoGen.Generator.Emitters.SqlServer;
 /// </summary>
 internal static class SqlServerSqlTextBuilder
 {
+    /// <summary>
+    /// Idempotent DDL: creates a non-default schema when missing, then — only if the table does not exist —
+    /// the table with its primary key and unique constraints, followed by its profile indexes.
+    /// Lines are separated by <c>\n</c> and carry no base indentation.
+    /// </summary>
     public static string CreateTable(EmitContext ctx)
     {
-        var sbColDefs = new StringBuilder();
+        var sb = new StringBuilder();
+        var schema = ctx.Profile.Schema;
+
+        if (schema.Length > 0 && !string.Equals(schema, "dbo", StringComparison.OrdinalIgnoreCase))
+        {
+            // CREATE SCHEMA must be the only statement in its batch, hence EXEC.
+            var createSchema = SqlTextHelpers.StringLiteralContent($"CREATE SCHEMA {ctx.SchemaQuoted}");
+            sb.Append($"IF SCHEMA_ID(N'{SqlTextHelpers.StringLiteralContent(schema)}') IS NULL EXEC(N'{createSchema}');\n");
+        }
+
+        sb.Append($"IF OBJECT_ID(N'{SqlTextHelpers.StringLiteralContent(ctx.SchemaTableQuoted)}', N'U') IS NULL\n");
+        sb.Append("BEGIN\n");
+        sb.Append($"CREATE TABLE {ctx.SchemaTableQuoted}(\n");
+
         for (var i = 0; i < ctx.Columns.Length; i++)
         {
             var col = ctx.Columns[i];
@@ -22,20 +40,36 @@ internal static class SqlServerSqlTextBuilder
             var identity = col.IsIdentity ? " IDENTITY(1,1)" : "";
             var defaultClause = SqlTextHelpers.DefaultClause(col.DefaultSqlExpression);
             var comma = i == ctx.Columns.Length - 1 ? "" : ",";
-            sbColDefs.AppendLine($"            {col.ColumnNameQuoted} {col.SqlType}{identity}{defaultClause} {nullability}{comma}");
+            sb.Append($"    {col.ColumnNameQuoted} {col.SqlType}{identity}{defaultClause} {nullability}{comma}\n");
         }
 
         if (ctx.Keys.Length > 0)
         {
             var pkCols = BuildJoined(ctx.Keys, col => col.ColumnNameQuoted);
-            sbColDefs.AppendLine($"        ,CONSTRAINT [PK_{ctx.Profile.Table}] PRIMARY KEY ({pkCols})");
+            sb.Append($"    ,CONSTRAINT [PK_{ctx.Profile.Table}] PRIMARY KEY ({pkCols})\n");
         }
 
-        var colDefs = sbColDefs.ToString().TrimEnd();
-        return $"""
-            CREATE TABLE {ctx.SchemaTableQuoted}(
-            {colDefs});
-            """;
+        for (var i = 0; i < ctx.Columns.Length; i++)
+        {
+            var col = ctx.Columns[i];
+            if (col.IsUnique)
+                sb.Append($"    ,CONSTRAINT [UQ_{ctx.Profile.Table}_{col.ParameterName}] UNIQUE ({col.ColumnNameQuoted})\n");
+        }
+
+        sb.Length--;
+        sb.Append(");\n");
+
+        if (!ctx.Indexes.IsDefaultOrEmpty)
+        {
+            foreach (var index in ctx.Indexes)
+            {
+                var unique = index.IsUnique ? "UNIQUE " : "";
+                sb.Append($"CREATE {unique}INDEX {index.NameQuoted} ON {ctx.SchemaTableQuoted} ({string.Join(", ", index.ColumnsQuoted)});\n");
+            }
+        }
+
+        sb.Append("END");
+        return sb.ToString();
     }
 
     public static string Insert(EmitContext ctx)

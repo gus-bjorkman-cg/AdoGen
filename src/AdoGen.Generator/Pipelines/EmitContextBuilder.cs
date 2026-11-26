@@ -61,7 +61,8 @@ internal static class EmitContextBuilder
                 IsReadOnly: isReadOnly,
                 IsConcurrencyToken: isConcurrencyToken,
                 DefaultSqlExpression: defaultSql,
-                Role: role
+                Role: role,
+                IsUnique: cfg.IsUnique
             ));
         }
 
@@ -130,8 +131,39 @@ internal static class EmitContextBuilder
             Quoter: quoter,
             Profile: profile,
             ConcurrencyToken: concurrencyToken,
-            ShouldGeneratePatchClass: discovery.ShouldGeneratePatchClass && patchColumnCount is > 0 and <= 64
+            ShouldGeneratePatchClass: discovery.ShouldGeneratePatchClass && patchColumnCount is > 0 and <= 64,
+            Indexes: BuildIndexes(profile, columns, quoter)
         );
+    }
+
+    /// <summary>
+    /// Resolves profile indexes to quoted columns and a name of the form <c>IX_{Table}_{Col1}_{Col2}</c>
+    /// (<c>UX_</c> for unique indexes), using database column names so <c>.Name(...)</c> renames are honoured.
+    /// </summary>
+    private static ImmutableArray<IndexDefinition> BuildIndexes(
+        ProfileInfo profile,
+        ImmutableArray<ColumnInfo> columns,
+        IIdentifierQuoter quoter)
+    {
+        if (profile.Indexes.IsDefaultOrEmpty) return ImmutableArray<IndexDefinition>.Empty;
+
+        var builder = ImmutableArray.CreateBuilder<IndexDefinition>(profile.Indexes.Length);
+        foreach (var index in profile.Indexes)
+        {
+            var name = new StringBuilder(index.IsUnique ? "UX_" : "IX_").Append(profile.Table);
+            var quoted = ImmutableArray.CreateBuilder<string>(index.Properties.Length);
+
+            foreach (var property in index.Properties)
+            {
+                var column = columns.First(c => c.Name == property);
+                name.Append('_').Append(column.ParameterName);
+                quoted.Add(column.ColumnNameQuoted);
+            }
+
+            builder.Add(new IndexDefinition(quoter.Quote(name.ToString()), quoted.MoveToImmutable(), index.IsUnique));
+        }
+
+        return builder.MoveToImmutable();
     }
 
     private static string BuildJoinedPredicate(

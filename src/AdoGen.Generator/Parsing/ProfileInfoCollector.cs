@@ -101,6 +101,7 @@ internal static class ProfileInfoCollector
         var configs = new Dictionary<string, ParamConfig>(StringComparer.Ordinal);
         var identityKeys = new HashSet<string>(StringComparer.Ordinal);
         var keys = new List<string>();
+        var indexes = new List<(IndexInfo Index, Location Location)>();
         
         var dtoProps = props.ToImmutableDictionary(static p => p.Name, p => p, StringComparer.Ordinal);
         var schema = provider.DefaultSchema();
@@ -149,6 +150,11 @@ internal static class ProfileInfoCollector
                             break;
                     }
                     break;
+                case "HasIndex":
+                    var index = TryGetIndex(expressionSyntax, model, dtoProps, dtoType, diagnostics, ct);
+                    if (index is not null) indexes.Add((index, expressionSyntax.GetLocation()));
+                    break;
+
                 case RuleFor:
                     if (TryGetSelectedProperty(expressionSyntax, model, dtoProps) is null)
                     {
@@ -178,6 +184,12 @@ internal static class ProfileInfoCollector
             ReportIgnoredInUse(cfg, keys.Contains(cfg.PropertyName), "a key");
             ReportIgnoredInUse(cfg, identityKeys.Contains(cfg.PropertyName), "an identity");
             ReportIgnoredInUse(cfg, cfg.IsConcurrencyToken, "a concurrency token");
+            ReportIgnoredInUse(cfg, cfg.IsUnique, "a unique constraint");
+            foreach (var (index, location) in indexes)
+            {
+                if (index.Properties.Contains(cfg.PropertyName))
+                    diagnostics.Add(Diagnostic.Create(SqlDiagnostics.IgnoredPropertyInUse, location, dtoType.Name, cfg.PropertyName, "an index column"));
+            }
         }
 
         if (ignored.Count > 0)
@@ -229,7 +241,8 @@ internal static class ProfileInfoCollector
             DtoProperties: props,
             ParamsByProperty: configs.ToImmutableDictionary(StringComparer.Ordinal),
             Namespace: dtoType.GetNamespace(),
-            IgnoredProperties: ignored.ToImmutable()
+            IgnoredProperties: ignored.ToImmutable(),
+            Indexes: DistinctIndexes(indexes, ignored)
         );
 
         void ReportIgnoredInUse(ParamConfig cfg, bool inUse, string usage)
@@ -269,6 +282,101 @@ internal static class ProfileInfoCollector
         }
     }
     
+    /// <summary>
+    /// Parses <c>HasIndex(x => x.Prop)</c>, <c>HasIndex(x => new { x.A, x.B })</c> and an optional constant
+    /// <c>unique</c> argument (positional or named). Reports AG019/AG007 and returns null on an unsupported shape.
+    /// </summary>
+    private static IndexInfo? TryGetIndex(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        IReadOnlyDictionary<string, IPropertySymbol> dtoProps,
+        INamedTypeSymbol dtoType,
+        ImmutableArray<Diagnostic>.Builder diagnostics,
+        CancellationToken ct)
+    {
+        ExpressionSyntax? selector = null;
+        ExpressionSyntax? uniqueArg = null;
+        var args = invocation.ArgumentList.Arguments;
+
+        for (var i = 0; i < args.Count; i++)
+        {
+            var name = args[i].NameColon?.Name.Identifier.Text;
+            if (name == "unique" || (name is null && i == 1)) uniqueArg = args[i].Expression;
+            else if (name == "selector" || (name is null && i == 0)) selector = args[i].Expression;
+        }
+
+        var properties = selector is LambdaExpressionSyntax lambda
+            ? GetIndexProperties(lambda, model, dtoProps, ct)
+            : default;
+
+        if (properties.IsDefaultOrEmpty)
+        {
+            diagnostics.Add(Diagnostic.Create(SqlDiagnostics.UnsupportedProfileExpression, invocation.GetLocation(), dtoType.Name, "HasIndex"));
+            return null;
+        }
+
+        var unique = false;
+        if (uniqueArg is not null && !model.TryGetConstBool(uniqueArg, ct, out unique))
+        {
+            diagnostics.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, invocation.GetLocation(), dtoType.Name, "HasIndex"));
+            return null;
+        }
+
+        return new IndexInfo(properties, unique);
+    }
+
+    private static ImmutableArray<string> GetIndexProperties(
+        LambdaExpressionSyntax lambda,
+        SemanticModel model,
+        IReadOnlyDictionary<string, IPropertySymbol> dtoProps,
+        CancellationToken ct)
+    {
+        if (lambda.Body is not AnonymousObjectCreationExpressionSyntax anonymous)
+        {
+            var single = lambda.TryGetPropertyNameFromLambdaStrict(model);
+            return single is not null && dtoProps.ContainsKey(single) ? ImmutableArray.Create(single) : default;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<string>(anonymous.Initializers.Count);
+        foreach (var initializer in anonymous.Initializers)
+        {
+            if (initializer.Expression is not MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax } member ||
+                model.GetSymbolInfo(member, ct).Symbol is not IPropertySymbol property ||
+                !dtoProps.ContainsKey(property.Name) ||
+                builder.Contains(property.Name))
+                return default;
+
+            builder.Add(property.Name);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableArray<IndexInfo> DistinctIndexes(
+        List<(IndexInfo Index, Location Location)> indexes,
+        ImmutableArray<string>.Builder ignored)
+    {
+        if (indexes.Count == 0) return ImmutableArray<IndexInfo>.Empty;
+
+        var result = ImmutableArray.CreateBuilder<IndexInfo>(indexes.Count);
+        foreach (var (index, _) in indexes)
+        {
+            if (index.Properties.Any(ignored.Contains)) continue;
+
+            var duplicate = false;
+            foreach (var existing in result)
+            {
+                if (existing.IsUnique != index.IsUnique || !existing.Properties.SequenceEqual(index.Properties)) continue;
+                duplicate = true;
+                break;
+            }
+
+            if (!duplicate) result.Add(index);
+        }
+
+        return result.ToImmutable();
+    }
+
     /// <summary>
     /// Resolves the property selected by a single inline-lambda argument (<c>x => x.Prop</c>), or null when
     /// the argument has another shape (method group, variable, nested member, unmapped property).

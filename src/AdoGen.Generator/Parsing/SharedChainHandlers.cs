@@ -231,6 +231,27 @@ internal sealed class ConcurrencyTokenChainHandler : IChainMethodHandler
     }
 }
 
+internal sealed class UniqueChainHandler : IChainMethodHandler
+{
+    private const string MethodName = "Unique";
+    private UniqueChainHandler() { }
+    public static UniqueChainHandler Instance { get; } = new();
+
+    public bool IsMatch(SqlProviderKind provider, string methodName) => methodName == MethodName;
+
+    public void Handle(
+        SemanticModel model,
+        INamedTypeSymbol dtoType,
+        string propertyName,
+        ChainMethod chain,
+        ParamConfig cfg,
+        ImmutableArray<Diagnostic>.Builder diagnosticsBuilder,
+        CancellationToken ct)
+    {
+        if (chain.Args.Count == 0) cfg.IsUnique = true;
+        else diagnosticsBuilder.Add(Diagnostic.Create(SqlDiagnostics.NonConstantArg, chain.Node.GetLocation(), dtoType.Name, propertyName));
+    }
+}
 
 internal sealed class IgnoreChainHandler : IChainMethodHandler
 {

@@ -77,11 +77,14 @@ public partial record User : ISqlDomainModel<global::AdoGen.Generator.Tests.User
 {
     private const string SqlCreateTable = 
         """
+        IF OBJECT_ID(N'[dbo].[Users]', N'U') IS NULL
+        BEGIN
         CREATE TABLE [dbo].[Users](
             [Id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
             [Name] VARCHAR(20) NOT NULL,
             [Email] VARCHAR(50) NOT NULL
-        ,CONSTRAINT [PK_Users] PRIMARY KEY ([Id]));
+            ,CONSTRAINT [PK_Users] PRIMARY KEY ([Id]));
+        END
         """;
     private const string SqlInsert = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES (@Id, @Name, @Email);";
     private const string SqlInsertBatchTemplate = "INSERT INTO [dbo].[Users] ([Id], [Name], [Email]) VALUES";

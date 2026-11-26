@@ -26,7 +26,7 @@ public abstract class SqlProfile<T>
     protected SqlProfile<T> Table(string name) => this;
     
     /// <summary>
-    /// Allows a custom schema. Default is dbo.
+    /// Allows a custom schema. Default is dbo. A missing schema is created by <c>CreateTableAsync</c>.
     /// </summary>
     /// <param name="name">Your schema name</param>
     /// <returns></returns>
@@ -46,6 +46,15 @@ public abstract class SqlProfile<T>
     /// <typeparam name="TProp"></typeparam>
     /// <returns></returns>
     protected SqlProfile<T> Identity<TProp>(Expression<Func<T, TProp>> selector) => this;
+
+    /// <summary>
+    /// Adds an index to the <c>CreateTableAsync</c> DDL. Has no effect on any other generated SQL.
+    /// Select a single property (<c>x => x.Email</c>) or several in key order (<c>x => new { x.LastName, x.FirstName }</c>).
+    /// The index is named <c>IX_{Table}_{Columns}</c>, or <c>UX_{Table}_{Columns}</c> when <paramref name="unique"/> is true.
+    /// </summary>
+    /// <param name="selector">Inline lambda selecting one property or an anonymous object of properties.</param>
+    /// <param name="unique">Creates a unique index. Must be a compile-time constant.</param>
+    protected SqlProfile<T> HasIndex<TProp>(Expression<Func<T, TProp>> selector, bool unique = false) => this;
 }
 
 /// <summary>
@@ -168,6 +177,12 @@ public sealed class SqlPropertyBuilder<TProp>
     /// When 0 rows are affected an <c>SqlConcurrencyException</c> is thrown.
     /// </summary>
     public SqlPropertyBuilder<TProp> ConcurrencyToken() => this;
+
+    /// <summary>
+    /// Adds a single-column unique constraint (<c>UQ_{Table}_{Column}</c>) to the <c>CreateTableAsync</c> DDL.
+    /// Has no effect on any other generated SQL. Use <c>HasIndex(..., unique: true)</c> on the profile for multi-column uniqueness.
+    /// </summary>
+    public SqlPropertyBuilder<TProp> Unique() => this;
 
     /// <summary>
     /// Excludes the property from mapping: it is not a column, is not read by <c>Map</c>, and is never
