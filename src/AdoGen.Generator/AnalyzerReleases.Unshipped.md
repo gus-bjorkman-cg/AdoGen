@@ -1,4 +1,4 @@
-\ufeff; Unshipped analyzer release
+﻿\ufeff; Unshipped analyzer release
 ; https://github.com/dotnet/roslyn-analyzers/blob/main/src/Microsoft.CodeAnalysis.Analyzers/ReleaseTrackingAnalyzers.Help.md
 
 ### New Rules
@@ -11,6 +11,8 @@
 | AG017   | Usage    | Error    | Unsupported property type            |
 | AG018   | Design   | Error    | Multiple profiles for the same type  |
 | AG019   | Usage    | Error    | Unsupported profile expression       |
+| AG020   | Design   | Info     | Key-only model                       |
+| AG021   | Usage    | Error    | Unknown profile method               |
 
 ### Removed Rules
 

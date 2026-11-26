@@ -22,7 +22,7 @@ internal static class SqlDiagnostics
 
     public static readonly DiagnosticDescriptor StringMissing = new(
         id: "AG004",
-        title: "String property requires explicit SqlDbType and Size",
+        title: "String property requires explicit type and size",
         messageFormat: "Type '{0}' has string property '{1}' without an explicit type and size in its profile",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error,
@@ -38,7 +38,7 @@ internal static class SqlDiagnostics
 
     public static readonly DiagnosticDescriptor BinaryMissing = new(
         id: "AG006",
-        title: "Binary property requires explicit SqlDbType and Size",
+        title: "Binary property requires explicit type and size",
         messageFormat: "Type '{0}' has binary property '{1}' without an explicit type and size in its profile",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error,
@@ -125,6 +125,20 @@ internal static class SqlDiagnostics
         id: "AG019",
         title: "Unsupported profile expression",
         messageFormat: "Profile call '{1}' for '{0}' must use an inline lambda that selects a mapped property of '{0}'",
+        category: "Usage",
+        DiagnosticSeverity.Error, true);
+
+    public static readonly DiagnosticDescriptor KeyOnlyModel = new(
+        id: "AG020",
+        title: "Key-only model",
+        messageFormat: "Type '{0}' has no writable non-key columns; UpdateAsync only verifies that the row exists and UpsertAsync inserts the row when missing and otherwise does nothing",
+        category: "Design",
+        DiagnosticSeverity.Info, true);
+
+    public static readonly DiagnosticDescriptor UnknownProfileMethod = new(
+        id: "AG021",
+        title: "Unknown profile method",
+        messageFormat: "Profile method '{1}' on property '{2}' of '{0}' is not recognized by the {3} generator and would be ignored",
         category: "Usage",
         DiagnosticSeverity.Error, true);
 }

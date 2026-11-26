@@ -1,7 +1,8 @@
 namespace AdoGen.Generator.Tests;
 
 /// <summary>
-/// Diagnostics and "generated code compiles" regressions for DTO/profile shapes (docs/analysis/BUGS.md B10–B19).
+/// Diagnostics and "generated code compiles" regressions for DTO/profile shapes (docs/analysis/BUGS.md B10–B19,
+/// FEATURES.md F1–F10). Every reachable AGxxx descriptor has at least one test here or in DomainTests.
 /// </summary>
 public sealed class GeneratorValidationTests
 {
@@ -349,4 +350,331 @@ public sealed class GeneratorValidationTests
         messages.Should().NotBeEmpty()
             .And.OnlyContain(m => m == $"Type 'Gadget' has no {profileName}. Create a class deriving from {profileName}<Gadget>.");
     }
+
+    // ── F9: one test per descriptor ───────────────────────────────────────────
+
+    [Theory]
+    [InlineData("SqlServer")]
+    [InlineData("PostgreSql")]
+    public void AG001_ShouldBeEmitted_WhenDtoIsNotPartial(string provider)
+    {
+        // Arrange
+        var (usings, genType, mapper, _) = Provider(provider);
+        var source = usings + $$"""
+
+            public sealed record Plain(int Id) : {{mapper}};
+            """;
+
+        // Act
+        var result = source.RunGenerator(genType);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG001");
+    }
+
+    [Fact]
+    public void AG004_ShouldBeEmitted_WhenSqlServerStringHasNoTypeAndSize()
+    {
+        // Arrange
+        var source = SqlUsings + """
+
+            public sealed partial record Tag(Guid Id, string Label) : ISqlDomainModel;
+            public sealed class TagProfile : SqlProfile<Tag>
+            {
+                public TagProfile() { }
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlDomainModel);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG004");
+    }
+
+    [Fact]
+    public void AG004_ShouldBeEmitted_WhenNpgsqlVarcharHasNoSize()
+    {
+        // Arrange
+        var source = NpgsqlUsings + """
+
+            using NpgsqlTypes;
+            public sealed partial record Tag(Guid Id, string Label) : INpgsqlDomainModel;
+            public sealed class TagProfile : NpgsqlProfile<Tag>
+            {
+                public TagProfile() => RuleFor(x => x.Label).Type(NpgsqlDbType.Varchar);
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.NpgsqlDomainModel);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG004");
+    }
+
+    [Theory]
+    [InlineData("SqlServer")]
+    [InlineData("PostgreSql")]
+    public void AG005_ShouldBeEmitted_WhenDecimalHasNoPrecisionAndScale(string provider)
+    {
+        // Arrange
+        var (usings, _, _, (genType, domain, profile)) = Provider(provider);
+        var source = usings + $$"""
+
+            public sealed partial record Price(Guid Id, decimal Amount) : {{domain}};
+            public sealed class PriceProfile : {{profile}}<Price>
+            {
+                public PriceProfile() { }
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(genType);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG005");
+    }
+
+    [Fact]
+    public void AG006_ShouldBeEmitted_WhenSqlServerBinaryHasNoTypeAndSize()
+    {
+        // Arrange
+        var source = SqlUsings + """
+
+            public sealed partial record Blob(Guid Id, byte[] Data) : ISqlDomainModel;
+            public sealed class BlobProfile : SqlProfile<Blob>
+            {
+                public BlobProfile() { }
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlDomainModel);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG006");
+    }
+
+    [Fact]
+    public void AG006_ShouldBeEmitted_WhenNpgsqlBinaryIsNotBytea()
+    {
+        // Arrange
+        var source = NpgsqlUsings + """
+
+            using NpgsqlTypes;
+            public sealed partial record Blob(Guid Id, byte[] Data) : INpgsqlDomainModel;
+            public sealed class BlobProfile : NpgsqlProfile<Blob>
+            {
+                public BlobProfile() => RuleFor(x => x.Data).Type(NpgsqlDbType.Text);
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.NpgsqlDomainModel);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG006");
+    }
+
+    [Theory]
+    [InlineData("SqlServer")]
+    [InlineData("PostgreSql")]
+    public void AG008_ShouldBeEmitted_WhenDomainModelHasNoKey(string provider)
+    {
+        // Arrange
+        var (usings, _, _, (genType, domain, profile)) = Provider(provider);
+        var source = usings + $$"""
+
+            public sealed partial record Event(Guid Code, int Value) : {{domain}};
+            public sealed class EventProfile : {{profile}}<Event>
+            {
+                public EventProfile() { }
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(genType);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG008");
+    }
+
+    [Fact]
+    public void AG010_ShouldBeEmitted_WhenDtoIsStatic()
+    {
+        // Arrange
+        var source = SqlUsings + """
+
+            public static partial class Holder : ISqlMapper
+            {
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlMapper);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG010");
+    }
+
+    [Fact]
+    public void AG011_ShouldBeEmitted_WhenDtoIsPrivate()
+    {
+        // Arrange
+        var source = SqlUsings + """
+
+            public partial class Outer
+            {
+                private partial record Hidden(int Id) : ISqlMapper;
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlMapper);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG011");
+    }
+
+    // ── F2: key-only models ───────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("SqlServer")]
+    [InlineData("PostgreSql")]
+    public void AG020_ShouldBeReportedAsInfoAndStillGenerate_WhenEveryColumnIsKey(string provider)
+    {
+        // Arrange
+        var (usings, _, _, (genType, domain, profile)) = Provider(provider);
+        var source = usings + $$"""
+
+            public sealed partial record Link(Guid LeftId, Guid RightId) : {{domain}};
+            public sealed class LinkProfile : {{profile}}<Link>
+            {
+                public LinkProfile()
+                {
+                    Key(x => x.LeftId);
+                    Key(x => x.RightId);
+                }
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(genType);
+        var errors = source.GetOutputCompilationErrors(genType);
+        var generated = result.Result.GetGeneratedText($"Link.Domain.{genType.Provider.ExtensionName}.g.cs");
+
+        // Assert
+        result.Diagnostics.Should().OnlyContain(d => d.Id == "AG020" && d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Info);
+        result.Diagnostics.Should().NotBeEmpty();
+        errors.Should().BeEmpty();
+        generated.Should().Contain("UpsertAsync");
+    }
+
+    [Fact]
+    public void AG020_ShouldBeReported_WhenNonKeyColumnsAreReadOnlyOrIdentity()
+    {
+        // Arrange
+        var source = SqlUsings + """
+
+            public sealed partial record Stamp(int Seq, Guid Code, DateTime CreatedAt) : ISqlDomainModel;
+            public sealed class StampProfile : SqlProfile<Stamp>
+            {
+                public StampProfile()
+                {
+                    Identity(x => x.Seq);
+                    Key(x => x.Code);
+                    RuleFor(x => x.CreatedAt).ReadOnly().DefaultValue("SYSUTCDATETIME()");
+                }
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlDomainModel);
+
+        // Assert
+        result.Diagnostics.Should().Contain(d => d.Id == "AG020");
+    }
+
+    [Theory]
+    [InlineData("Count")]
+    [InlineData("Version")]
+    public void AG020_ShouldNotBeReported_WhenModelHasWritableNonKeyColumn(string configuredColumn)
+    {
+        // Arrange
+        var source = SqlUsings + $$"""
+
+            public sealed partial record Counter(Guid Id, int Count, int Version) : ISqlDomainModel;
+            public sealed class CounterProfile : SqlProfile<Counter>
+            {
+                public CounterProfile()
+                {
+                    RuleFor(x => x.{{(configuredColumn == "Count" ? "Version" : "Count")}}).ReadOnly();
+                    RuleFor(x => x.{{configuredColumn}}){{(configuredColumn == "Version" ? ".ConcurrencyToken()" : "")}};
+                }
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlDomainModel);
+
+        // Assert
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AG020_ShouldNotBeReported_WhenDtoIsMapperOnly()
+    {
+        // Arrange
+        var source = SqlUsings + """
+
+            public sealed partial record Row(Guid Id) : ISqlMapper;
+            """;
+
+        // Act
+        var result = source.RunGenerator(AdoGenType.SqlMapper);
+
+        // Assert
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    // ── F3: unknown chain methods ─────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("SqlServer")]
+    [InlineData("PostgreSql")]
+    public void AG021_ShouldBeEmitted_WhenChainContainsUnknownMethod(string provider)
+    {
+        // Arrange
+        var (usings, _, _, (genType, domain, profile)) = Provider(provider);
+        var source = usings + $$"""
+
+            public static class PropertyBuilderExtensions
+            {
+                public static PropertyBuilder<T> Indexed<T>(this PropertyBuilder<T> builder) => builder;
+            }
+            public sealed partial record Widget(Guid Id, int Size) : {{domain}};
+            public sealed class WidgetProfile : {{profile}}<Widget>
+            {
+                public WidgetProfile() => RuleFor(x => x.Size).Indexed();
+            }
+            """;
+
+        // Act
+        var result = source.RunGenerator(genType);
+
+        // Assert
+        var messages = result.Diagnostics
+            .Where(d => d.Id == "AG021")
+            .Select(d => d.GetMessage(System.Globalization.CultureInfo.InvariantCulture))
+            .ToList();
+        messages.Should().NotBeEmpty()
+            .And.OnlyContain(m => m.Contains("'Indexed'") && m.Contains("'Size'") && m.Contains("'Widget'"));
+    }
+
+    private static (string Usings, AdoGenType MapperType, string MapperInterface, (AdoGenType DomainType, string DomainInterface, string ProfileBase) Domain)
+        Provider(string provider) =>
+        provider == "SqlServer"
+            ? (SqlUsings, AdoGenType.SqlMapper, "ISqlMapper", (AdoGenType.SqlDomainModel, "ISqlDomainModel", "SqlProfile"))
+            : (NpgsqlUsings, AdoGenType.NpgsqlMapper, "INpgsqlMapper", (AdoGenType.NpgsqlDomainModel, "INpgsqlDomainModel", "NpgsqlProfile"));
 }

@@ -146,6 +146,14 @@ internal static class DiscoveryValidation
                     property.Type.ToDisplayString()));
             }
 
+            if (dto.Kind is SqlModelKind.Domain or SqlModelKind.Bulk && profile.IsKeyOnly())
+            {
+                diagnostics.Add(Diagnostic.Create(
+                    SqlDiagnostics.KeyOnlyModel,
+                    dto.Dto.Locations.FirstOrDefault() ?? Location.None,
+                    dto.Dto.Name));
+            }
+
             // Validate concurrency tokens
             var concurrencyTokenCount = 0;
             
@@ -197,6 +205,23 @@ internal static class DiscoveryValidation
         });
     }
     
+    /// <summary>
+    /// True when the model has a key but no column an UPDATE could write: every non-key column is an
+    /// identity or read-only. UpdateAsync is then a no-op existence check and UpsertAsync insert-if-missing.
+    /// </summary>
+    private static bool IsKeyOnly(this ProfileInfo profile)
+    {
+        if (profile.Keys.IsDefaultOrEmpty) return false;
+
+        foreach (var kvp in profile.ParamsByProperty)
+        {
+            if (profile.Keys.Contains(kvp.Key) || profile.IdentityKeys.Contains(kvp.Key)) continue;
+            if (!kvp.Value.IsReadOnly) return false;
+        }
+
+        return true;
+    }
+
     private static string ProfileBaseName(SqlProviderKind provider) =>
         provider is SqlProviderKind.PostgreSql ? "NpgsqlProfile" : "SqlProfile";
 

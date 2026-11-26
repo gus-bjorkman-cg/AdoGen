@@ -34,7 +34,8 @@ internal sealed class SqlBuilderGenerator : IIncrementalGenerator
                 for (var i = 0; i < validatedDto.Diagnostics.Length; i++) spc.ReportDiagnostic(validatedDto.Diagnostics[i]);
 
                 if (validatedDto.Discovery.Kind == SqlModelKind.None) return;
-                if (validatedDto.Diagnostics.Length != 0) return;
+                for (var i = 0; i < validatedDto.Diagnostics.Length; i++)
+                    if (validatedDto.Diagnostics[i].Severity == DiagnosticSeverity.Error) return;
 
                 var dto = validatedDto.Discovery;
                 var ctx = EmitContextBuilder.Build(validatedDto);

@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using AdoGen.Generator.Extensions;
+using AdoGen.Generator.Diagnostics;
 using AdoGen.Generator.Models;
 using AdoGen.Generator.Parsing.PostgreSql;
 using AdoGen.Generator.Parsing.SqlServer;
@@ -77,13 +77,26 @@ internal static class ConfigureChainParser
 
         foreach (var chain in chainMethods)
         {
+            var handled = false;
+
             for (var i = 0; i < Handlers.Count; i++)
             {
                 if (!Handlers[i].IsMatch(provider, chain.Name)) continue;
                 
                 Handlers[i].Handle(model, dtoType, propName, chain, cfg, diagnosticsBuilder, ct);
+                handled = true;
                 break;
             }
+
+            if (handled) continue;
+
+            diagnosticsBuilder.Add(Diagnostic.Create(
+                SqlDiagnostics.UnknownProfileMethod,
+                chain.Node.GetLocation(),
+                dtoType.Name,
+                chain.Name,
+                propName,
+                provider is SqlProviderKind.PostgreSql ? "PostgreSQL" : "SQL Server"));
         }
 
         configs[cfg.PropertyName] = cfg;
